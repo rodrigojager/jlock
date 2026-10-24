@@ -9,6 +9,7 @@ repository = "https://github.com/rodrigojager/jlock"
 readme = "README.md"
 keywords = ["lock", "flock", "mutex", "cli", "concurrency"]
 categories = ["command-line-utilities", "concurrency"]
+exclude = ["docs/evidence", ".github", ".scratch", "install.sh", "install.ps1"]
 
 [[bin]]
 name = "jlock"
@@ -33,3 +34,12 @@ libc = "0.2"
 
 [profile.release]
 strip = true
+
+# `cargo binstall jlock` downloads the archives of the GitHub Release (see .github/workflows/release.yml).
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }{ archive-suffix }"
+bin-dir = "{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-fmt = "zip"

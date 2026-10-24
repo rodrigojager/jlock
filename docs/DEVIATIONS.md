@@ -81,3 +81,12 @@ what was decided during implementation and why.
 - **Done instead:** the table is pure data in `src/commands.rs` (included by `tests/help.rs` with
   `#[path]`); `src/help.rs` renders it and checks the options against it. Still one table, used by both
   the help and the dispatcher.
+
+## 10. `x86_64-apple-darwin` is built on an arm64 macOS runner (ticket 14)
+
+- **What:** ticket 14 builds `x86_64-apple-darwin` on `macos-13`, the Intel runner.
+- **Why not:** GitHub retired the `macos-13` runners; a workflow that names them waits for a runner that
+  never comes.
+- **Done instead:** the Intel binary is cross-built on `macos-14` (Apple's toolchain targets both
+  architectures). The test suite still runs on that runner, for arm64; the Intel binary is not tested
+  natively before it is published.

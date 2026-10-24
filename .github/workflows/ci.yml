@@ -21,7 +21,13 @@ jobs:
       - name: Lint
         run: cargo clippy --all-targets -- -D warnings
       - name: Test
-        run: cargo test
+        run: cargo test --no-fail-fast
+        env:
+          # 200 cycles of the stress test in CI (1000 locally): CI runners are slower.
+          JLOCK_TEST_CYCLES: "200"
+      - name: Shellcheck install.sh
+        if: runner.os == 'Linux'
+        run: shellcheck install.sh
       - name: Build release
         run: cargo build --release
       - name: Upload binary
