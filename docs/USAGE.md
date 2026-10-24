@@ -348,14 +348,18 @@ jlock run D:\proj\dist -- npm run build           # one build at a time on this 
 jlock run name:port-3000 --timeout 2m -- ./serve  # give up after 2 minutes (exit 11)
 ```
 
-## From an agent: `acquire` + `hold` + `release`
+## From an agent: `hold --detach` + `release`
 
-1. Before editing, take the files or folders, with an identity that survives across commands:
-   `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   (`queued`/`timeout` mean someone else has them: wait, or pick other work).
-2. Keep them alive while the task runs: start `jlock hold src/parser.rs src/lexer.rs --owner agent-7`
-   in the background (it is granted at once, since you already hold them), or call
-   `jlock heartbeat <key> --owner agent-7` more often than `JLOCK_STALE_MS`.
-3. When done: send `release` to the `hold` process's standard input, or
-   `jlock release --group task-42 --owner agent-7`.
-4. If `hold` exits 14 the lock was taken away (forced or expired): stop editing.
+1. Before editing, take every file or folder of the task in one call, with an identity that survives
+   across commands:
+   `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --ttl 2h --timeout 2m --detach`.
+   It answers (`granted`, or `timeout`/exit 11 if someone else kept them past `--timeout`; with
+   `--no-wait`, `busy`/exit 10 at once) and returns; a background `jlock hold` keeps the lock alive.
+2. After a long pause, `jlock heartbeat <key> --owner agent-7` says whether the lock is still yours
+   (exit 13 `lost` if it was broken or expired).
+3. When done (or when the task fails): `jlock release --group task-42 --owner agent-7`. The background
+   process notices and ends.
+
+Plain `acquire` is not enough for an agent: its lock expires after `JLOCK_STALE_MS` (30 s) without a
+`heartbeat`, and an agent spends minutes between two commands. The skills in
+[`skills/`](../skills/README.md) teach Claude Code, OpenCode and Codex this workflow.

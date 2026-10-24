@@ -70,6 +70,35 @@ source: `cargo install --path .`. Ensuite, dans un nouveau terminal, vérifiez q
 jlock doctor
 ```
 
+**Apprenez à votre agent IA à s'en servir.** Le dossier [`skills/`](skills/README.md) contient une skill pour
+Claude Code, OpenCode et Codex. Elle indique à l'agent quand prendre un verrou, quelles commandes et options
+utiliser, et que faire quand un fichier est pris. Une seule commande l'installe pour votre agent; ouvrez
+ensuite une nouvelle session de l'agent.
+
+Linux et macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows (PowerShell):
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+Pour installer une skill dans un seul projet, et pour d'autres détails, voir [`skills/README.md`](skills/README.md).
+
 ## Cinq minutes
 
 Alice prend un verrou sur un nom. Bob demande le même sans attendre, et on lui dit qui l'a. Puis Alice le

@@ -248,6 +248,18 @@ fn every_readme_has_the_same_shape() {
             commands(&english),
             "{tag}: example commands"
         );
+        assert!(
+            text.contains("](skills/README.md)"),
+            "{tag}: link to the skills"
+        );
+        for tool in ["claude-code", "opencode", "codex"] {
+            let url = format!("/main/skills/{tool}/jlock/SKILL.md");
+            assert_eq!(
+                text.matches(&url).count(),
+                2,
+                "{tag}: install commands for {tool}"
+            );
+        }
         assert!(text.contains(&about_const("GITHUB")), "{tag}: GitHub link");
         assert!(
             text.contains(&about_const("LINKEDIN")),

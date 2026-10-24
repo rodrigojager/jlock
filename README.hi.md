@@ -69,6 +69,35 @@ Rust के साथ: `cargo install jlock`, `cargo binstall jlock` (रिल�
 jlock doctor
 ```
 
+**अपने AI एजेंट को इसका उपयोग सिखाएँ।** [`skills/`](skills/README.md) फ़ोल्डर में Claude Code, OpenCode और
+Codex के लिए एक स्किल है। यह एजेंट को बताती है कि लॉक कब लेना है, कौन-सी कमांड और विकल्प उपयोग करने हैं, और
+कोई फ़ाइल ली हुई हो तो क्या करना है। एक कमांड इसे आपके एजेंट के लिए इंस्टॉल कर देती है; उसके बाद एजेंट का एक
+नया सत्र शुरू करें।
+
+Linux और macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows (PowerShell):
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+स्किल को केवल एक प्रोजेक्ट के लिए इंस्टॉल करने और अन्य विवरणों के लिए, [`skills/README.md`](skills/README.md) देखें।
+
 ## पाँच मिनट में
 
 Alice एक नाम पर लॉक लेती है। Bob बिना प्रतीक्षा किए वही नाम माँगता है और उसे बताया जाता है कि वह किसके पास है।

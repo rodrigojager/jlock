@@ -79,6 +79,42 @@ jlock doctor
 
 </div>
 
+**علّم وكيل الذكاء الاصطناعي الخاص بك أن يستخدم jlock.** يحتوي المجلد [`skills/`](skills/README.md) على مهارة (skill)
+لكل من Claude Code و OpenCode و Codex. تخبر المهارة الوكيل متى يأخذ قفلًا، وأي الأوامر والخيارات يستخدم، وماذا
+يفعل حين يكون الملف مشغولًا. أمر واحد يثبّتها لوكيلك؛ ثم افتح جلسة جديدة للوكيل.
+
+على Linux و macOS:
+
+<div dir="ltr">
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+</div>
+
+على Windows (PowerShell):
+
+<div dir="ltr">
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+</div>
+
+لتثبيت المهارة لمشروع واحد فقط، ولتفاصيل أخرى، راجع [`skills/README.md`](skills/README.md).
+
 ## خمس دقائق
 
 تأخذ أليس (`alice`) قفلًا على اسم. ثم يطلب بوب (`bob`) الاسم نفسه دون أن ينتظر، فيُخبَر بمن يملكه. بعد ذلك

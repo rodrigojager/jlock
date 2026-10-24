@@ -52,6 +52,32 @@ Rust があれば、`cargo install jlock`、`cargo binstall jlock`（リリー�
 jlock doctor
 ```
 
+**AI エージェントに jlock の使い方を教える。** [`skills/`](skills/README.md) フォルダには、Claude Code、OpenCode、Codex 向けのスキルがある。スキルはエージェントに、いつロックを取得するか、どのコマンドとオプションを使うか、ファイルが使用中のときにどうするかを教える。1 つのコマンドでエージェントにスキルがインストールされる。その後、エージェントの新しいセッションを始める。
+
+Linux と macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows（PowerShell）:
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+1 つのプロジェクトだけにスキルをインストールする方法などの詳細は、[`skills/README.md`](skills/README.md) を参照。
+
 ## 5 分で試す
 
 アリスがある名前のロックを取得する。ボブは待たずに同じものを求め、誰が持っているかを知らされる。その後、アリスがロックを返す。

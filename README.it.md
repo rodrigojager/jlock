@@ -68,6 +68,35 @@ codice sorgente: `cargo install --path .`. Poi, in un nuovo terminale, controlla
 jlock doctor
 ```
 
+**Insegna al tuo agente di IA a usarlo.** La cartella [`skills/`](skills/README.md) contiene una skill per
+Claude Code, OpenCode e Codex. Dice all'agente quando prendere un blocco, quali comandi e opzioni usare e
+cosa fare quando un file è occupato. Un solo comando la installa per il tuo agente; poi apri una nuova
+sessione dell'agente.
+
+Linux e macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows (PowerShell):
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+Per installare la skill in un solo progetto, e per altri dettagli, vedi [`skills/README.md`](skills/README.md).
+
 ## Cinque minuti
 
 Alice prende un blocco su un nome. Bob chiede lo stesso senza attendere e gli viene detto chi ce l'ha. Poi

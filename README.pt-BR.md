@@ -68,6 +68,35 @@ fonte: `cargo install --path .`. Depois, num terminal novo, confira se está tud
 jlock doctor
 ```
 
+**Ensine o seu agente de IA a usar o jlock.** A pasta [`skills/`](skills/README.md) tem uma skill para
+Claude Code, OpenCode e Codex. Ela diz ao agente quando pegar uma trava, quais comandos e opções usar e o
+que fazer quando um arquivo está ocupado. Um comando instala a skill no seu agente; depois, abra uma sessão
+nova do agente.
+
+Linux e macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows (PowerShell):
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+Para instalar a skill só num projeto, e outros detalhes, veja [`skills/README.md`](skills/README.md).
+
 ## Cinco minutos
 
 Alice pega a trava de um nome. Bob pede o mesmo nome sem esperar e fica sabendo quem está com ele. Depois

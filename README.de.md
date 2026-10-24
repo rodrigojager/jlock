@@ -69,6 +69,35 @@ dem Quellcode: `cargo install --path .`. Prüfe danach in einem neuen Terminal, 
 jlock doctor
 ```
 
+**Bring deinem KI-Agenten bei, jlock zu benutzen.** Der Ordner [`skills/`](skills/README.md) enthält eine
+Skill für Claude Code, OpenCode und Codex. Sie sagt dem Agenten, wann er eine Sperre nehmen soll, welche
+Befehle und Optionen er verwenden soll und was zu tun ist, wenn eine Datei belegt ist. Ein Befehl installiert
+sie für deinen Agenten; starte danach eine neue Sitzung des Agenten.
+
+Linux und macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows (PowerShell):
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+Weitere Details, etwa wie du eine Skill nur für ein Projekt installierst, findest du in [`skills/README.md`](skills/README.md).
+
 ## Fünf Minuten
 
 Alice nimmt eine Sperre auf einen Namen. Bob fragt nach demselben Namen, ohne zu warten, und erfährt, wer

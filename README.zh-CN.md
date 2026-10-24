@@ -52,6 +52,32 @@ irm https://raw.githubusercontent.com/rodrigojager/jlock/main/install.ps1 | iex
 jlock doctor
 ```
 
+**教你的 AI 智能体使用它。** [`skills/`](skills/README.md) 文件夹里有一个适用于 Claude Code、OpenCode 和 Codex 的技能（skill）。它告诉智能体何时获取锁、该用哪些命令和选项，以及文件被占用时该怎么做。一条命令就能为你的智能体安装它；安装后请重新开启一个智能体会话。
+
+Linux 和 macOS：
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows（PowerShell）：
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+如果只想为单个项目安装技能，以及其他细节，请参阅 [`skills/README.md`](skills/README.md)。
+
 ## 五分钟上手
 
 Alice 获取一个名称的锁。Bob 不等待地请求同一个名称，得到的回答是谁持有它。然后 Alice 把它归还：

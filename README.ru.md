@@ -68,6 +68,35 @@ irm https://raw.githubusercontent.com/rodrigojager/jlock/main/install.ps1 | iex
 jlock doctor
 ```
 
+**Научите своего ИИ-агента пользоваться jlock.** В папке [`skills/`](skills/README.md) есть навык (skill) для
+Claude Code, OpenCode и Codex. Он подсказывает агенту, когда брать блокировку, какие команды и параметры
+использовать и что делать, если файл занят. Одна команда устанавливает навык для вашего агента; после этого
+начните новую сессию агента.
+
+Linux и macOS:
+
+```
+# Claude Code
+mkdir -p ~/.claude/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -o ~/.claude/skills/jlock/SKILL.md
+# OpenCode
+mkdir -p ~/.config/opencode/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -o ~/.config/opencode/skills/jlock/SKILL.md
+# Codex
+mkdir -p ~/.agents/skills/jlock && curl -fsSL https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -o ~/.agents/skills/jlock/SKILL.md
+```
+
+Windows (PowerShell):
+
+```
+# Claude Code
+New-Item -ItemType Directory -Force "$HOME\.claude\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/claude-code/jlock/SKILL.md -OutFile "$HOME\.claude\skills\jlock\SKILL.md"
+# OpenCode
+New-Item -ItemType Directory -Force "$HOME\.config\opencode\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/opencode/jlock/SKILL.md -OutFile "$HOME\.config\opencode\skills\jlock\SKILL.md"
+# Codex
+New-Item -ItemType Directory -Force "$HOME\.agents\skills\jlock" | Out-Null; irm https://raw.githubusercontent.com/rodrigojager/jlock/main/skills/codex/jlock/SKILL.md -OutFile "$HOME\.agents\skills\jlock\SKILL.md"
+```
+
+Как установить навык только для одного проекта, а также другие подробности — см. [`skills/README.md`](skills/README.md).
+
 ## Пять минут
 
 Алиса берёт блокировку на имя. Боб просит то же самое без ожидания и узнаёт, у кого оно. Затем Алиса
