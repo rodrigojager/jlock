@@ -44,8 +44,10 @@ résoudre tout ceci:
 |---|---|---|
 | Modes de partage de Windows (ouvrir un fichier en exclusif) | le SE refuse les autres ouvertures | ne dure que tant que le fichier est ouvert (quelques millisecondes pour un éditeur); bloque aussi votre propre éditeur; pas de file d'attente, pas de « qui » |
 | Mutex nommé de Windows | un verrou qui meurt avec son processus | exige un processus qui le tienne en permanence; pas d'ordre équitable; pas de liste |
-| `flock(1)` + `lslocks` (Linux) | garder un verrou pendant qu'une commande tourne; liste par PID | absent de Windows; pas d'ordre d'arrivée; aucune identité au-delà d'un PID; pas de détection d'interblocage; impossible de garder un verrou d'une commande à l'autre |
+| `flock(1)` + `lslocks` (Linux) | garder un verrou pendant qu'une commande tourne; liste par PID | absent de Windows; pas d'ordre d'arrivée; aucune identité au-delà d'un PID (impossible de savoir quel agent ou quelle tâche tient le fichier); pas de détection d'interblocage; impossible de garder un verrou d'une commande à l'autre |
 | `proper-lockfile` (npm) | verrouiller des dossiers, détection des verrous abandonnés par la mtime | pas de file d'attente (nouvelles tentatives au hasard); pas de CLI; pas de liste globale |
+
+**Pourquoi l'identité compte.** Un PID dit seulement quel processus tient le fichier, et les processus d'un agent naissent et meurent sans cesse: chaque modification, chaque commande shell est un nouveau processus. Ce qu'il faut savoir, c'est *qui* tient le fichier et *pour quoi faire*. jlock l'enregistre avec chaque verrou: `--owner` nomme l'agent ou la session (`claude:a8ec2aca`), `--group` la tâche sur laquelle il travaille (`tache-42`), `--intent` ce qu'il fait ("T4: refactoriser le parseur") et `--meta` toute donnée supplémentaire (`--meta task=T04`). Ainsi, qui coordonne des agents en parallèle voit quel agent et quelle tâche tiennent chaque fichier (`jlock list`), rend d'un coup les fichiers d'une tâche (`jlock release --group tache-42`) et distribue des tâches qui ne touchent pas les mêmes fichiers. Les scripts et les personnes en profitent aussi, mais ce sont les agents d'IA qui travaillent côte à côte qui le rendent nécessaire: ils modifient en quelques millisecondes, gardent les fichiers pendant des minutes, et rien d'autre sur la machine ne sait qui ils sont.
 
 ## Installation
 

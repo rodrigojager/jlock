@@ -43,8 +43,10 @@ Abwechseln klingt einfach. Es auf einem Rechner ohne Server richtig zu machen, h
 |---|---|---|
 | Windows-Freigabemodi (eine Datei exklusiv öffnen) | das Betriebssystem verweigert anderen das Öffnen | gilt nur, solange die Datei offen ist (bei einem Editor Millisekunden); blockiert auch deinen eigenen Editor; keine Warteschlange, kein „wer“ |
 | Benannter Mutex unter Windows | eine Sperre, die mit ihrem Prozess stirbt | braucht einen Prozess, der sie die ganze Zeit hält; keine faire Reihenfolge; keine Liste |
-| `flock(1)` + `lslocks` (Linux) | eine Sperre halten, während ein Befehl läuft; Liste nach PID | nicht unter Windows; keine Reihenfolge der Ankunft; keine Identität außer einer PID; keine Deadlock-Erkennung; kann nicht über getrennte Befehle hinweg halten |
+| `flock(1)` + `lslocks` (Linux) | eine Sperre halten, während ein Befehl läuft; Liste nach PID | nicht unter Windows; keine Reihenfolge der Ankunft; keine Identität außer einer PID (sagt nicht, welcher Agent oder welche Aufgabe die Datei hält); keine Deadlock-Erkennung; kann nicht über getrennte Befehle hinweg halten |
 | `proper-lockfile` (npm) | sperrt Ordner, erkennt tote Sperren an der mtime | keine Warteschlange (zufällige Wiederholungen); kein CLI; keine globale Liste |
+
+**Warum die Identität zählt.** Eine PID sagt nur, welcher Prozess die Datei hält, und die Prozesse eines Agenten kommen und gehen ständig: Jede Änderung, jeder Shell-Befehl ist ein neuer Prozess. Wissen musst du aber, *wer* die Datei hält und *wofür*. jlock speichert das mit jeder Sperre: `--owner` nennt den Agenten oder die Sitzung (`claude:a8ec2aca`), `--group` die Aufgabe, an der er arbeitet (`aufgabe-42`), `--intent`, was er gerade tut („T4: Parser umbauen“), und `--meta` beliebige weitere Daten (`--meta task=T04`). So sieht, wer Agenten parallel koordiniert, welcher Agent und welche Aufgabe jede Datei halten (`jlock list`), gibt die Dateien einer Aufgabe auf einmal zurück (`jlock release --group aufgabe-42`) und verteilt Aufgaben, die nicht dieselben Dateien berühren. Skripte und Menschen profitieren auch davon, aber notwendig machen es die KI-Agenten, die nebeneinander arbeiten: Sie ändern Dateien in Millisekunden, halten sie minutenlang, und nichts sonst auf dem Rechner weiß, wer sie sind.
 
 ## Installation
 

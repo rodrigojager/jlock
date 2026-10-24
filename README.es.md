@@ -42,8 +42,10 @@ Turnarse parece sencillo. Hacerlo bien en una sola máquina, sin servidor, oblig
 |---|---|---|
 | Modos de compartición de Windows (abrir un archivo en exclusiva) | el SO rechaza las demás aperturas | solo dura mientras el archivo está abierto (milisegundos para un editor); bloquea también a tu propio editor; sin cola, sin "quién" |
 | Mutex con nombre de Windows | un bloqueo que muere con su proceso | necesita un proceso que lo mantenga todo el tiempo; sin orden justo; sin lista |
-| `flock(1)` + `lslocks` (Linux) | mantener un bloqueo mientras corre un comando; listar por PID | no existe en Windows; sin orden de llegada; sin identidad más allá de un PID; sin detección de deadlock; no puede mantenerse entre comandos separados |
+| `flock(1)` + `lslocks` (Linux) | mantener un bloqueo mientras corre un comando; listar por PID | no existe en Windows; sin orden de llegada; sin identidad más allá de un PID (no dice qué agente o tarea tiene el archivo); sin detección de deadlock; no puede mantenerse entre comandos separados |
 | `proper-lockfile` (npm) | bloquear carpetas, detección de abandonados por mtime | sin cola (reintentos al azar); sin CLI; sin lista global |
+
+**Por qué importa la identidad.** Un PID solo dice qué proceso tiene el archivo, y los procesos de un agente nacen y mueren todo el tiempo: cada edición, cada comando de shell es un proceso nuevo. Lo que hace falta saber es *quién* tiene el archivo y *para qué*. jlock lo guarda en cada bloqueo: `--owner` dice qué agente o sesión (`claude:a8ec2aca`), `--group` en qué tarea está trabajando (`tarea-42`), `--intent` qué está haciendo ("T4: refactorizar el parser") y `--meta` cualquier dato adicional (`--meta task=T04`). Así, quien coordina agentes en paralelo ve qué agente y qué tarea tienen cada archivo (`jlock list`), devuelve de una vez los archivos de una tarea (`jlock release --group tarea-42`) y reparte tareas que no tocan los mismos archivos. Los scripts y las personas también se benefician, pero son los agentes de IA trabajando lado a lado los que lo hacen necesario: editan en milisegundos, se quedan con los archivos durante minutos, y nada más en la máquina sabe quiénes son.
 
 ## Instalación
 

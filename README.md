@@ -40,8 +40,10 @@ Taking turns sounds simple. Doing it right on one machine, with no server, means
 |---|---|---|
 | Windows share modes (open a file exclusively) | the OS refuses other opens | lasts only while the file is open (milliseconds for an editor); blocks your own editor too; no queue, no "who" |
 | Windows named mutex | a lock that dies with its process | needs a process holding it the whole time; no fair order; no list |
-| `flock(1)` + `lslocks` (Linux) | hold a lock while a command runs; list by PID | not on Windows; no arrival order; no identity beyond a PID; no deadlock detection; cannot hold across separate commands |
+| `flock(1)` + `lslocks` (Linux) | hold a lock while a command runs; list by PID | not on Windows; no arrival order; no identity beyond a PID (it cannot tell which agent or task holds the file); no deadlock detection; cannot hold across separate commands |
 | `proper-lockfile` (npm) | lock folders, stale detection by mtime | no queue (random retries); no CLI; no global list |
+
+**Why the identity matters.** A PID says only which process holds a file, and an agent's processes come and go all the time: every edit, every shell command is a new one. What you need to know is *who* holds the file and *for what*. jlock records that with every lock: `--owner` names the agent or session (`claude:a8ec2aca`), `--group` the task it is working on (`task-42`), `--intent` what it is doing ("T4: refactor the parser"), and `--meta` any extra data (`--meta task=T04`). With that, whoever runs agents in parallel can see which agent and which task holds each file (`jlock list`), give all of a task's files back at once (`jlock release --group task-42`), and hand out tasks that do not touch the same files. Scripts and people benefit too, but it is AI agents working side by side that make this necessary: they edit in milliseconds, keep files for minutes, and nothing else on the machine knows who they are.
 
 ## Install
 

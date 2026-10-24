@@ -42,8 +42,10 @@ questo:
 |---|---|---|
 | Modalità di condivisione di Windows (aprire un file in esclusiva) | il SO rifiuta le altre aperture | dura solo finché il file è aperto (millisecondi per un editor); blocca anche il tuo editor; nessuna coda, nessun "chi" |
 | Mutex con nome di Windows | un blocco che muore con il suo processo | richiede un processo che lo tenga per tutto il tempo; nessun ordine equo; nessun elenco |
-| `flock(1)` + `lslocks` (Linux) | tiene un blocco mentre un comando è in esecuzione; elenco per PID | non esiste su Windows; nessun ordine di arrivo; nessuna identità oltre al PID; nessun rilevamento dei deadlock; non può tenere un blocco tra comandi separati |
+| `flock(1)` + `lslocks` (Linux) | tiene un blocco mentre un comando è in esecuzione; elenco per PID | non esiste su Windows; nessun ordine di arrivo; nessuna identità oltre al PID (non dice quale agente o attività tiene il file); nessun rilevamento dei deadlock; non può tenere un blocco tra comandi separati |
 | `proper-lockfile` (npm) | blocca cartelle, rileva i blocchi abbandonati tramite mtime | nessuna coda (tentativi casuali); nessuna CLI; nessun elenco globale |
+
+**Perché l'identità conta.** Un PID dice solo quale processo tiene il file, e i processi di un agente nascono e muoiono di continuo: ogni modifica, ogni comando di shell è un processo nuovo. Quello che serve sapere è *chi* tiene il file e *per fare cosa*. jlock lo registra con ogni blocco: `--owner` indica l'agente o la sessione (`claude:a8ec2aca`), `--group` l'attività su cui sta lavorando (`attivita-42`), `--intent` cosa sta facendo ("T4: rifattorizzare il parser") e `--meta` qualsiasi dato in più (`--meta task=T04`). Così chi coordina agenti in parallelo vede quale agente e quale attività tengono ogni file (`jlock list`), restituisce in un colpo i file di un'attività (`jlock release --group attivita-42`) e distribuisce attività che non toccano gli stessi file. Anche script e persone ne traggono vantaggio, ma sono gli agenti IA che lavorano fianco a fianco a renderlo necessario: modificano in millisecondi, tengono i file per minuti, e nient'altro sulla macchina sa chi sono.
 
 ## Installazione
 

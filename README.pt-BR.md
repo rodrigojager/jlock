@@ -42,8 +42,10 @@ Revezar parece simples. Fazer isso direito numa máquina só, sem servidor, exig
 |---|---|---|
 | Modos de compartilhamento do Windows (abrir um arquivo em modo exclusivo) | o SO recusa outras aberturas | dura só enquanto o arquivo está aberto (milissegundos, para um editor); bloqueia também o seu próprio editor; sem fila, sem "quem" |
 | Mutex nomeado do Windows | uma trava que morre com o seu processo | exige um processo segurando-a o tempo todo; sem ordem justa; sem lista |
-| `flock(1)` + `lslocks` (Linux) | segura uma trava enquanto um comando roda; lista por PID | não existe no Windows; sem ordem de chegada; nenhuma identidade além do PID; sem detecção de deadlock; não segura entre comandos separados |
+| `flock(1)` + `lslocks` (Linux) | segura uma trava enquanto um comando roda; lista por PID | não existe no Windows; sem ordem de chegada; nenhuma identidade além do PID (não diz qual agente ou tarefa está com o arquivo); sem detecção de deadlock; não segura entre comandos separados |
 | `proper-lockfile` (npm) | trava pastas, detecta travas abandonadas pelo mtime | sem fila (tentativas aleatórias); sem CLI; sem lista global |
+
+**Por que a identidade importa.** Um PID só diz qual processo está com o arquivo, e os processos de um agente nascem e morrem o tempo todo: cada edição, cada comando de shell é um processo novo. O que se precisa saber é *quem* está com o arquivo e *para quê*. O jlock guarda isso em cada trava: `--owner` diz qual agente ou sessão (`claude:a8ec2aca`), `--group` em qual tarefa ele está trabalhando (`tarefa-42`), `--intent` o que está fazendo ("T4: refatorar o parser") e `--meta` qualquer dado a mais (`--meta task=T04`). Com isso, quem coordena agentes em paralelo vê qual agente e qual tarefa estão com cada arquivo (`jlock list`), devolve de uma vez os arquivos de uma tarefa (`jlock release --group tarefa-42`) e distribui tarefas que não mexem nos mesmos arquivos. Scripts e pessoas também ganham com isso, mas são os agentes de IA trabalhando lado a lado que tornam isso necessário: editam em milissegundos, ficam com os arquivos por minutos, e nada mais na máquina sabe quem eles são.
 
 ## Instalação
 
