@@ -44,19 +44,27 @@ pub fn is_not_empty(e: &io::Error) -> bool {
 /// Runs `op` on `path`, waiting and retrying while it fails with a transient error. If it still
 /// fails that way after the last wait, the error names the path (the OS message alone does not).
 pub fn retry<T>(path: &Path, mut op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+    let mut result = op();
     for delay in RETRY_DELAYS_MS {
-        match op() {
-            Err(e) if is_transient(&e) => sleep(Duration::from_millis(delay)),
-            other => return other,
+        match &result {
+            Err(e) if is_transient(e) => {
+                sleep(Duration::from_millis(delay));
+                result = op();
+            }
+            _ => break,
         }
     }
-    op().map_err(|e| {
-        if is_transient(&e) {
-            io::Error::new(e.kind(), format!("{}: {e}", path.display()))
-        } else {
-            e
-        }
-    })
+    result.map_err(|e| with_path(path, e))
+}
+
+/// The error with the path in its message (the OS message alone does not say which file), keeping
+/// its kind. "Not found" and "already exists" stay as they are: callers handle them.
+pub fn with_path(path: &Path, e: io::Error) -> io::Error {
+    if is_not_found(&e) || is_exists(&e) {
+        e
+    } else {
+        io::Error::new(e.kind(), format!("{}: {e}", path.display()))
+    }
 }
 
 /// Creates a folder and its parents. Unlike plain `create_dir_all`, a folder that a concurrent
@@ -115,7 +123,15 @@ pub fn rmdir_if_empty(path: &Path) -> io::Result<bool> {
 pub fn touch(path: &Path) -> io::Result<()> {
     retry(path, || {
         let file = OpenOptions::new().write(true).open(path)?;
-        file.set_modified(SystemTime::now())
+        file.set_modified(SystemTime::now()).map_err(|e| {
+            // macOS answers EINVAL, not ENOENT, when the file was deleted after it was opened (an
+            // expirer removed it in between): that is "not found", which callers handle.
+            if path.exists() {
+                e
+            } else {
+                io::Error::new(io::ErrorKind::NotFound, e.to_string())
+            }
+        })
     })
 }
 
