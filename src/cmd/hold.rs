@@ -1,5 +1,6 @@
 //! `jlock hold`: take the keys, then stay alive renewing the heartbeat until a `release` line on
-//! stdin, CTRL+C/SIGTERM, or the end of the process. A lost lock ends it with 14.
+//! stdin (or, with `--release-on-eof`, the end of stdin: the host holding the pipe is gone),
+//! CTRL+C/SIGTERM, or the end of the process. A lost lock ends it with 14.
 
 use crate::cli::{fs_error, print_json, usage, CmdResult, EXIT_LOST, EXIT_OK};
 use crate::cmd::acquire::{acquire_all, normalize_keys, parse, report, SetOutcome};
@@ -166,8 +167,10 @@ fn released_by(key: &str, owner: &str) -> bool {
     false
 }
 
-fn watch_stdin() {
-    std::thread::spawn(|| {
+/// Reads stdin for the line `release`. With `release_on_eof`, the end of stdin (the pipe closed: the
+/// host that held it is gone) counts as that line too; without it, the end of stdin is ignored.
+fn watch_stdin(release_on_eof: bool) {
+    std::thread::spawn(move || {
         for line in std::io::stdin().lock().lines() {
             match line {
                 Ok(l) if l.trim() == "release" => {
@@ -175,8 +178,11 @@ fn watch_stdin() {
                     return;
                 }
                 Ok(_) => {}
-                Err(_) => return,
+                Err(_) => break,
             }
+        }
+        if release_on_eof {
+            wait::interrupt();
         }
     });
 }
@@ -187,13 +193,16 @@ pub fn run(args: Vec<String>) -> CmdResult {
     if !rest.is_empty() {
         return Err(usage(txt!("error.rest_not_run", cmd = "hold")));
     }
+    if opts.detach && opts.release_on_eof {
+        return Err(usage(txt!("error.eof_with_detach")));
+    }
     let child = crate::detach::is_child();
     if opts.detach && !child {
         normalize_keys(&opts.keys)?; // bad keys are refused here, not in the second process
         return crate::detach::start(original);
     }
     wait::install_interrupt_handler();
-    watch_stdin();
+    watch_stdin(opts.release_on_eof);
     let keys = normalize_keys(&opts.keys)?;
     let store = Store::open()?;
     let deadline = opts.timeout.map(|t| Instant::now() + t);

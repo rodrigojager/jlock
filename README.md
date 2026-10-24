@@ -134,6 +134,9 @@ Options worth knowing:
 - `--no-wait`: do not wait in line. If a file is taken, the answer comes at once (`busy`, exit code 10)
   with who has it, so the agent can pick other work instead of standing still.
 - `--timeout 2m`: wait at most this long, then give up (exit code 11).
+- `--release-on-eof`: for a program that stays open and runs `hold` in the foreground (without `--detach`),
+  keeping its standard input: if the program dies, the pipe closes and the lock is released at once. Short
+  calls use `--detach`; a host that stays open uses `--release-on-eof`.
 - `--ttl 2h`: a safety limit. The lock goes away by itself after this long, even if the agent never
   releases it.
 

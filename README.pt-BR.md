@@ -136,6 +136,9 @@ Opções que vale conhecer:
 - `--no-wait`: não esperar na fila. Se um arquivo está ocupado, a resposta vem na hora (`ocupada`, código
   de saída 10) dizendo quem está com ele, e o agente pode pegar outro trabalho em vez de ficar parado.
 - `--timeout 2m`: esperar no máximo esse tempo, depois desistir (código de saída 11).
+- `--release-on-eof`: para um programa que fica aberto e roda o `hold` em primeiro plano (sem `--detach`),
+  segurando a entrada padrão: se o programa morre, o cano fecha e a trava é solta na hora. Chamadas curtas usam
+  `--detach`; um programa que fica aberto usa `--release-on-eof`.
 - `--ttl 2h`: um limite de segurança. A trava some sozinha depois desse tempo, mesmo que o agente nunca a
   devolva.
 

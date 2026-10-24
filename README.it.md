@@ -136,6 +136,9 @@ Opzioni da conoscere:
 - `--no-wait`: non mettersi in coda. Se un file è occupato, la risposta arriva subito (`busy`, codice di
   uscita 10) con chi lo tiene, così l'agente può scegliere un altro lavoro invece di restare fermo.
 - `--timeout 2m`: attendere al massimo questo tempo, poi rinunciare (codice di uscita 11).
+- `--release-on-eof`: per un programma che resta aperto ed esegue `hold` in primo piano (senza `--detach`),
+  tenendo il suo standard input: se il programma muore, la pipe si chiude e il blocco è rilasciato subito. Le
+  chiamate brevi usano `--detach`; un programma che resta aperto usa `--release-on-eof`.
 - `--ttl 2h`: un limite di sicurezza. Il blocco se ne va da solo dopo questo tempo, anche se l'agente non
   lo rilascia mai.
 

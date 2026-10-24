@@ -184,6 +184,11 @@ impl Kid {
         let _ = stdin.flush();
     }
 
+    /// Closes the child's standard input: from now on it reads the end of the input.
+    pub fn close_stdin(&mut self) {
+        drop(self.child.stdin.take());
+    }
+
     /// Exit code if it ended within `timeout`.
     pub fn wait(&mut self, timeout: Duration) -> Option<i32> {
         let start = Instant::now();

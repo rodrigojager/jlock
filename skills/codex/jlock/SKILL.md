@@ -42,6 +42,9 @@ also use jlock, so take them every time, even when you think you are alone.
      for the same files in another order).
    - `--detach` makes it answer and return while a small background process keeps the lock alive. Do
      not run `hold` without `--detach` from a tool call: it would never return.
+   - `--release-on-eof` is for a program that stays open (an editor plugin, a server) and runs `hold` in
+     the foreground with its standard input open: the lock ends the moment the program dies. From a tool
+     call, use `--detach`.
    - `--timeout 2m` waits at most two minutes for others to finish; `--no-wait` does not wait at all.
    - `--ttl 2h` is a safety limit: the lock goes away by itself after two hours even if you never
      release it.

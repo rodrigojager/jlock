@@ -137,6 +137,9 @@ Optionen, die du kennen solltest:
 - `--no-wait`: nicht in der Warteschlange warten. Ist eine Datei belegt, kommt die Antwort sofort (`busy`,
   Exit-Code 10), samt dem, der sie hat, sodass der Agent sich andere Arbeit suchen kann, statt stillzustehen.
 - `--timeout 2m`: höchstens so lange warten, dann aufgeben (Exit-Code 11).
+- `--release-on-eof`: für ein Programm, das offen bleibt und `hold` im Vordergrund ausführt (ohne `--detach`)
+  und dabei seine Standardeingabe hält: stirbt das Programm, schließt sich die Pipe und die Sperre wird sofort
+  freigegeben. Kurze Aufrufe nutzen `--detach`; ein Programm, das offen bleibt, `--release-on-eof`.
 - `--ttl 2h`: eine Sicherheitsgrenze. Die Sperre verschwindet nach dieser Zeit von selbst, auch wenn der
   Agent sie nie freigibt.
 

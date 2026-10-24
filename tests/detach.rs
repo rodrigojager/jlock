@@ -105,3 +105,55 @@ fn release_by_the_owner_ends_a_foreground_hold_with_0() {
         );
     }
 }
+
+#[test]
+fn release_on_eof_ends_the_hold_when_stdin_closes() {
+    let env = Env::new("eof-release");
+    let mut kid = env.spawn(&["hold", "name:e", "--owner", "a", "--release-on-eof"]);
+    assert_eq!(kid.read_line(), "granted name:e");
+    kid.close_stdin();
+    assert_eq!(
+        kid.wait(Duration::from_secs(5)),
+        Some(0),
+        "the hold should end with 0 at the end of its input"
+    );
+    assert!(env.lock_dirs().is_empty(), "the key is still held");
+    let events = log_events(&env, "name:e");
+    assert!(events.contains(&"release".to_string()), "{events:?}");
+    assert!(!events.contains(&"lost".to_string()), "{events:?}");
+}
+
+#[test]
+fn without_the_option_the_end_of_stdin_does_not_end_the_hold() {
+    let env = Env::new("eof-ignored");
+    let mut kid = env.spawn(&["hold", "name:f", "--owner", "a"]);
+    assert_eq!(kid.read_line(), "granted name:f");
+    kid.close_stdin();
+    // Several heartbeats later (100 ms each in the tests): still running, still ours.
+    std::thread::sleep(Duration::from_millis(400));
+    assert!(
+        kid.running(),
+        "the hold ended at EOF without --release-on-eof"
+    );
+    assert_eq!(env.holder_owner("name:f").as_deref(), Some("a"));
+    kid.kill();
+}
+
+#[test]
+fn release_on_eof_with_detach_is_a_usage_error() {
+    let env = Env::new("eof-detach");
+    let done = env.run(&[
+        "hold",
+        "name:g",
+        "--owner",
+        "a",
+        "--release-on-eof",
+        "--detach",
+    ]);
+    assert_eq!(done.code, 2, "{}{}", done.stdout, done.stderr);
+    assert!(done.stderr.contains("--release-on-eof"), "{}", done.stderr);
+    assert!(
+        env.lock_dirs().is_empty(),
+        "a key was taken before the refusal"
+    );
+}

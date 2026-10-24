@@ -136,6 +136,9 @@ Opciones que conviene conocer:
 - `--no-wait`: no esperar en la cola. Si un archivo está ocupado, la respuesta llega al momento (`ocupada`,
   código de salida 10) con quién lo tiene, y el agente puede tomar otro trabajo en lugar de quedarse quieto.
 - `--timeout 2m`: esperar como máximo este tiempo y luego desistir (código de salida 11).
+- `--release-on-eof`: para un programa que sigue abierto y ejecuta `hold` en primer plano (sin `--detach`),
+  manteniendo su entrada estándar: si el programa muere, la tubería se cierra y el bloqueo se suelta al
+  instante. Las llamadas cortas usan `--detach`; un programa que sigue abierto usa `--release-on-eof`.
 - `--ttl 2h`: un límite de seguridad. El bloqueo desaparece solo pasado este tiempo, aunque el agente nunca
   lo devuelva.
 

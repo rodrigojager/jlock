@@ -57,7 +57,7 @@ pub const ACQUIRE_OPTS: &[Opt] = &[
     JSON,
 ];
 
-/// `hold` takes the options of `acquire`, and `--detach`.
+/// `hold` takes the options of `acquire`, `--detach` and `--release-on-eof`.
 pub const HOLD_OPTS: &[Opt] = &[
     opt("owner", Some("id"), "help.opt.acquire.owner", "agent-7"),
     opt("group", Some("group"), "help.opt.acquire.group", "task-42"),
@@ -73,6 +73,7 @@ pub const HOLD_OPTS: &[Opt] = &[
     opt("no-wait", None, "help.opt.acquire.no_wait", ""),
     opt("timeout", Some("time"), "help.opt.acquire.timeout", "30s"),
     opt("detach", None, "help.opt.hold.detach", ""),
+    opt("release-on-eof", None, "help.opt.hold.release_on_eof", ""),
     JSON,
 ];
 

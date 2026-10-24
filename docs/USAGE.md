@@ -83,6 +83,12 @@ an agent to hold files for a whole task: a lock taken with plain `acquire` expir
 `JLOCK_STALE_MS` (30 s) without a `jlock heartbeat`, and an agent spends minutes between two commands.
 A `--ttl` is a good idea with `--detach`, as a limit if the agent never releases.
 
+`--release-on-eof` is for the other kind of caller: a program that stays open (an editor plugin, a
+server) and runs `hold` in the foreground, holding its standard input. The end of that input counts as the
+line `release`: if the program dies, the pipe closes and the lock is released at once, even on Windows,
+where a dead parent does not end its children. It does not go with `--detach` (the background process has
+no standard input): short calls use `--detach`, a host that stays open uses `--release-on-eof`.
+
 ### `release` — give keys back
 
 ```
@@ -175,7 +181,7 @@ Any command already does this at most once per `JLOCK_SWEEP_MS`; `gc` does it no
 
 ```
 jlock doctor [--json]
-ok    version          jlock 0.1.0, running from C:\Users\me\.cargo\bin\jlock.exe
+ok    version          jlock 0.1.1, running from C:\Users\me\.cargo\bin\jlock.exe
 ok    registry folder  C:\Users\me\AppData\Local\jlock (the default for this system): a writable folder
 ok    primitives       create_new refuses an existing file, rename replaces one, remove deletes
 ok    OS lock          taken, refused to a second handle, then released
@@ -251,7 +257,7 @@ the README and the roadmap. It does not use the network.
 
 ### `--version`, `--help`, `--lang`
 
-`jlock --version` prints one line, `jlock 0.1.0`, stable for scripts. `--help` (or `-h`) goes with any
+`jlock --version` prints one line, `jlock 0.1.1`, stable for scripts. `--help` (or `-h`) goes with any
 command and shows its help page. `--lang <tag>` can go with any command and sets the language of its
 text output (see below).
 

@@ -110,6 +110,8 @@ $ jlock status name:demo
 
 - `--no-wait`：不排队等候。如果某个文件已被占用，会立即得到回答（`busy`，退出码 10）以及谁持有它，这样智能体可以去做别的工作，而不是原地等待。
 - `--timeout 2m`：最多等待这么久，然后放弃（退出码 11）。
+- `--release-on-eof`：用于保持运行、在前台执行 `hold`（不带 `--detach`）并握住其标准输入的程序：程序一旦死亡，
+  管道关闭，锁立刻释放。短调用用 `--detach`；保持运行的宿主用 `--release-on-eof`。
 - `--ttl 2h`：安全上限。经过这段时间后锁会自行消失，即使智能体从未释放它。
 
 为什么不直接用 `jlock acquire`？用 `acquire` 获取的锁同样会在命令结束后保留，但必须至少每 30 秒续期一次（`jlock heartbeat`），否则会被视为失效并过期。智能体在两条命令之间往往要花上几分钟，所以 `hold --detach` 才是适合它的工具；`acquire` 适用于能自行续期的程序。如果有人解除了锁（`jlock unlock --force`），后台进程会结束，`jlock heartbeat <file> --owner agent-7` 会回答 `lost`（退出码 13）：长时间停顿后值得检查一下。

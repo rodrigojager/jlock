@@ -139,6 +139,9 @@ Les options à connaître:
   suite (`occupé`, code de sortie 10) avec son détenteur, et l'agent peut passer à autre chose au lieu de
   rester planté.
 - `--timeout 2m`: attendre au plus ce délai, puis abandonner (code de sortie 11).
+- `--release-on-eof` : pour un programme qui reste ouvert et exécute `hold` au premier plan (sans `--detach`),
+  en gardant son entrée standard : si le programme meurt, le tube se ferme et le verrou est relâché aussitôt.
+  Les appels courts utilisent `--detach` ; un programme qui reste ouvert, `--release-on-eof`.
 - `--ttl 2h`: une limite de sécurité. Le verrou disparaît de lui-même passé ce délai, même si l'agent ne
   le rend jamais.
 
