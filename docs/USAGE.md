@@ -96,6 +96,7 @@ jlock status D:\proj\src\a.ts
 free d:/proj/src/a.ts
 conflicts:
   d:/proj/src held by agent-3, 1 waiting
+  why: a lock on a folder covers everything inside it, so a held folder above this key blocks it
 ```
 
 Shows the holder (owner, since, heartbeat, group, intent), the queue with positions, and the
@@ -108,12 +109,16 @@ jlock list [--owner x] [--group g] [--under D:\proj] [--stale] [--json] [--watch
 KEY                  OWNER    GROUP   INTENT    HELD   HEARTBEAT  QUEUE
 d:/proj/src          agent-3  run-42  refactor  4m10s  2s         1
 name:port-3000       dev      -       -         15s    1s         0
+
+2 locks, 1 waiting
 ```
 
 Read straight from the folder, so it is always the truth. `--under` keeps paths at or below a folder;
 `--stale` only dead locks (heartbeat older than `JLOCK_STALE_MS` with nobody holding the OS lock, or past
 their ttl); `--watch` redraws every second until CTRL+C. A `hold`/`run` whose heartbeat is late but still
-has the OS lock is alive: it is shown as `late`, not `dead`, and the expiration leaves it alone.
+has the OS lock is alive: it is shown as `late`, not `dead`, and the expiration leaves it alone. The
+footer counts locks and waiters, and explains `(dead)` and `(late)` when they appear;
+`jlock help list` explains every column.
 
 ### `graph` — who waits for whom
 
@@ -151,9 +156,39 @@ log bytes:       48211
 
 Any command already does this at most once per `JLOCK_SWEEP_MS`; `gc` does it now and reports.
 
+### `help` — explain jlock or one command
+
+```
+jlock help                 # what jlock is, the commands grouped by what they are for
+jlock help acquire         # one command: every option with its default and an example,
+jlock acquire --help       #   complete examples, its exit codes, related commands
+```
+
+Every option a command accepts has a line in its help page: the parser and the help are made from the
+same table, and an option that is not in it is refused with exit 2 (with the closest name, if it looks
+like a typo). An unknown command does the same. Help pages are wrapped at 100 columns.
+
+### `about` — who made it
+
+```
+jlock about [--json]
+```
+
+The version, the author (Rodrigo Jäger, <https://github.com/rodrigojager>,
+<https://www.linkedin.com/in/rodrigojager>), the repository, the license and the links to this file,
+the README and the roadmap. It does not use the network.
+
 ### `--version`, `--help`, `--lang`
 
-`--lang <tag>` can go with any command and sets the language of its text output (see below).
+`jlock --version` prints one line, `jlock 0.1.0`, stable for scripts. `--help` (or `-h`) goes with any
+command and shows its help page. `--lang <tag>` can go with any command and sets the language of its
+text output (see below).
+
+### Tips
+
+After some results a short tip on the next step goes to standard error (standard output keeps one line
+per key): after `busy` and `timeout` how to see who holds the key, after `not_owner` whose lock it is,
+after `lost` what to do. They never appear with `--json`; `JLOCK_HINTS=0` turns them off.
 
 ## Language
 
@@ -201,6 +236,7 @@ inside a file system error (exit 20) comes from the system, in the system's lang
 | `JLOCK_SWEEP_MS` | 60000 | minimum time between global sweeps |
 | `JLOCK_LOG_MAX_BYTES` | 5242880 | log rotation size |
 | `JLOCK_LANG` | system language, else `en` | language of the text output (see [Language](#language)) |
+| `JLOCK_HINTS` | `1` | `0` turns off the tips printed after some results |
 | `JLOCK_DEBUG` | unset | any value: trace to stderr |
 
 ## On disk

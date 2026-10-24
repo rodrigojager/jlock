@@ -172,7 +172,9 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | `jlock graph [--json]` | quem espera por quem; ciclos. |
 | `jlock unlock (<chave> \| --owner x \| --group g) --force [--reason "…"]` | quebra travas de outrem, registrando quem forçou; o dono recebe `lost` no próximo heartbeat. |
 | `jlock gc [--json]` | varredura global agora: expira travas e senhas mortas, consome `broken\`, remove pastas de chave vazias, rotaciona o log, reescreve o índice; imprime o que removeu. |
-| `jlock --version`, `jlock --help` | — |
+| `jlock help [<comando>]`, `jlock <comando> --help` | **[rev. 5]** ajuda geral agrupada por intenção (pegar e soltar, ver, emergência, manutenção, ajuda); por comando: sinopse, descrição, uma linha por opção (o que faz, padrão, exemplo), exemplos, códigos de saída, veja também. Gerada da mesma tabela de comandos e opções que o despacho usa para recusar opções desconhecidas (código 2, com sugestão do nome mais parecido). Quebrada em 100 colunas. |
+| `jlock about [--json]` | **[rev. 5]** nome, versão, descrição, autor (Rodrigo Jäger), GitHub `https://github.com/rodrigojager`, LinkedIn `https://www.linkedin.com/in/rodrigojager`, repositório, licença, links da documentação; sem rede |
+| `jlock --version`, `jlock --help` | `--version` é uma linha só (`jlock 0.1.0`), estável para scripts; o rodapé do `--help` traz o autor e os links |
 | `--lang <tag>` (global, em qualquer posição antes de `--`) | **[rev. 5]** idioma das saídas de texto desta execução: `en`, `pt-BR`, `es`, `fr`, `de`, `it`, `zh-CN`, `ja`, `ru`, `ar`, `hi`. Prioridade: `--lang` > `JLOCK_LANG` > idioma do sistema > `en`. Comandos, opções, `--json`, `log.jsonl`, `index.json` e códigos de saída não mudam com o idioma. |
 
 ### Códigos de saída
@@ -209,6 +211,7 @@ uma linha curta por chave.
 | `JLOCK_SWEEP_MS` | 60000 | intervalo mínimo entre varreduras globais |
 | `JLOCK_LOG_MAX_BYTES` | 5242880 | rotação do log |
 | `JLOCK_LANG` | idioma do sistema, senão `en` | **[rev. 5]** idioma das saídas de texto (tag exata, depois a língua primária: `pt` → `pt-BR`); tag desconhecida → aviso e inglês |
+| `JLOCK_HINTS` | `1` | **[rev. 5]** `0` desliga as dicas (`tip: ...`, no stderr) que algumas saídas de texto trazem; nunca aparecem no `--json` |
 
 Os testes usam valores curtos por essas variáveis.
 

@@ -131,6 +131,7 @@ impl<'a> Keeper<'a> {
         } else {
             println!("{line}");
         }
+        crate::help::hint(self.json, t!("tip.lost", key = key.text));
         for k in &self.keys {
             if k.text != key.text {
                 let _ = release_key(&self.store.key_dir(k), &self.owner);

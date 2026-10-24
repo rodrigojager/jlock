@@ -170,6 +170,11 @@ pub fn fill(template: &str, args: &[(&str, &dyn Display)]) -> String {
     out + rest
 }
 
+/// Whether the reference catalog has `key` (every catalog has the same keys; a test checks it).
+pub fn has(key: &str) -> bool {
+    catalog("en").contains_key(key)
+}
+
 pub fn tr(key: &str) -> String {
     template(lang(), key)
 }

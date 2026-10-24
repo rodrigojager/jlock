@@ -1,6 +1,6 @@
 //! Argument parsing by hand, exit codes (plan section 6) and command dispatch.
 
-use crate::i18n::{t, txt, Text};
+use crate::i18n::{txt, Text};
 use std::time::Duration;
 
 pub const EXIT_OK: i32 = 0;
@@ -158,22 +158,49 @@ pub fn main(mut args: Vec<String>) -> i32 {
     }
 }
 
+/// `jlock help [<command>]`.
+fn help(args: Vec<String>) -> CmdResult {
+    let me = crate::commands::find("help").expect("help is in the table");
+    if let crate::help::Check::Help = crate::help::check(me, &args)? {
+        print!("{}", crate::help::command(me));
+        return Ok(EXIT_OK);
+    }
+    match args.first().map(String::as_str) {
+        None => print!("{}", crate::help::general()),
+        Some(name) => match crate::commands::find(name) {
+            Some(c) => print!("{}", crate::help::command(c)),
+            None => return Err(crate::help::unknown_command(name)),
+        },
+    }
+    Ok(EXIT_OK)
+}
+
 fn dispatch(args: Vec<String>) -> CmdResult {
     let mut iter = args.into_iter();
     let Some(cmd) = iter.next() else {
-        print!("{}", t!("help.usage"));
+        print!("{}", crate::help::general());
         return Err(usage(txt!("error.missing_command")));
     };
     let rest: Vec<String> = iter.collect();
     match cmd.as_str() {
         "--version" | "-V" | "version" => {
             println!("jlock {}", env!("CARGO_PKG_VERSION"));
-            Ok(EXIT_OK)
+            return Ok(EXIT_OK);
         }
-        "--help" | "-h" | "help" => {
-            print!("{}", t!("help.usage"));
-            Ok(EXIT_OK)
-        }
+        "--help" | "-h" | "help" => return help(rest),
+        _ => {}
+    }
+    let Some(c) = crate::commands::find(&cmd) else {
+        return Err(crate::help::unknown_command(&cmd));
+    };
+    // Options are checked against the table the help is made from: an option either has a line
+    // of help or is refused here.
+    if let crate::help::Check::Help = crate::help::check(c, &rest)? {
+        print!("{}", crate::help::command(c));
+        return Ok(EXIT_OK);
+    }
+    match cmd.as_str() {
+        "about" => crate::cmd::about::run(rest),
         "status" => crate::cmd::status::run(rest),
         "acquire" => crate::cmd::acquire::run(rest),
         "release" => crate::cmd::release::run(rest),
@@ -184,6 +211,6 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "list" => crate::cmd::list::run(rest),
         "unlock" => crate::cmd::unlock::run(rest),
         "gc" => crate::cmd::gc::run(rest),
-        other => Err(usage(txt!("error.unknown_command", cmd = other))),
+        other => Err(crate::help::unknown_command(other)),
     }
 }

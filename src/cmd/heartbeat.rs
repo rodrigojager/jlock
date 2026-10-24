@@ -7,6 +7,7 @@ use crate::cli::{
 use crate::cmd::acquire::normalize_keys;
 use crate::expire;
 use crate::heartbeat::{beat, Beat};
+use crate::help::hint;
 use crate::holder::Ident;
 use crate::i18n::{t, txt};
 use crate::store::Store;
@@ -60,6 +61,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
                             "holder": holder, "reason": reason }));
     } else {
         println!("{}", t!("result.lost", key = key.text));
+        hint(false, t!("tip.lost", key = key.text));
     }
     Ok(EXIT_NOT_OWNER)
 }

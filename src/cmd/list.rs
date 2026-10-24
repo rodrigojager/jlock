@@ -8,7 +8,7 @@ use crate::cmd::status::{heartbeat_ms, human, liveness, ms_since};
 use crate::conflict::is_ancestor;
 use crate::heartbeat::stale_after;
 use crate::holder::now_micros;
-use crate::i18n::{pad, t, txt, width};
+use crate::i18n::{pad, t, trn, txt, width};
 use crate::index::{self, KeyState};
 use crate::key::Kind;
 use crate::store::Store;
@@ -139,6 +139,24 @@ fn table(rows: &[Value]) -> String {
             .collect();
         out += cells.join("  ").trim_end();
         out += "\n";
+    }
+    // Footer: how many locks and waiters, then the legend of the marks that appear above.
+    let held = rows.iter().filter(|r| !r["holder"].is_null()).count() as u64;
+    let waiting: u64 = rows
+        .iter()
+        .map(|r| r["queue"].as_array().map_or(0, Vec::len) as u64)
+        .sum();
+    out += &format!(
+        "\n{}, {}\n",
+        trn("list.footer_locks", held, &[]),
+        trn("list.footer_waiting", waiting, &[])
+    );
+    let marked = |field: &str| rows.iter().any(|r| r["holder"][field] == json!(true));
+    if marked("stale") {
+        out += &format!("{}\n", t!("list.legend_dead"));
+    }
+    if marked("late") {
+        out += &format!("{}\n", t!("list.legend_late"));
     }
     out
 }

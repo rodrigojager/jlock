@@ -5,14 +5,14 @@ use crate::cli::{
     fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
 };
 use crate::cmd::acquire::normalize_keys;
-use crate::conflict::conflicting_dirs;
+use crate::conflict::{conflicting_dirs, is_ancestor};
 use crate::expire;
 use crate::fsx;
 use crate::heartbeat::stale_after;
 use crate::holder::{now_micros, Holder};
 use crate::i18n::{t, txt, Text};
 use crate::index;
-use crate::key::Key;
+use crate::key::{Key, Kind};
 use crate::oslock;
 use crate::store::{KeyDir, Store};
 use serde_json::{json, Value};
@@ -120,6 +120,7 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
         );
     }
     let mut conflicts = Vec::new();
+    let mut reasons: Vec<&str> = Vec::new();
     for cd in conflicting_dirs(store, &key)? {
         expire::expire_key(&cd, None)?;
         let cs = index::state(cd)?;
@@ -144,11 +145,25 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
             text += &crate::i18n::trn("status.conflict_waiting", cs.tickets.len() as u64, &[]);
         }
         text += "\n";
+        let why = if cs.dir.key.kind == Kind::All || key.kind == Kind::All {
+            "status.why_all"
+        } else if is_ancestor(&cs.dir.key.text, &key.text) {
+            "status.why_above"
+        } else {
+            "status.why_inside"
+        };
+        if !reasons.contains(&why) {
+            reasons.push(why);
+        }
         conflicts.push(json!({
             "key": cs.dir.key.text,
             "holder": cs.holder.as_ref().map(|h| holder_json(&cs.dir, h)),
             "queue": cs.tickets.len(),
         }));
+    }
+    // Why these keys block this one: a folder covers what is inside it, and `*` covers everything.
+    for why in reasons {
+        text += &crate::help::wrap(&t!(why), "  ", "    ", crate::help::COLUMNS);
     }
     let value = json!({
         "result": "ok",

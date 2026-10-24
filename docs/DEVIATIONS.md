@@ -1,6 +1,6 @@
 # Deviations from `docs/PLAN.md`
 
-**Open deviations: none.** Everything below was written into the plan on 24/10/2026 (revision 4, the
+**Open deviations: 8 and later** (phase 2, to be written into the plan as revision 5). Entries 1–7 were written into the plan on 24/10/2026 (revision 4, the
 paragraphs marked **[rev. 4]**), so the plan is the source of truth again. The entries stay as the record of
 what was decided during implementation and why.
 
@@ -63,3 +63,21 @@ what was decided during implementation and why.
   OS lock on `holder.json`; if it is taken, the owner is alive and the lock stays. A `hold`/`run` that is
   alive but stuck therefore keeps its keys until its `--ttl` runs out or someone uses `unlock --force`.
   Locks taken with plain `acquire` (no OS lock) expire by heartbeat exactly as in the plan.
+
+## 8. Tips go to standard error (ticket 12)
+
+- **What:** ticket 12 asks for tips "in the text outputs" without saying which stream.
+- **Why:** scripts that read the text (`out=$(jlock acquire ...)`) expect one line per key on standard
+  output; an extra `tip:` line there would break them unless every script set `JLOCK_HINTS=0`.
+- **Done instead:** tips are printed to standard error, only in text mode (never with `--json`), and
+  `JLOCK_HINTS=0` turns them off. Standard output keeps exactly the lines it had before.
+
+## 9. The command table lives in `src/commands.rs` (ticket 12)
+
+- **What:** ticket 12 places the single table of commands and options in `src/help.rs`.
+- **Why:** the test that checks "every option the parser takes has a line of help" has to read that table,
+  and integration tests can only include a source file that does not depend on the rest of the crate;
+  `help.rs` uses the catalogs, the CLI types and `about.rs`.
+- **Done instead:** the table is pure data in `src/commands.rs` (included by `tests/help.rs` with
+  `#[path]`); `src/help.rs` renders it and checks the options against it. Still one table, used by both
+  the help and the dispatcher.

@@ -1,9 +1,11 @@
 mod cli;
+mod commands;
 mod conflict;
 mod expire;
 mod fsx;
 mod graph;
 mod heartbeat;
+mod help;
 mod holder;
 mod home;
 mod i18n;
@@ -17,6 +19,7 @@ mod sweep;
 mod wait;
 
 mod cmd {
+    pub mod about;
     pub mod acquire;
     pub mod gc;
     pub mod graph;

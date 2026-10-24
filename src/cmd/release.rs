@@ -6,6 +6,7 @@ use crate::cli::{
 };
 use crate::cmd::acquire::normalize_keys;
 use crate::fsx;
+use crate::help::hint;
 use crate::holder::Ident;
 use crate::i18n::{t, txt};
 use crate::index;
@@ -98,7 +99,8 @@ pub fn run(args: Vec<String>) -> CmdResult {
                 if !json {
                     match &holder {
                         Some(h) => {
-                            println!("{}", t!("release.not_owner", key = kd.key.text, holder = h))
+                            println!("{}", t!("release.not_owner", key = kd.key.text, holder = h));
+                            hint(false, t!("tip.not_owner", owner = h));
                         }
                         None => println!("{}", t!("release.not_locked", key = kd.key.text)),
                     }

@@ -9,6 +9,7 @@ use crate::conflict;
 use crate::expire;
 use crate::fsx;
 use crate::graph;
+use crate::help::hint;
 use crate::holder::{iso, now_micros, Holder, Ident};
 use crate::i18n::{t, txt};
 use crate::index;
@@ -569,12 +570,19 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
                                 position = position
                             )
                         );
+                        let tip = if code == EXIT_BUSY {
+                            "tip.busy"
+                        } else {
+                            "tip.timeout"
+                        };
+                        hint(false, t!(tip, key = key.text));
                     }
                 }
                 Outcome::Deadlock { chain } => {
                     out["chain"] = json!(chain);
                     if !opts.json {
                         println!("{}", t!(word, key = key.text, chain = chain));
+                        hint(false, t!("tip.deadlock"));
                     }
                 }
                 _ => {
