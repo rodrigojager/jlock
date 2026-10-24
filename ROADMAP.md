@@ -24,7 +24,8 @@ The whole core protocol, developed and tested on Windows 10 / NTFS:
 
 ## Next: 0.2, "usable by anyone"
 
-Tracked as work items 11–17 in the maintainers' ticket folder.
+Tracked as work items 11–17 in the maintainers' ticket folder. **Implemented on 24 October 2026**; it ships with the
+first tagged release (the one-line installers and `jlock update` need a published GitHub Release).
 
 1. **Internationalization.** Catalogs embedded in the binary; `--lang`, `JLOCK_LANG`, or the system language;
    English as reference and fallback. Commands and options stay English; everything explained to a human is

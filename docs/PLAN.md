@@ -14,6 +14,9 @@ Revisão 4, 24/10/2026: o plano absorve o que a implementação decidiu onde ele
 ticket 09 (palavra solta é caminho; pedido repetido do mesmo dono; código 130; espera por hierarquia com uma senha
 só; tentativas curtas em derivados; trava do SO conta como vida). Os pontos estão marcados com **[rev. 4]**; o
 histórico de cada um está em `docs/DEVIATIONS.md`.
+Revisão 5, 24/10/2026: a fase 2 da seção 14 (idiomas, help didático, `about`, `doctor`, releases, instaladores,
+`update`, READMEs) deixa de ser proposta e passa a descrever o que foi implementado; comandos e variáveis novos
+entram nas tabelas da seção 6. Os pontos estão marcados com **[rev. 5]**.
 
 ---
 
@@ -417,56 +420,68 @@ Tamanho estimado: núcleo 500–700 linhas, CLI 300, mais testes.
 
 ---
 
-## 14. Fase 2: para qualquer pessoa usar (proposta de 24/10/2026, para revisão)
+## 14. Fase 2: para qualquer pessoa usar **[rev. 5]**
 
-Decisões já tomadas com o autor; viram **[rev. 5]** quando os tickets 11–17 (em `.scratch/jlock/issues/`) forem
-aprovados e executados. O roadmap público está em `ROADMAP.md`; Linux e macOS têm plano próprio em
-`docs/PLAN-LINUX-MACOS.md`.
+Proposta de 24/10/2026, executada no mesmo dia pelos tickets 11–17 (em `.scratch/jlock/issues/`). Os comandos e
+as variáveis novos estão nas tabelas da seção 6, marcados com **[rev. 5]**; o histórico das escolhas que os
+tickets deixavam em aberto está em `docs/DEVIATIONS.md` (§8–§13). O roadmap público está em `ROADMAP.md`; Linux e
+macOS têm plano próprio em `docs/PLAN-LINUX-MACOS.md`.
 
-### Decisões
+### Decisões, como implementadas
 
-1. **Idiomas.** Inglês é a referência e a reserva. Catálogos JSON embutidos no binário (`locales/<tag>.json`),
-   sem dependência nova; `tr(chave)` em toda string de texto. Idiomas: `en`, `pt-BR`, `es`, `fr`, `de`, `it`,
-   `zh-CN`, `ja`, `ru`, `ar`, `hi`. Comandos, opções, `--json`, `log.jsonl`, `index.json` e códigos de saída não
-   mudam com o idioma. Revisão de textos é aceita em qualquer idioma (`CONTRIBUTING.md`).
-2. **Help didático.** `jlock help <comando>` explica cada comando e **cada opção** (o que faz, padrão, exemplo),
-   com exemplos reais e os códigos de saída do comando; dicas nas saídas de texto (`JLOCK_HINTS=0` desliga);
-   legenda no `list`. `jlock about` com autor e links.
-3. **`doctor`.** Diagnostica e sugere; nunca conserta sozinho.
-4. **Releases e instalação em um comando.** Tag `v*` → binários para `x86_64-pc-windows-msvc`,
-   `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin`,
-   `SHA256SUMS`, GitHub Release. `install.sh` e `install.ps1` na raiz; `cargo binstall jlock`.
-5. **`update` pelo `curl` do sistema.** Sem cliente HTTP em Rust (regra de dependências mínimas). PowerShell como
-   reserva no Windows. O jlock só acessa a rede em `update`, e só quando chamado.
-6. **READMEs** nos onze idiomas, com exemplos reexecutados por teste.
-7. **Caminhos: symlinks e caixa (todos os sistemas).** Symlinks resolvidos por padrão, canonicalizando o maior
-   prefixo existente (`JLOCK_CANONICAL=0` desliga): só junta nomes do mesmo arquivo numa chave, nunca separa.
-   Caixa dobrada no Windows e no macOS, preservada no Linux; `JLOCK_CASE=sensitive` para volumes sensíveis no
-   macOS. Entra na seção 5 quando implementado (U5 em `docs/PLAN-LINUX-MACOS.md`).
-8. **`run` e sinais.** `SIGTERM`/`SIGINT` recebido pelo `run` é repassado ao comando; prazo `JLOCK_KILL_GRACE_MS`
-   (5000) antes do `SIGKILL`; só então libera e sai com `128 + sinal`. Hoje o `run` ignora o sinal e segura até o
-   comando terminar (U2).
-9. **Pacotes Unix.** 0.2: `install.sh`, Homebrew, `cargo binstall`. `.deb`/`.rpm` e AUR só no 0.3, depois da suíte
-   verde em Linux de verdade (U1, U7).
+1. **Idiomas.** Inglês é a referência e a reserva para qualquer chave que falte. Catálogos JSON planos embutidos
+   no binário (`locales/<tag>.json`, `include_str!`, lidos uma vez por processo), sem dependência nova além de
+   `Win32_Globalization` do `windows-sys`; `t!`/`txt!` em toda string de texto, `_one`/`_other` para plural.
+   Idiomas: `en`, `pt-BR`, `es`, `fr`, `de`, `it`, `zh-CN`, `ja`, `ru`, `ar`, `hi`, cada um com `_glossary`.
+   Escolha: `--lang` (em qualquer posição antes de `--`) > `JLOCK_LANG` > idioma do sistema (`LC_ALL`,
+   `LC_MESSAGES`, `LANG`; `GetUserDefaultLocaleName` no Windows) > `en`; tag exata, depois a língua primária;
+   tag desconhecida dada pelo usuário → aviso em inglês e segue em inglês. Comandos, opções, `--json`,
+   `log.jsonl`, `index.json` e códigos de saída não mudam com o idioma; as mensagens de erro no `--json` saem
+   em inglês. Larguras contadas como o terminal mostra (CJK = 2 colunas). `zh-CN`, `ja`, `ru`, `ar` e `hi`
+   aguardam revisão de falante nativo; revisão de textos é aceita em qualquer idioma (`CONTRIBUTING.md`).
+2. **Help didático.** Uma tabela única de comandos e opções (`src/commands.rs`, DEVIATIONS §9) gera
+   `jlock help [<comando>]` / `jlock <comando> --help` (sinopse, descrição, uma linha por opção com padrão e
+   exemplo, exemplos, códigos de saída, veja também; quebra em 100 colunas) e é usada pelo despacho para
+   recusar opções desconhecidas (código 2, com o nome mais parecido). `jlock about [--json]` com autor e
+   links, de constantes únicas em `src/cmd/about.rs`. Dicas (`tip: ...`) no stderr depois de `busy`,
+   `timeout`, `deadlock`, `not_owner` e `lost`, nunca no `--json`, desligáveis com `JLOCK_HINTS=0`
+   (DEVIATIONS §8). `list` com rodapé de contagem e legenda de `(dead)`/`(late)`; `status` explica por que
+   cada conflito bloqueia.
+3. **`doctor`.** Nove checagens com `ok`/`warn`/`fail` e correção; código 0 sem `fail`, 20 com `fail`. Só
+   sugere: não cria `JLOCK_HOME` (ausente é `fail`, com o comando que cria), não roda `gc`, não mexe no
+   `PATH`; os temporários dele são apagados mesmo em falha.
+4. **Releases e instalação em um comando.** Tag `v*` → `release.yml` confere a versão com o `Cargo.toml`, roda
+   os testes e compila `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`,
+   `x86_64-apple-darwin` (no runner arm64, DEVIATIONS §10) e `aarch64-apple-darwin`; empacota
+   `jlock-<versão>-<alvo>.zip|.tar.gz` com o binário, `LICENSE` e `README.md`; gera `SHA256SUMS`; publica o
+   GitHub Release. `install.sh` (POSIX sh) e `install.ps1` (PowerShell 5.1 e 7) na raiz, com verificação da
+   soma; `cargo binstall jlock`. Passo a passo em `docs/RELEASING.md`.
+5. **`update` pelo `curl` do sistema.** Sem cliente HTTP em Rust; PowerShell como reserva no Windows; o `tar`
+   do sistema abre o arquivo (DEVIATIONS §12); SHA-256 próprio em `src/sha256.rs` (DEVIATIONS §11). Troca o
+   próprio executável (no Windows o antigo vira `jlock.exe.old`, apagado pelo próximo jlock que inicia),
+   confere o `--version` do novo e repõe o antigo se falhar. **O jlock só acessa a rede em `update`, e só
+   quando chamado.**
+6. **READMEs** nos onze idiomas, com a mesma estrutura, barra de idiomas e exemplos; as saídas dos blocos
+   `<!-- jlock-example -->` são reexecutadas por `tests/readmes.rs` no idioma de cada arquivo.
+7. **Caminhos: symlinks e caixa (todos os sistemas)** — decidido, ainda não implementado (U5 em
+   `docs/PLAN-LINUX-MACOS.md`). Symlinks resolvidos por padrão, canonicalizando o maior prefixo existente
+   (`JLOCK_CANONICAL=0` desliga): só junta nomes do mesmo arquivo numa chave, nunca separa. Caixa dobrada no
+   Windows e no macOS, preservada no Linux; `JLOCK_CASE=sensitive` para volumes sensíveis no macOS. Entra na
+   seção 5 quando implementado.
+8. **`run` e sinais** — decidido, ainda não implementado (U2). `SIGTERM`/`SIGINT` recebido pelo `run` é
+   repassado ao comando; prazo `JLOCK_KILL_GRACE_MS` (5000) antes do `SIGKILL`; só então libera e sai com
+   `128 + sinal`. Hoje o `run` ignora o sinal e segura até o comando terminar.
+9. **Pacotes Unix.** 0.2: `install.sh` (feito), Homebrew e `cargo binstall` (feito). `.deb`/`.rpm` e AUR só no
+   0.3, depois da suíte verde em Linux de verdade (U1, U7).
 
-### Acréscimos ao CLI (seção 6)
+### O que ficou para o CI ou para o autor
 
-| Comando / opção | O que faz |
-|---|---|
-| `jlock help [<comando>]`, `jlock <comando> --help` | ajuda geral agrupada por intenção; por comando: sinopse, descrição, tabela de opções, exemplos, códigos de saída, veja também |
-| `jlock about [--json]` | nome, versão, descrição, autor (Rodrigo Jäger), GitHub `github.com/rodrigojager`, LinkedIn `linkedin.com/in/rodrigojager`, repositório, licença, documentação |
-| `jlock doctor [--json]` | registro, primitivas (`create_new`/`rename`/`remove`), trava do SO, variáveis, `PATH`, estado atual; 0 sem `fail`, 20 com `fail` |
-| `jlock update [--check] [--version vX.Y.Z] [--json]` | último Release (ou a versão pedida) → verifica SHA256 → troca o próprio executável; `--check` só compara |
-| `--lang <tag>` (global) | idioma desta execução |
+- `install.sh` só foi exercitado no `sh` do Git Bash; o `shellcheck` e o teste Unix de `tests/installers.rs`
+  rodam no CI (Ubuntu e macOS).
+- O primeiro Release depende de uma tag publicada pelo autor (`docs/RELEASING.md`); até lá, `jlock update`
+  responde código 20, "no release found".
 
-| Variável | Padrão | Uso |
-|---|---|---|
-| `JLOCK_LANG` | idioma do sistema, senão `en` | idioma das saídas de texto |
-| `JLOCK_HINTS` | `1` | `0` desliga as dicas nas saídas de texto |
-| `JLOCK_UPDATE_BASE` | GitHub do projeto | origem alternativa para `update` (testes usam `file://`) |
+### Ordem executada
 
-### Ordem dos tickets
-
-11 i18n (`en` + `pt-BR`) → 12 help/about (bloqueado por 11) → 13 doctor (11) → 14 release e instaladores (livre)
-→ 15 update (11, 14) → 16 traduções para os nove idiomas restantes (12, 13, 15) → 17 READMEs (13, 14, 15, 16).
-Depois: Linux e macOS (`docs/PLAN-LINUX-MACOS.md`, tickets U1–U8).
+11 i18n (`en` + `pt-BR`) → 12 help/about → 13 doctor → 14 release e instaladores → 15 update → 16 traduções
+para os nove idiomas restantes → 17 READMEs. Depois: Linux e macOS (`docs/PLAN-LINUX-MACOS.md`, tickets U1–U8).

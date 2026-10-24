@@ -1,8 +1,9 @@
 # Deviations from `docs/PLAN.md`
 
-**Open deviations: 8 and later** (phase 2, to be written into the plan as revision 5). Entries 1–7 were written into the plan on 24/10/2026 (revision 4, the
-paragraphs marked **[rev. 4]**), so the plan is the source of truth again. The entries stay as the record of
-what was decided during implementation and why.
+**Open deviations: none.** Entries 1–7 were written into the plan on 24/10/2026 as revision 4 (the paragraphs
+marked **[rev. 4]**), entries 8–13 the same day as revision 5 (section 14 and the **[rev. 5]** rows of section 6).
+The plan is the source of truth again; the entries stay as the record of what was decided during
+implementation and why.
 
 ## 1. `busy` vs `queued` in the `--no-wait` answer — now in plan §6, `acquire` row
 
