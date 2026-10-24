@@ -180,9 +180,10 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "status" => status(rest),
         "acquire" => crate::cmd::acquire::run(rest),
         "release" => crate::cmd::release::run(rest),
-        "run" | "hold" | "heartbeat" | "list" | "graph" | "unlock" | "gc" => {
-            Err(usage(format!("{cmd}: not implemented yet")))
-        }
+        "hold" => crate::cmd::hold::run(rest),
+        "run" => crate::cmd::run::run(rest),
+        "heartbeat" => crate::cmd::heartbeat::run(rest),
+        "list" | "graph" | "unlock" | "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
         other => Err(usage(format!(
             "unknown command '{other}' (see jlock --help)"
         ))),
@@ -208,7 +209,16 @@ fn status(args: Vec<String>) -> CmdResult {
     let key = crate::key::normalize(&input, &cwd).map_err(usage)?;
     let root = crate::home::root().map_err(usage)?;
     let locks = crate::home::locks_dir(&root).map_err(|e| fs_error(root.display(), &e))?;
-    let held = locks.join(&key.hash).join("holder.json").exists();
+    let store = crate::store::Store {
+        root: root.clone(),
+        locks,
+    };
+    let kd = store.key_dir(&key);
+    if kd.exists() {
+        crate::expire::expire_key(&kd, None).map_err(|e| fs_error(&key.text, &e))?;
+        let _ = kd.cleanup();
+    }
+    let held = kd.holder_path().exists();
     let state = if held { "held" } else { "free" };
     if json {
         print_json(&serde_json::json!({ "result": "ok", "key": key.text, "state": state }));

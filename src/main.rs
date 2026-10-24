@@ -2,7 +2,9 @@
 #![allow(dead_code)]
 
 mod cli;
+mod expire;
 mod fsx;
+mod heartbeat;
 mod holder;
 mod home;
 mod key;
@@ -12,7 +14,10 @@ mod wait;
 
 mod cmd {
     pub mod acquire;
+    pub mod heartbeat;
+    pub mod hold;
     pub mod release;
+    pub mod run;
 }
 
 fn main() {

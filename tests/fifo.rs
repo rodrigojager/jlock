@@ -8,7 +8,9 @@ const SECS5: Duration = Duration::from_secs(5);
 
 #[test]
 fn grants_follow_arrival_order() {
-    let env = Env::new("fifo-order");
+    let mut env = Env::new("fifo-order");
+    // Plain acquire has no heartbeat: keep the holders from expiring during the test.
+    env.set("JLOCK_STALE_MS", "20000");
     let key = "name:fifo";
     let mut kids: Vec<Kid> = Vec::new();
     let mut first_granted = Instant::now();

@@ -5,8 +5,9 @@ use crate::cli::{
     fs_error, parse_duration, print_json, usage, Arg, CmdResult, Failure, Parser, EXIT_BUSY,
     EXIT_OK, EXIT_TIMEOUT,
 };
+use crate::expire;
 use crate::fsx;
-use crate::holder::{Holder, Ident};
+use crate::holder::{iso, now_micros, Holder, Ident};
 use crate::key::{self, Key};
 use crate::queue::{self, Ticket};
 use crate::store::{KeyDir, Store};
@@ -159,6 +160,13 @@ fn look(kd: &KeyDir, owner: &str, mine: Option<&str>) -> io::Result<View> {
     })
 }
 
+/// The holder body as written at the grant: `since` is the moment the lock was taken.
+fn granted_now(body: &Holder) -> Holder {
+    let mut b = body.clone();
+    b.since = iso(now_micros());
+    b
+}
+
 /// Takes one key for `ident`: at once or never with `wait == false`; otherwise in arrival order,
 /// up to `deadline`.
 pub fn acquire_one(
@@ -173,6 +181,7 @@ pub fn acquire_one(
     let body = Holder::new(&key.text, ident);
 
     if !wait_turn {
+        expire::expire_key(&kd, None)?;
         let view = look(&kd, &ident.owner, None)?;
         if let Some(h) = &view.holder {
             if h.owner == ident.owner {
@@ -237,10 +246,11 @@ fn wait_turn_loop(
             Err(e) => return Err(e),
         }
         kd.ensure_key_file()?;
+        expire::expire_key(kd, Some(&ticket.name))?;
         let view = look(kd, owner, Some(&ticket.name))?;
         match &view.holder {
             Some(h) if h.owner == owner => return granted(ticket),
-            None if view.ahead == 0 => match try_take(kd, body)? {
+            None if view.ahead == 0 => match try_take(kd, &granted_now(body))? {
                 Take::Granted => return granted(ticket),
                 Take::Held(h) => wait::debug(format!(
                     "EEXIST on {}: {} got in first",
@@ -260,49 +270,149 @@ fn wait_turn_loop(
     }
 }
 
-/// Prints the outcome (one line, or one JSON object) and returns the exit code.
-pub fn report(opts: &AcquireOpts, key: &Key, outcome: &Outcome) -> i32 {
-    let owner = &opts.ident.owner;
-    let (result, code, extra) = match outcome {
-        Outcome::Granted { waited_ms } => {
-            if !opts.json {
-                println!("granted {}", key.text);
-            }
-            ("granted", EXIT_OK, json!({ "waited_ms": waited_ms }))
-        }
-        Outcome::Busy { holder, position } | Outcome::Timeout { holder, position } => {
-            let (result, word, code) = match outcome {
-                Outcome::Busy { .. } => ("queued", "busy", EXIT_BUSY),
-                _ => ("timeout", "timeout", EXIT_TIMEOUT),
-            };
-            if !opts.json {
-                let by = holder
-                    .as_ref()
-                    .map_or("nobody (queue ahead)", |h| h.owner.as_str());
-                println!("{word} {} held by {by} (position {position})", key.text);
-            }
-            (
-                result,
-                code,
-                json!({ "holder": holder, "position": position }),
-            )
-        }
-        Outcome::Interrupted => {
-            if !opts.json {
-                println!("interrupted {}", key.text);
-            }
-            ("error", EXIT_INTERRUPTED, json!({ "error": "interrupted" }))
+#[allow(clippy::large_enum_variant)] // built once per command
+pub enum SetOutcome {
+    Granted {
+        keys: Vec<Key>,
+        waited_ms: u64,
+    },
+    /// `key` was not obtained; the keys taken before it were released again.
+    Failed {
+        key: Key,
+        outcome: Outcome,
+        released: Vec<Key>,
+    },
+}
+
+/// Canonical order: sorted by normalized text, duplicates dropped.
+pub fn canonical(keys: &[Key]) -> Vec<Key> {
+    let mut keys = keys.to_vec();
+    keys.sort_by(|a, b| a.text.cmp(&b.text));
+    keys.dedup_by(|a, b| a.text == b.text);
+    keys
+}
+
+/// Takes all keys in canonical order, or none: on the first failure the ones already taken (and
+/// not held by this owner before) are released.
+pub fn acquire_all(
+    store: &Store,
+    keys: &[Key],
+    ident: &Ident,
+    wait_turn: bool,
+    deadline: Option<Instant>,
+) -> io::Result<SetOutcome> {
+    let start = Instant::now();
+    let mut taken: Vec<Key> = Vec::new();
+    let undo = |taken: &[Key]| {
+        for k in taken {
+            let _ = crate::cmd::release::release_key(&store.key_dir(k), &ident.owner);
         }
     };
-    if opts.json {
-        let mut out =
-            json!({ "result": result, "key": key.text, "keys": [key.text], "owner": owner });
-        for (k, v) in extra.as_object().unwrap() {
-            out[k] = v.clone();
+    for key in canonical(keys) {
+        let had_it = store
+            .key_dir(&key)
+            .read_holder()
+            .ok()
+            .flatten()
+            .is_some_and(|h| h.owner == ident.owner);
+        match acquire_one(store, &key, ident, wait_turn, deadline) {
+            Ok(Outcome::Granted { .. }) => {
+                if !had_it {
+                    taken.push(key);
+                }
+            }
+            Ok(outcome) => {
+                undo(&taken);
+                return Ok(SetOutcome::Failed {
+                    key,
+                    outcome,
+                    released: taken,
+                });
+            }
+            Err(e) => {
+                undo(&taken);
+                return Err(e);
+            }
         }
-        print_json(&out);
     }
-    code
+    Ok(SetOutcome::Granted {
+        keys: canonical(keys),
+        waited_ms: start.elapsed().as_millis() as u64,
+    })
+}
+
+fn texts(keys: &[Key]) -> Vec<String> {
+    keys.iter().map(|k| k.text.clone()).collect()
+}
+
+/// Prints the outcome (one line per key, or one JSON object) and returns the exit code.
+pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
+    let owner = &opts.ident.owner;
+    match outcome {
+        SetOutcome::Granted { keys, waited_ms } => {
+            if opts.json {
+                let mut out = json!({
+                    "result": "granted", "keys": texts(keys), "owner": owner, "waited_ms": waited_ms
+                });
+                if keys.len() == 1 {
+                    out["key"] = json!(keys[0].text);
+                }
+                print_json(&out);
+            } else {
+                for k in keys {
+                    println!("granted {}", k.text);
+                }
+            }
+            EXIT_OK
+        }
+        SetOutcome::Failed {
+            key,
+            outcome,
+            released,
+        } => {
+            let (result, word, code) = match outcome {
+                Outcome::Busy { .. } => ("queued", "busy", EXIT_BUSY),
+                Outcome::Timeout { .. } => ("timeout", "timeout", EXIT_TIMEOUT),
+                Outcome::Interrupted => ("error", "interrupted", EXIT_INTERRUPTED),
+                Outcome::Granted { .. } => unreachable!("a granted key is not a failure"),
+            };
+            let mut out = json!({
+                "result": result, "key": key.text, "keys": texts(&opts_keys(opts)),
+                "owner": owner, "failed": key.text, "released": texts(released),
+            });
+            match outcome {
+                Outcome::Busy { holder, position } | Outcome::Timeout { holder, position } => {
+                    out["holder"] = json!(holder);
+                    out["position"] = json!(position);
+                    if !opts.json {
+                        let by = holder
+                            .as_ref()
+                            .map_or("nobody (queue ahead)", |h| h.owner.as_str());
+                        println!("{word} {} held by {by} (position {position})", key.text);
+                    }
+                }
+                _ => {
+                    out["error"] = json!("interrupted");
+                    if !opts.json {
+                        println!("{word} {}", key.text);
+                    }
+                }
+            }
+            if !opts.json {
+                for k in released {
+                    println!("released {}", k.text);
+                }
+            }
+            if opts.json {
+                print_json(&out);
+            }
+            code
+        }
+    }
+}
+
+fn opts_keys(opts: &AcquireOpts) -> Vec<Key> {
+    canonical(&normalize_keys(&opts.keys).unwrap_or_default())
 }
 
 pub fn run(args: Vec<String>) -> CmdResult {
@@ -316,9 +426,8 @@ pub fn run(args: Vec<String>) -> CmdResult {
     wait::install_interrupt_handler();
     let keys = normalize_keys(&opts.keys)?;
     let store = Store::open()?;
-    let key = &keys[0];
     let deadline = opts.timeout.map(|t| Instant::now() + t);
-    let outcome = acquire_one(&store, key, &opts.ident, opts.wait, deadline)
-        .map_err(|e| fs_error(format!("cannot lock {}", key.text), &e))?;
-    Ok(report(&opts, key, &outcome))
+    let outcome = acquire_all(&store, &keys, &opts.ident, opts.wait, deadline)
+        .map_err(|e| fs_error("cannot lock", &e))?;
+    Ok(report(&opts, &outcome))
 }
