@@ -2,11 +2,13 @@
 #![allow(dead_code)]
 
 mod cli;
+mod conflict;
 mod expire;
 mod fsx;
 mod heartbeat;
 mod holder;
 mod home;
+mod index;
 mod key;
 mod queue;
 mod store;
@@ -18,6 +20,7 @@ mod cmd {
     pub mod hold;
     pub mod release;
     pub mod run;
+    pub mod status;
 }
 
 fn main() {

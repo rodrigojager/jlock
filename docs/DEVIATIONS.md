@@ -28,3 +28,16 @@ Points where the implementation departs from the plan, or fills a gap the plan l
   for "interrupted".
 - **Done instead:** the ticket is removed and the command exits with 130 (the shell convention for SIGINT),
   `--json` result `error` with `"error": "interrupted"`.
+
+## 5. Waiting on conflicting keys: one ticket, ordered across queues
+
+- **What:** section 7.1 step 1 says a path request waits "with a ticket in each conflicting key".
+- **Why not:** tickets in several queues have to be created, renewed and removed together, and a crash
+  in between leaves partial state in keys the caller never asked for.
+- **Done instead:** the request has one ticket, in its own key. On each poll it also reads the queues and
+  holders of every conflicting key (folder above, files inside, `*`) and only goes ahead when no other
+  owner holds a conflicting key and no other owner has an older ticket in any conflicting queue. Ticket
+  names are global arrival times, so this is the same arrival order. Two conflicting keys taken at the
+  same instant by requests that could not see each other are caught right after the `create_new`: each
+  side re-reads the conflicting holders, and one that finds a clash withdraws its `holder.json` and keeps
+  waiting.

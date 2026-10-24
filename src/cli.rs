@@ -177,7 +177,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
             print!("{HELP}");
             Ok(EXIT_OK)
         }
-        "status" => status(rest),
+        "status" => crate::cmd::status::run(rest),
         "acquire" => crate::cmd::acquire::run(rest),
         "release" => crate::cmd::release::run(rest),
         "hold" => crate::cmd::hold::run(rest),
@@ -188,42 +188,4 @@ fn dispatch(args: Vec<String>) -> CmdResult {
             "unknown command '{other}' (see jlock --help)"
         ))),
     }
-}
-
-fn status(args: Vec<String>) -> CmdResult {
-    let mut p = Parser::new(args);
-    let mut json = false;
-    let mut input = None;
-    while let Some(arg) = p.next() {
-        match arg {
-            Arg::Flag(f) if f == "json" => json = true,
-            Arg::Pos(k) if input.is_none() => input = Some(k),
-            Arg::Pos(k) => return Err(usage(format!("status takes one key (extra '{k}')"))),
-            Arg::Flag(f) => return Err(usage(format!("status: unknown option --{f}"))),
-            Arg::Rest(_) => return Err(usage("status: unexpected '--'")),
-        }
-    }
-    let input = input.ok_or_else(|| usage("status needs a key"))?;
-    let cwd =
-        std::env::current_dir().map_err(|e| fs_error("cannot read the current directory", &e))?;
-    let key = crate::key::normalize(&input, &cwd).map_err(usage)?;
-    let root = crate::home::root().map_err(usage)?;
-    let locks = crate::home::locks_dir(&root).map_err(|e| fs_error(root.display(), &e))?;
-    let store = crate::store::Store {
-        root: root.clone(),
-        locks,
-    };
-    let kd = store.key_dir(&key);
-    if kd.exists() {
-        crate::expire::expire_key(&kd, None).map_err(|e| fs_error(&key.text, &e))?;
-        let _ = kd.cleanup();
-    }
-    let held = kd.holder_path().exists();
-    let state = if held { "held" } else { "free" };
-    if json {
-        print_json(&serde_json::json!({ "result": "ok", "key": key.text, "state": state }));
-    } else {
-        println!("{state} {}", key.text);
-    }
-    Ok(EXIT_OK)
 }
