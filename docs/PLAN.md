@@ -406,3 +406,50 @@ Tamanho estimado: núcleo 500–700 linhas, CLI 300, mais testes.
 - Painel: `jlock list --watch` numa aba do herdr; seção no HUD do OpenCode e no painel do Claude Code com as
   travas do repositório atual.
 - Publicação no crates.io (nome livre a confirmar na hora).
+
+---
+
+## 14. Fase 2: para qualquer pessoa usar (proposta de 24/10/2026, para revisão)
+
+Decisões já tomadas com o autor; viram **[rev. 5]** quando os tickets 11–17 (em `.scratch/jlock/issues/`) forem
+aprovados e executados. O roadmap público está em `ROADMAP.md`; Linux e macOS têm plano próprio em
+`docs/PLAN-LINUX-MACOS.md`.
+
+### Decisões
+
+1. **Idiomas.** Inglês é a referência e a reserva. Catálogos JSON embutidos no binário (`locales/<tag>.json`),
+   sem dependência nova; `tr(chave)` em toda string de texto. Idiomas: `en`, `pt-BR`, `es`, `fr`, `de`, `it`,
+   `zh-CN`, `ja`, `ru`, `ar`, `hi`. Comandos, opções, `--json`, `log.jsonl`, `index.json` e códigos de saída não
+   mudam com o idioma. Revisão de textos é aceita em qualquer idioma (`CONTRIBUTING.md`).
+2. **Help didático.** `jlock help <comando>` explica cada comando e **cada opção** (o que faz, padrão, exemplo),
+   com exemplos reais e os códigos de saída do comando; dicas nas saídas de texto (`JLOCK_HINTS=0` desliga);
+   legenda no `list`. `jlock about` com autor e links.
+3. **`doctor`.** Diagnostica e sugere; nunca conserta sozinho.
+4. **Releases e instalação em um comando.** Tag `v*` → binários para `x86_64-pc-windows-msvc`,
+   `x86_64-unknown-linux-musl`, `aarch64-unknown-linux-musl`, `x86_64-apple-darwin`, `aarch64-apple-darwin`,
+   `SHA256SUMS`, GitHub Release. `install.sh` e `install.ps1` na raiz; `cargo binstall jlock`.
+5. **`update` pelo `curl` do sistema.** Sem cliente HTTP em Rust (regra de dependências mínimas). PowerShell como
+   reserva no Windows. O jlock só acessa a rede em `update`, e só quando chamado.
+6. **READMEs** nos onze idiomas, com exemplos reexecutados por teste.
+
+### Acréscimos ao CLI (seção 6)
+
+| Comando / opção | O que faz |
+|---|---|
+| `jlock help [<comando>]`, `jlock <comando> --help` | ajuda geral agrupada por intenção; por comando: sinopse, descrição, tabela de opções, exemplos, códigos de saída, veja também |
+| `jlock about [--json]` | nome, versão, descrição, autor (Rodrigo Jäger), GitHub `github.com/rodrigojager`, LinkedIn `linkedin.com/in/rodrigojager`, repositório, licença, documentação |
+| `jlock doctor [--json]` | registro, primitivas (`create_new`/`rename`/`remove`), trava do SO, variáveis, `PATH`, estado atual; 0 sem `fail`, 20 com `fail` |
+| `jlock update [--check] [--version vX.Y.Z] [--json]` | último Release (ou a versão pedida) → verifica SHA256 → troca o próprio executável; `--check` só compara |
+| `--lang <tag>` (global) | idioma desta execução |
+
+| Variável | Padrão | Uso |
+|---|---|---|
+| `JLOCK_LANG` | idioma do sistema, senão `en` | idioma das saídas de texto |
+| `JLOCK_HINTS` | `1` | `0` desliga as dicas nas saídas de texto |
+| `JLOCK_UPDATE_BASE` | GitHub do projeto | origem alternativa para `update` (testes usam `file://`) |
+
+### Ordem dos tickets
+
+11 i18n (`en` + `pt-BR`) → 12 help/about (bloqueado por 11) → 13 doctor (11) → 14 release e instaladores (livre)
+→ 15 update (11, 14) → 16 traduções para os nove idiomas restantes (12, 13, 15) → 17 READMEs (13, 14, 15, 16).
+Depois: Linux e macOS (`docs/PLAN-LINUX-MACOS.md`, tickets U1–U8).
