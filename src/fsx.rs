@@ -54,7 +54,20 @@ pub fn retry<T>(path: &Path, mut op: impl FnMut() -> io::Result<T>) -> io::Resul
             _ => break,
         }
     }
-    result.map_err(|e| with_path(path, e))
+    result.map_err(|e| with_path(path, vanished(path, e)))
+}
+
+/// macOS answers EINVAL, not ENOENT, for a file or folder that another process removes at that very
+/// instant (a cleanup removing an empty key folder while a newcomer creates or lists its queue). Gone
+/// is "not found", which every caller already handles. Only EINVAL is turned, so real permission
+/// problems are never hidden.
+fn vanished(path: &Path, e: io::Error) -> io::Error {
+    #[cfg(unix)]
+    if e.raw_os_error() == Some(libc::EINVAL) && !path.exists() {
+        return io::Error::new(io::ErrorKind::NotFound, e.to_string());
+    }
+    let _ = path;
+    e
 }
 
 /// The error with the path in its message (the OS message alone does not say which file), keeping
