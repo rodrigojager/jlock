@@ -51,3 +51,13 @@ Points where the implementation departs from the plan, or fills a gap the plan l
 - **Done instead:** the index rename is tried 4 times 10 ms apart, then given up (the `.tmp` is removed);
   the next change or the global sweep writes it again. It is skipped when its content would not change.
   Lock files, tickets, `broken/` and the log rotation keep the full retry ladder.
+
+## 7. A late heartbeat no longer breaks a live `hold`/`run`
+
+- **What:** plan sections 9 and 10 say an owner frozen for more than `STALE_MS` while alive has its lock
+  broken and gets `lost`. Ticket 09 adds the OS lock and asks that a live `hold`/`run` (OS lock still
+  taken) is **not** broken when its heartbeat is late.
+- **Done instead:** as ticket 09 says. Before breaking a holder for a stale heartbeat, the expirer tries the
+  OS lock on `holder.json`; if it is taken, the owner is alive and the lock stays. A `hold`/`run` that is
+  alive but stuck therefore keeps its keys until its `--ttl` runs out or someone uses `unlock --force`.
+  Locks taken with plain `acquire` (no OS lock) expire by heartbeat exactly as in the plan.

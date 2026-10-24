@@ -12,6 +12,7 @@ mod home;
 mod index;
 mod key;
 mod log;
+mod oslock;
 mod queue;
 mod store;
 mod sweep;

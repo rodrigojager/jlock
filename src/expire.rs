@@ -113,6 +113,11 @@ pub fn expire_holder(kd: &KeyDir) -> io::Result<Option<Expired>> {
     let Some(reason) = judge(body.as_ref(), age <= stale_after()) else {
         return Ok(None);
     };
+    // A late heartbeat is not death while a `hold`/`run` still has the OS lock: the kernel would
+    // have freed it. The ttl, on the other hand, applies to the living too.
+    if reason == "stale" && crate::oslock::is_held(&path) {
+        return Ok(None);
+    }
     Ok(break_file(kd, &path, "expired.json", |b, age| {
         judge(b, age <= stale_after()).is_none()
     })?
