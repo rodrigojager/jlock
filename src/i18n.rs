@@ -7,10 +7,20 @@ use serde_json::{Map, Value};
 use std::fmt::Display;
 use std::sync::OnceLock;
 
-/// Every catalog, by tag. English first: it is the reference.
+/// Every catalog, by tag. English first: it is the reference. Other tags of a language reach its
+/// catalog through [`resolve`] (`es-MX` → `es`, `zh-TW` → `zh-CN`, `pt-PT` → `pt-BR`).
 pub const CATALOGS: &[(&str, &str)] = &[
     ("en", include_str!("../locales/en.json")),
     ("pt-BR", include_str!("../locales/pt-BR.json")),
+    ("es", include_str!("../locales/es.json")),
+    ("fr", include_str!("../locales/fr.json")),
+    ("de", include_str!("../locales/de.json")),
+    ("it", include_str!("../locales/it.json")),
+    ("zh-CN", include_str!("../locales/zh-CN.json")),
+    ("ja", include_str!("../locales/ja.json")),
+    ("ru", include_str!("../locales/ru.json")),
+    ("ar", include_str!("../locales/ar.json")),
+    ("hi", include_str!("../locales/hi.json")),
 ];
 
 static LANG: OnceLock<&'static str> = OnceLock::new();

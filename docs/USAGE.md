@@ -258,8 +258,20 @@ jlock --lang pt-BR status name:x
 livre name:x
 ```
 
-Accepted tags: `en`, `pt-BR`. A tag is matched exactly first, then by its main language
-(`pt`, `pt_PT.UTF-8` → `pt-BR`); an unknown tag prints a warning and the run goes on in English.
+| Tag | Language | | Tag | Language |
+|---|---|---|---|---|
+| `en` | English | | `zh-CN` | 简体中文 |
+| `pt-BR` | Português (Brasil) | | `ja` | 日本語 |
+| `es` | Español | | `ru` | Русский |
+| `fr` | Français | | `ar` | العربية |
+| `de` | Deutsch | | `hi` | हिन्दी |
+| `it` | Italiano | | | |
+
+A tag is matched exactly first, then by its main language (`pt`, `pt_PT.UTF-8` → `pt-BR`; `es-MX` →
+`es`; `zh-TW` → `zh-CN`); an unknown tag prints a warning and the run goes on in English. To make a
+language the default for your shell, set `JLOCK_LANG` (for example `export JLOCK_LANG=ja`, or
+`$env:JLOCK_LANG = "ja"` in PowerShell). The Chinese, Japanese, Russian, Arabic and Hindi texts still
+await a review by a native speaker; corrections are welcome, see [`CONTRIBUTING.md`](../CONTRIBUTING.md).
 
 What never changes with the language: command and option names, every `--json` output, `log.jsonl`,
 `index.json` and the exit codes. Scripts should read `--json`; the text is for people. The OS message

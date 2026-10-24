@@ -37,8 +37,15 @@ pub fn wrap(text: &str, first: &str, indent: &str, columns: usize) -> String {
                 fresh = false;
                 continue;
             }
+            // CJK text can break between any two characters: it goes on filling this line. Other
+            // words start a new one.
+            let wide = word.chars().any(|c| char_width(c) == 2);
             if !fresh {
-                flush(&mut line, &mut fresh, &mut out);
+                if wide && width(&line) + 2 < columns {
+                    line.push(' ');
+                } else {
+                    flush(&mut line, &mut fresh, &mut out);
+                }
             }
             for c in word.chars() {
                 if !fresh && width(&line) + char_width(c) > columns {

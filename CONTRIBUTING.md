@@ -51,15 +51,41 @@ for example by putting the number after a noun ("waiting: {n}").
 - The operating system's own message inside a file system error, which comes in the system's language.
 - `JLOCK_DEBUG` traces.
 
+### Width and direction
+
+Help pages are wrapped at 100 terminal columns. Chinese and Japanese characters take two columns each
+and jlock counts them that way (`src/i18n.rs`, `width`), so a line of CJK text breaks earlier; keep the
+example comments in `help.cmd.*.examples` short (they are not wrapped). Arabic is printed as plain text:
+jlock adds no bidirectional control characters and leaves the display to the terminal, which may show
+mixed Arabic and Latin text (command names, keys) in an order that reads oddly. Suggestions that read
+better in common terminals are welcome.
+
 ### Status of the languages
 
 | Tag | Language | Status |
 |---|---|---|
 | `en` | English | complete (reference) |
 | `pt-BR` | Português (Brasil) | complete |
+| `es` | Español | complete |
+| `fr` | Français | complete |
+| `de` | Deutsch | complete |
+| `it` | Italiano | complete |
+| `zh-CN` | 简体中文 | complete, **native review pending** |
+| `ja` | 日本語 | complete, **native review pending** |
+| `ru` | Русский | complete, **native review pending** |
+| `ar` | العربية | complete, **native review pending** |
+| `hi` | हिन्दी | complete, **native review pending** |
+
+"Native review pending" means the translation was written without a native speaker and may sound
+stiff or strange. If you speak one of these languages, a review is the most useful contribution you can
+make: read `jlock --lang <tag> help`, `jlock --lang <tag> help acquire` and the catalog itself, and
+send what you would say differently.
 
 ## Reviewing the text
 
-Corrections to the wording are accepted and welcome in **any language, English included**: clarity, tone,
-terms that read oddly. You do not need to know Rust. Either open a pull request that changes only the
-JSON file, or open an issue with the sentence as it is and your suggestion.
+**Reviews of the text are accepted and welcome in any language, English included**: clarity, tone,
+terms that read oddly, a sentence that says too much or too little. You do not need to know Rust:
+
+- open a pull request that changes only `locales/<tag>.json` (run `cargo test --test i18n` if you can;
+  CI runs it anyway), or
+- open an issue with the sentence as it is today, the command that prints it, and your suggestion.
