@@ -167,7 +167,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 |---|---|
 | `jlock acquire <chave…> [--owner id] [--group g] [--intent "…"] [--meta k=v…] [--ttl 2h] [--wait\|--no-wait] [--timeout 30s] [--json]` | pega todas as chaves (ordem canônica, tudo ou nada). Padrão: espera sem limite. Saída: `granted`; `queued` (dono e posição) com `--no-wait`; `timeout` (dono e posição) com `--timeout` vencido; `deadlock` com a cadeia. **[rev. 4]** Na linha de texto, `--no-wait` escreve `busy <chave> held by <dono> (position N)`; o `--json` diz `queued`. Pedir de novo uma chave que o mesmo `owner` já tem é `granted` na hora. |
 | `jlock run <chave…> [opções de acquire] -- <comando…>` | como `flock(1)`: pega, mantém heartbeat, roda o comando, libera ao terminar (ou ao morrer: expira). Código de saída do comando é repassado. |
-| `jlock hold <chave…> [opções de acquire]` | fica vivo renovando o heartbeat; encerra ao receber a linha `release` na entrada padrão, SIGINT/CTRL+C, ou ao ser encerrado. Imprime `granted` e depois eventos (`lost`). |
+| `jlock hold <chave…> [opções de acquire] [--detach]` | fica vivo renovando o heartbeat; encerra ao receber a linha `release` na entrada padrão, SIGINT/CTRL+C, ou ao ser encerrado. Imprime `granted` e depois eventos (`lost`). **[rev. 5]** Quando o próprio dono devolve uma chave com `jlock release` (o log diz `release` dele), o `hold` imprime `released`, segue com as outras e sai com 0 quando não sobra nenhuma; `lost`/14 fica para trava quebrada ou expirada. Com `--detach`, responde como o `hold` (mesma saída, mesmo código) e volta, enquanto um segundo `jlock hold`, desligado do terminal, mantém a trava até `release`, `--ttl` ou `unlock --force`: uma chamada só para um agente. |
 | `jlock release [<chave…>] [--owner id] [--group g]` | libera (só o dono). Sem chaves: tudo do dono; com `--group`: tudo do grupo. |
 | `jlock heartbeat <chave> --owner id` | renova; `lost` se a trava não é mais sua. (Para quem não usa `hold`.) |
 | `jlock status <chave>` | dono e fila da chave, inclusive conflitos por hierarquia (pasta acima ou arquivos dentro). |
@@ -473,6 +473,14 @@ macOS têm plano próprio em `docs/PLAN-LINUX-MACOS.md`.
    `128 + sinal`. Hoje o `run` ignora o sinal e segura até o comando terminar.
 9. **Pacotes Unix.** 0.2: `install.sh` (feito), Homebrew e `cargo binstall` (feito). `.deb`/`.rpm` e AUR só no
    0.3, depois da suíte verde em Linux de verdade (U1, U7).
+10. **`hold --detach` para agentes** (pedido do autor, 24/10/2026, depois dos tickets). Um agente passa minutos
+   entre dois comandos, e uma trava de `acquire` puro expira em `JLOCK_STALE_MS` sem `heartbeat`; manter um
+   `hold` vivo exigia uma chamada em segundo plano e outra para saber a resposta. Com `--detach`, uma chamada
+   espera a vez, responde (mesma saída e mesmo código do `hold`) e volta; um segundo `jlock hold`, iniciado
+   desligado do terminal (sessão própria no Unix; `DETACHED_PROCESS` e, quando o job permite, fora do job do
+   chamador no Windows) e sem herdar os handles padrão do primeiro, mantém a trava até `release`, `--ttl` ou
+   `unlock --force`. Junto: o `release` do próprio dono encerra um `hold` com 0, sem registrar `lost` (o
+   `hold` confere no fim do log se o último evento da chave é um `release` desse dono).
 
 ### O que ficou para o CI ou para o autor
 

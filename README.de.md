@@ -93,25 +93,47 @@ erhalten, in dem Alice sie freigibt. `jlock help acquire` erklärt jede Option.
 ## Aus einem Agenten heraus
 
 Ein Agent (Claude Code, OpenCode, Codex oder jeder andere) nimmt, was er gleich ändern wird, behält es,
-während er arbeitet, und gibt es am Ende zurück:
+während er arbeitet, und gibt es am Ende zurück. Dafür braucht es zwei Aufrufe:
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   nimmt beide Dateien oder keine und wartet, bis es an der Reihe ist. `--owner` ist die Identität des
-   Agenten über alle Befehle hinweg; `--group` fasst alles zusammen, was eine Aufgabe hält.
-2. `jlock hold src/parser.rs src/lexer.rs --owner agent-7` im Hintergrund hält die Sperre am Leben (sie wird
-   sofort erteilt, da der Besitzer die Dateien bereits hält). Ohne das musst du `jlock heartbeat` öfter als
-   alle 30 Sekunden aufrufen.
-3. `jlock release --group task-42 --owner agent-7` am Ende; oder schreib die Zeile `release` auf die
-   Standardeingabe von `hold`.
-4. Endet `hold` mit Code 14 (`lost`), hat jemand die Sperre aufgebrochen oder sie ist abgelaufen: Hör auf zu
-   bearbeiten.
+1. **Nehmen:** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   nimmt beide Dateien oder keine, wartet, bis es an der Reihe ist, falls jemand anderes sie hat, antwortet
+   `granted` und kehrt zurück. Ein kleiner jlock-Prozess bleibt im Hintergrund und hält die Sperre am Leben,
+   sodass der Agent dafür keine Aufrufe und keine Tokens verbraucht. `--owner` ist die Identität des Agenten
+   über alle Befehle hinweg; `--group` fasst alles zusammen, was eine Aufgabe hält.
+2. **Zurückgeben:** `jlock release --group task-42 --owner agent-7`, wenn die Aufgabe erledigt ist. Der
+   Hintergrundprozess bemerkt es und endet.
+
+Optionen, die du kennen solltest:
+
+- `--no-wait`: nicht in der Warteschlange warten. Ist eine Datei belegt, kommt die Antwort sofort (`busy`,
+  Exit-Code 10), samt dem, der sie hat, sodass der Agent sich andere Arbeit suchen kann, statt stillzustehen.
+- `--timeout 2m`: höchstens so lange warten, dann aufgeben (Exit-Code 11).
+- `--ttl 2h`: eine Sicherheitsgrenze. Die Sperre verschwindet nach dieser Zeit von selbst, auch wenn der
+  Agent sie nie freigibt.
+
+Warum nicht einfach `jlock acquire`? Eine mit `acquire` genommene Sperre überdauert den Befehl ebenfalls, muss
+aber mindestens alle 30 Sekunden erneuert werden (`jlock heartbeat`), sonst gilt sie als tot und läuft ab. Ein
+Agent verbringt Minuten zwischen zwei Befehlen, deshalb ist `hold --detach` das Werkzeug für ihn; `acquire` ist
+für Programme, die selbst erneuern. Bricht jemand die Sperre auf (`jlock unlock --force`), endet der
+Hintergrundprozess, und `jlock heartbeat <file> --owner agent-7` antwortet `lost` (Exit-Code 13): Nach einer
+langen Pause lohnt sich diese Prüfung.
+
+Der ganze Ablauf, an einem Namen:
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+erteilt name:port-3000
+$ jlock release --group task-42 --owner agent-7
+freigegeben name:port-3000
+```
 
 Mit `--json` gibt jeder Befehl ein einziges JSON-Objekt aus, in jeder Sprache gleich:
 
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
+{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":0}
 ```
 
 ## Aus einem Skript heraus
@@ -130,7 +152,7 @@ Hier ist der Befehl jlock selbst, so siehst du die Sperre, die gehalten wird, so
 ```text
 $ jlock run name:nightly -- jlock list
 SCHLÜSSEL     BESITZER    GRUPPE  ABSICHT  DAUER  HEARTBEAT  WARTEND
-name:nightly  pid:189184  -       -        46ms   46ms       0
+name:nightly  pid:182568  -       -        26ms   25ms       0
 
 1 Sperre, 0 warten
 $ jlock list

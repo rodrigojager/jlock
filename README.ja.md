@@ -74,13 +74,29 @@ $ jlock status name:demo
 
 ## エージェントから使う
 
-エージェント（Claude Code、OpenCode、Codex、その他何でも）は、これから変更するものを取得し、作業中はそれを保持し、最後に返す。
+エージェント（Claude Code、OpenCode、Codex、その他何でも）は、これから変更するものを取得し、作業中はそれを保持し、最後に返す。必要な呼び出しは 2 回だけである。
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   は、両方のファイルを取得するか、どちらも取得しないかのどちらかで、順番が来るまで待つ。`--owner` はコマンドをまたいで使うエージェントの識別子で、`--group` は 1 つのタスクが保持するものすべてをまとめる。
-2. `jlock hold src/parser.rs src/lexer.rs --owner agent-7` をバックグラウンドで動かすと、ロックが生き続ける（所有者はすでにファイルを保持しているので、すぐに取得できる）。これを使わない場合は、`jlock heartbeat` を 30 秒より短い間隔で呼ぶ。
-3. 最後に `jlock release --group task-42 --owner agent-7` を実行する。または、`hold` の標準入力に `release` という行を書く。
-4. `hold` が終了コード 14（`lost`）で終了したら、誰かがロックを破棄したか、ロックが失効したということである。編集をやめること。
+1. **取得:** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   は、両方のファイルを取得するか、どちらも取得しないかのどちらかで、他の誰かが持っていれば順番を待ち、`granted` と答えて戻る。小さな jlock プロセスがバックグラウンドに残ってロックを生かし続けるので、エージェントはそのために呼び出しもトークンも使わない。`--owner` はコマンドをまたいで使うエージェントの識別子で、`--group` は 1 つのタスクが保持するものすべてをまとめる。
+2. **返却:** タスクが終わったら `jlock release --group task-42 --owner agent-7` を実行する。バックグラウンドのプロセスはそれに気づいて終了する。
+
+知っておくと便利なオプション:
+
+- `--no-wait`: 列に並んで待たない。ファイルが使用中なら、誰が持っているかを添えてすぐに答えが返る（`busy`、終了コード 10）。エージェントは立ち止まらずに別の作業を選べる。
+- `--timeout 2m`: 最大この時間だけ待ち、その後諦める（終了コード 11）。
+- `--ttl 2h`: 安全のための上限。エージェントが一度も解放しなくても、この時間が経つとロックはひとりでに消える。
+
+なぜ普通の `jlock acquire` ではないのか。`acquire` で取得したロックもコマンドの終了後に残るが、少なくとも 30 秒ごとに更新（`jlock heartbeat`）しなければ死んだものとみなされ、失効する。エージェントは 2 つのコマンドの間に何分もかけるので、エージェントに合うのは `hold --detach` である。`acquire` は自分で更新するプログラム向けである。誰かがロックを破棄した（`jlock unlock --force`）場合、バックグラウンドのプロセスは終了し、`jlock heartbeat <file> --owner agent-7` は `lost`（終了コード 13）と答える。長く間を空けた後には確かめる価値がある。
+
+名前を使った一連の流れ:
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+取得 name:port-3000
+$ jlock release --group task-42 --owner agent-7
+解放 name:port-3000
+```
 
 `--json` を付けると、どのコマンドも JSON オブジェクトを 1 つ出力する。その内容はどの言語でも同じである。
 
@@ -105,7 +121,7 @@ jlock run name:deploy-prod --timeout 2m -- ./deploy.sh
 ```text
 $ jlock run name:nightly -- jlock list
 キー          所有者      グループ  用途  保持  ハートビート  キュー
-name:nightly  pid:180936  -         -     74ms  74ms          0
+name:nightly  pid:189108  -         -     24ms  22ms          0
 
 ロック 1 件, 待機 0 件
 $ jlock list

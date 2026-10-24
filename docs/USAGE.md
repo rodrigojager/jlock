@@ -61,9 +61,27 @@ granted d:/proj/src
 ```
 
 Prints `granted`, then stays alive renewing the heartbeat. It releases and exits 0 on a `release` line
-on standard input, CTRL+C or SIGTERM. If the lock is taken away it prints `lost <key>` and exits 14.
-While held, `holder.json` also carries an operating-system lock (`LockFileEx` / `flock`), so the
-kernel frees it the instant the process dies.
+on standard input, CTRL+C or SIGTERM. When the owner gives a key back with `jlock release`, `hold` prints
+`released <key>`, keeps the others, and exits 0 when none is left (the log shows a `release`, not a loss).
+If the lock is taken away (`unlock --force`, expiration) it prints `lost <key>` and exits 14. While held,
+`holder.json` also carries an operating-system lock (`LockFileEx` / `flock`), so the kernel frees it the
+instant the process dies.
+
+```
+jlock hold src/a.ts src/b.ts --owner agent-7 --group task-42 --ttl 2h --detach
+granted d:/proj/src/a.ts
+granted d:/proj/src/b.ts
+jlock release --group task-42 --owner agent-7
+```
+
+`--detach` makes it one call: `hold` waits its turn (or answers `busy` with `--no-wait`, `timeout` with
+`--timeout`), prints the same answer with the same exit code, and returns; a second `jlock hold`,
+started detached from the terminal (its own session on Unix; `DETACHED_PROCESS` and, when the caller's
+job allows it, out of that job on Windows), keeps the lock alive until `jlock release`, its `--ttl` or
+`unlock --force`. It writes nothing anywhere afterwards; the log keeps what happened. This is the way for
+an agent to hold files for a whole task: a lock taken with plain `acquire` expires after
+`JLOCK_STALE_MS` (30 s) without a `jlock heartbeat`, and an agent spends minutes between two commands.
+A `--ttl` is a good idea with `--detach`, as a limit if the agent never releases.
 
 ### `release` — give keys back
 

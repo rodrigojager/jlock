@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod conflict;
+mod detach;
 mod expire;
 mod fetch;
 mod fsx;

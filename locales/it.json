@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "Tiene chiavi finché non gli si dice di smettere.",
   "help.cmd.hold.usage": "<chiave...> [opzioni]",
-  "help.cmd.hold.desc": "Prende le chiavi (con le stesse opzioni di acquire), stampa concessa, poi resta in esecuzione rinnovando il blocco. Rilascia ed esce con 0 quando legge la riga release dal suo standard input, con CTRL+C, o quando viene terminato. Mentre è in esecuzione, il sistema operativo blocca anche holder.json, così il blocco si libera nell'istante in cui il processo muore. Se il blocco gli viene tolto, stampa persa ed esce con 14.",
-  "help.cmd.hold.examples": "# Tiene i file di un'attività finché è in corso (avvialo in background)\njlock hold src/a.ts src/b.ts --owner agente-7 --group attivita-42\n# Più tardi, scrivi questa riga nel suo standard input per lasciarle:\nrelease",
+  "help.cmd.hold.desc": "Prende le chiavi (con le stesse opzioni di acquire), stampa concessa, poi resta in esecuzione rinnovando il blocco. Rilascia ed esce con 0 quando legge la riga release dal suo standard input, con CTRL+C, o quando viene terminato; termina con 0 anche quando il suo proprietario restituisce le chiavi con jlock release. Mentre è in esecuzione, il sistema operativo blocca anche holder.json, così il blocco si libera nell'istante in cui il processo muore. Se il blocco gli viene tolto, stampa persa ed esce con 14. Con --detach risponde e torna subito, e un secondo processo mantiene il blocco in background: il modo più semplice per un agente di tenere i file di un'intera attività.",
+  "help.cmd.hold.examples": "# Un agente prende i file della sua attività: una chiamata, la risposta in mano\njlock hold src/a.ts src/b.ts --owner agente-7 --group attivita-42 --detach\n# ... e li restituisce alla fine\njlock release --group attivita-42 --owner agente-7\n# In primo piano, scrivere release nel suo standard input lo rilascia\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "Risponde e torna come acquire (concessa, occupata, tempo esaurito, con gli stessi codici di uscita), mentre un secondo jlock hold mantiene vivo il blocco in background fino a jlock release, al --ttl o a unlock --force. Una sola chiamata per un agente, con la risposta in mano.",
   "help.exit.hold.0": "rilasciata, dopo release, CTRL+C o terminazione",
 
   "help.cmd.release.summary": "Restituisce chiavi.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "impossibile creare {path}",
   "error.run_needs_command": "run richiede un comando dopo '--'",
   "error.cannot_run": "impossibile eseguire {cmd}",
+  "error.cannot_detach": "impossibile avviare il jlock hold in background",
   "error.waiting_for": "in attesa di {cmd}",
   "error.release_needs": "release richiede chiavi, --owner o --group",
   "error.any_owner_group": "--any-owner va solo con --group",

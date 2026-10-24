@@ -107,17 +107,41 @@ $ jlock status name:demo
 ## الاستخدام من وكيل
 
 يأخذ الوكيل (Claude Code أو OpenCode أو Codex أو أي وكيل آخر) ما هو على وشك تغييره، ويحتفظ به أثناء عمله،
-ثم يُرجعه في النهاية:
+ثم يُرجعه في النهاية. ويكفي لذلك استدعاءان:
 
-1. الأمر `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   يأخذ الملفين معًا أو لا يأخذ أيًّا منهما، وينتظر دوره. الخيار `--owner` هو هوية الوكيل عبر الأوامر كلها؛
-   والخيار `--group` يربط معًا كل ما تحتفظ به مهمة واحدة.
-2. الأمر `jlock hold src/parser.rs src/lexer.rs --owner agent-7` يعمل في الخلفية ويُبقي القفل حيًا (ويُمنح
-   فورًا، لأن المالك يملك الملفين أصلًا). وإن لم تستخدمه، فاستدعِ `jlock heartbeat` مرة واحدة على الأقل كل
-   30 ثانية.
-3. الأمر `jlock release --group task-42 --owner agent-7` في النهاية؛ أو اكتب السطر `release` في الدخل
-   القياسي لـ `hold`.
-4. إن خرج `hold` بالرمز 14 (`lost`)، فهذا يعني أن أحدًا كسر القفل أو أن صلاحيته انتهت: توقّف عن التعديل.
+1. **الأخذ:** الأمر `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   يأخذ الملفين معًا أو لا يأخذ أيًّا منهما، وينتظر دوره إن كانا لدى غيره، ثم يجيب `مُنح` ويعود. وتبقى عملية
+   صغيرة من jlock في الخلفية تُبقي القفل حيًا، فلا ينفق الوكيل على ذلك أي استدعاءات ولا أي توكنات. الخيار
+   `--owner` هو هوية الوكيل عبر الأوامر كلها؛ والخيار `--group` يربط معًا كل ما تحتفظ به مهمة واحدة.
+2. **الإرجاع:** الأمر `jlock release --group task-42 --owner agent-7` عند انتهاء المهمة. فتلاحظ العملية التي
+   في الخلفية ذلك وتنتهي.
+
+خيارات تستحق المعرفة:
+
+- `--no-wait`: لا ينتظر في الطابور. إن كان ملف مأخوذًا، يأتي الجواب فورًا (`مشغول`، رمز الخروج 10) مع من
+  يملكه، فيستطيع الوكيل أن يختار عملًا آخر بدل أن يبقى واقفًا.
+- `--timeout 2m`: ينتظر هذه المدة على الأكثر، ثم يستسلم (رمز الخروج 11).
+- `--ttl 2h`: حد أمان. يزول القفل من تلقاء نفسه بعد هذه المدة، حتى لو لم يحرّره الوكيل أبدًا.
+
+لماذا لا يكفي `jlock acquire` وحده؟ القفل المأخوذ بـ `acquire` يبقى هو أيضًا بعد انتهاء الأمر، لكن يجب
+تجديده (`jlock heartbeat`) مرة كل 30 ثانية على الأقل، وإلا عُدّ ميتًا وانتهت صلاحيته. والوكيل يقضي دقائق بين
+أمرين، لذا فإن `hold --detach` هو أداته؛ أما `acquire` فللبرامج التي تجدد القفل بنفسها. وإن كسر أحدهم القفل
+(`jlock unlock --force`)، تنتهي العملية التي في الخلفية، ويجيب `jlock heartbeat <file> --owner agent-7` بـ
+`فُقد` (رمز الخروج 13): ويستحق ذلك التحقق بعد توقف طويل.
+
+الدورة كاملة، على اسم:
+
+<!-- jlock-example -->
+<div dir="ltr">
+
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+مُنح name:port-3000
+$ jlock release --group task-42 --owner agent-7
+حُرّر name:port-3000
+```
+
+</div>
 
 مع `--json`، يطبع كل أمر كائن JSON واحدًا، وهو نفسه في كل اللغات:
 
@@ -126,7 +150,7 @@ $ jlock status name:demo
 
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":0}
+{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
 ```
 
 </div>
@@ -153,7 +177,7 @@ jlock run name:deploy-prod --timeout 2m -- ./deploy.sh
 ```text
 $ jlock run name:nightly -- jlock list
 المفتاح       المالك      المجموعة  الغرض  المدة  النبضة  الطابور
-name:nightly  pid:188824  -         -      20ms   19ms    0
+name:nightly  pid:178108  -         -      102ms  101ms   0
 
 الأقفال: 1, في الانتظار: 0
 $ jlock list

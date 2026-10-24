@@ -74,13 +74,29 @@ $ jlock status name:demo
 
 ## 在智能体中使用
 
-智能体（Claude Code、OpenCode、Codex 或其他任何智能体）先获取它要修改的东西，在工作期间一直持有，结束时归还：
+智能体（Claude Code、OpenCode、Codex 或其他任何智能体）先获取它要修改的东西，在工作期间一直持有，结束时归还。这只需要两次调用：
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   要么获取两个文件，要么一个都不获取，并排队等候。`--owner` 是智能体跨命令使用的身份；`--group` 把一个任务持有的所有锁归在一起。
-2. 在后台运行 `jlock hold src/parser.rs src/lexer.rs --owner agent-7`，让锁保持有效（它会立即被授予，因为该所有者已经持有这些文件）。如果不用它，就要以短于 30 秒的间隔调用 `jlock heartbeat`。
-3. 结束时运行 `jlock release --group task-42 --owner agent-7`；或者向 `hold` 的标准输入写入一行 `release`。
-4. 如果 `hold` 以退出码 14（`lost`）退出，说明有人解除了这个锁或使其过期：请停止编辑。
+1. **获取：** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   要么获取两个文件，要么一个都不获取；如果别人正持有它们，就排队等候，然后回答 `granted` 并返回。一个小小的 jlock 进程留在后台让锁保持有效，因此智能体无需为此花费任何调用，也不花费 token。`--owner` 是智能体跨命令使用的身份；`--group` 把一个任务持有的所有锁归在一起。
+2. **归还：** 任务完成后运行 `jlock release --group task-42 --owner agent-7`。后台进程会察觉并结束。
+
+值得了解的选项：
+
+- `--no-wait`：不排队等候。如果某个文件已被占用，会立即得到回答（`busy`，退出码 10）以及谁持有它，这样智能体可以去做别的工作，而不是原地等待。
+- `--timeout 2m`：最多等待这么久，然后放弃（退出码 11）。
+- `--ttl 2h`：安全上限。经过这段时间后锁会自行消失，即使智能体从未释放它。
+
+为什么不直接用 `jlock acquire`？用 `acquire` 获取的锁同样会在命令结束后保留，但必须至少每 30 秒续期一次（`jlock heartbeat`），否则会被视为失效并过期。智能体在两条命令之间往往要花上几分钟，所以 `hold --detach` 才是适合它的工具；`acquire` 适用于能自行续期的程序。如果有人解除了锁（`jlock unlock --force`），后台进程会结束，`jlock heartbeat <file> --owner agent-7` 会回答 `lost`（退出码 13）：长时间停顿后值得检查一下。
+
+在一个名称上完整走一遍：
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+已授予 name:port-3000
+$ jlock release --group task-42 --owner agent-7
+已释放 name:port-3000
+```
 
 使用 `--json` 时，每个命令都输出一个 JSON 对象，在所有语言下都相同：
 
@@ -105,7 +121,7 @@ jlock run name:deploy-prod --timeout 2m -- ./deploy.sh
 ```text
 $ jlock run name:nightly -- jlock list
 键            所有者      组  用途  时长  心跳  队列
-name:nightly  pid:178320  -   -     24ms  24ms  0
+name:nightly  pid:188636  -   -     25ms  24ms  0
 
 1 个锁, 0 个在等待
 $ jlock list

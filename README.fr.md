@@ -94,18 +94,42 @@ libère. `jlock help acquire` explique chaque option.
 ## L'utiliser depuis un agent
 
 Un agent (Claude Code, OpenCode, Codex ou n'importe quel autre) prend ce qu'il s'apprête à modifier, le
-garde pendant qu'il travaille, et le rend à la fin:
+garde pendant qu'il travaille, et le rend à la fin. Il suffit de deux appels:
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   prend les deux fichiers ou aucun, en attendant son tour. `--owner` est l'identité de l'agent d'une
-   commande à l'autre; `--group` relie tout ce que détient une même tâche.
-2. `jlock hold src/parser.rs src/lexer.rs --owner agent-7` en arrière-plan garde le verrou en vie (il est
-   accordé tout de suite, puisque le propriétaire détient déjà les fichiers). Sans lui, appelez
-   `jlock heartbeat` plus souvent que toutes les 30 secondes.
-3. `jlock release --group task-42 --owner agent-7` à la fin; ou écrivez la ligne `release` sur l'entrée
-   standard de `hold`.
-4. Si `hold` sort avec le code 14 (`lost`), quelqu'un a cassé le verrou ou l'a fait expirer: arrêtez de
-   modifier.
+1. **Prendre:** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   prend les deux fichiers ou aucun, en attendant son tour si quelqu'un d'autre les a, répond `accordé` et
+   rend la main. Un petit processus jlock reste en arrière-plan et garde le verrou en vie, si bien que
+   l'agent n'y dépense ni appels ni tokens. `--owner` est l'identité de l'agent d'une commande à l'autre;
+   `--group` relie tout ce que détient une même tâche.
+2. **Rendre:** `jlock release --group task-42 --owner agent-7` quand la tâche est finie. Le processus en
+   arrière-plan s'en aperçoit et s'arrête.
+
+Les options à connaître:
+
+- `--no-wait`: ne pas attendre dans la file d'attente. Si un fichier est pris, la réponse arrive tout de
+  suite (`occupé`, code de sortie 10) avec son détenteur, et l'agent peut passer à autre chose au lieu de
+  rester planté.
+- `--timeout 2m`: attendre au plus ce délai, puis abandonner (code de sortie 11).
+- `--ttl 2h`: une limite de sécurité. Le verrou disparaît de lui-même passé ce délai, même si l'agent ne
+  le rend jamais.
+
+Pourquoi pas simplement `jlock acquire`? Un verrou pris avec `acquire` survit lui aussi à la commande, mais
+il doit être renouvelé (`jlock heartbeat`) au moins toutes les 30 secondes, sinon il est considéré comme
+mort et expire. Un agent passe des minutes entre deux commandes, donc `hold --detach` est l'outil qu'il lui
+faut; `acquire` est fait pour les programmes qui renouvellent d'eux-mêmes. Si quelqu'un casse le verrou
+(`jlock unlock --force`), le processus en arrière-plan s'arrête et
+`jlock heartbeat <fichier> --owner agent-7` répond `perdu` (code de sortie 13): à vérifier après une
+longue pause.
+
+Le cycle complet, sur un nom:
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+accordé name:port-3000
+$ jlock release --group task-42 --owner agent-7
+libéré name:port-3000
+```
 
 Avec `--json`, chaque commande affiche un seul objet JSON, identique dans toutes les langues:
 
@@ -131,7 +155,7 @@ Ici, la commande est jlock lui-même, ce qui permet de voir le verrou tenu penda
 ```text
 $ jlock run name:nightly -- jlock list
 CLÉ           PROPRIÉTAIRE  GROUPE  INTENTION  DEPUIS  HEARTBEAT  FILE
-name:nightly  pid:172384    -       -          24ms    24ms       0
+name:nightly  pid:181076    -       -          34ms    33ms       0
 
 1 verrou, 0 en attente
 $ jlock list

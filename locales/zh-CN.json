@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "持有键，直到被要求停止。",
   "help.cmd.hold.usage": "<键...> [选项]",
-  "help.cmd.hold.desc": "获取键（选项与 acquire 相同），输出“已授予”，然后持续运行并续期锁。当它从标准输入读到一行 release、收到 CTRL+C 或被终止时，释放锁并以 0 退出。运行期间，操作系统也会锁住 holder.json，因此进程一旦退出，锁会立即释放。如果锁被夺走，它输出“已丢失”并以 14 退出。",
-  "help.cmd.hold.examples": "# 任务运行期间持有其文件（在后台启动）\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42\n# 之后向它的标准输入写入这一行即可释放：\nrelease",
+  "help.cmd.hold.desc": "获取键（选项与 acquire 相同），输出“已授予”，然后持续运行并续期锁。当它从标准输入读到一行 release、收到 CTRL+C 或被终止时，释放锁并以 0 退出；当其所有者用 jlock release 归还这些键时，它也以 0 结束。运行期间，操作系统也会锁住 holder.json，因此进程一旦退出，锁会立即释放。如果锁被夺走，它输出“已丢失”并以 14 退出。使用 --detach 时，它立即回答并返回，由第二个进程在后台持有锁：这是智能体持有整个任务的文件最简单的方式。",
+  "help.cmd.hold.examples": "# 智能体获取任务的文件：一次调用，立即得到回答\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42 --detach\n# ……结束时归还\njlock release --group task-42 --owner agent-7\n# 在前台运行时，向标准输入写入 release 即释放\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "像 acquire 一样回答并返回（已授予、忙、超时，退出码相同），同时由第二个 jlock hold 在后台让锁保持有效，直到 jlock release、--ttl 到期或 unlock --force。对智能体来说只需一次调用，立即得到回答。",
   "help.exit.hold.0": "已释放：在 release、CTRL+C 或终止之后",
 
   "help.cmd.release.summary": "归还键。",
@@ -357,6 +358,7 @@
   "error.cannot_create": "无法创建 {path}",
   "error.run_needs_command": "run 需要在 '--' 之后给出命令",
   "error.cannot_run": "无法运行 {cmd}",
+  "error.cannot_detach": "无法启动后台的 jlock hold",
   "error.waiting_for": "等待 {cmd} 时出错",
   "error.release_needs": "release 需要键、--owner 或 --group",
   "error.any_owner_group": "--any-owner 只能与 --group 一起使用",

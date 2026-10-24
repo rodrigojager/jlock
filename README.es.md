@@ -92,17 +92,40 @@ liberara. `jlock help acquire` explica cada opción.
 ## Uso desde un agente
 
 Un agente (Claude Code, OpenCode, Codex o cualquier otro) toma lo que va a cambiar, lo conserva mientras
-trabaja y lo devuelve al final:
+trabaja y lo devuelve al final. Bastan dos llamadas:
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   toma los dos archivos o ninguno, esperando su turno. `--owner` es la identidad del agente de un comando
-   a otro; `--group` agrupa todo lo que tiene una misma tarea.
-2. `jlock hold src/parser.rs src/lexer.rs --owner agent-7` en segundo plano mantiene vivo el bloqueo (se
-   concede al instante, porque el dueño ya tiene los archivos). Sin él, llama a `jlock heartbeat` con más
-   frecuencia que cada 30 segundos.
-3. `jlock release --group task-42 --owner agent-7` al final; o escribe la línea `release` en la entrada
-   estándar de `hold`.
-4. Si `hold` sale con el código 14 (`lost`), alguien rompió el bloqueo o este caducó: deja de editar.
+1. **Tomar:** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   toma los dos archivos o ninguno, esperando su turno si otro los tiene, responde `concedida` y vuelve.
+   Un pequeño proceso de jlock se queda en segundo plano manteniendo vivo el bloqueo, así que el agente no
+   gasta llamadas, ni tokens, en eso. `--owner` es la identidad del agente de un comando a otro; `--group`
+   agrupa todo lo que tiene una misma tarea.
+2. **Devolver:** `jlock release --group task-42 --owner agent-7` cuando la tarea termina. El proceso en
+   segundo plano lo nota y termina.
+
+Opciones que conviene conocer:
+
+- `--no-wait`: no esperar en la cola. Si un archivo está ocupado, la respuesta llega al momento (`ocupada`,
+  código de salida 10) con quién lo tiene, y el agente puede tomar otro trabajo en lugar de quedarse quieto.
+- `--timeout 2m`: esperar como máximo este tiempo y luego desistir (código de salida 11).
+- `--ttl 2h`: un límite de seguridad. El bloqueo desaparece solo pasado este tiempo, aunque el agente nunca
+  lo devuelva.
+
+¿Por qué no un simple `jlock acquire`? Un bloqueo tomado con `acquire` también sobrevive al comando, pero
+hay que renovarlo (`jlock heartbeat`) al menos cada 30 segundos, o se da por muerto y caduca. Un agente pasa
+minutos entre dos comandos, así que `hold --detach` es la herramienta para él; `acquire` es para programas
+que renuevan por sí mismos. Si alguien rompe el bloqueo (`jlock unlock --force`), el proceso en segundo
+plano termina y `jlock heartbeat <archivo> --owner agent-7` responde `perdida` (código de salida 13): vale la
+pena comprobarlo tras una pausa larga.
+
+El ciclo completo, sobre un nombre:
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+concedida name:port-3000
+$ jlock release --group task-42 --owner agent-7
+liberada name:port-3000
+```
 
 Con `--json`, cada comando imprime un objeto JSON, igual en todos los idiomas:
 
@@ -127,8 +150,8 @@ Aquí el comando es el propio jlock, así que puedes ver el bloqueo tomado mient
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-CLAVE         DUEÑO     GRUPO  INTENCIÓN  TIEMPO  HEARTBEAT  COLA
-name:nightly  pid:9404  -      -          20ms    19ms       0
+CLAVE         DUEÑO       GRUPO  INTENCIÓN  TIEMPO  HEARTBEAT  COLA
+name:nightly  pid:184680  -      -          21ms    22ms       0
 
 1 bloqueo, 0 esperando
 $ jlock list

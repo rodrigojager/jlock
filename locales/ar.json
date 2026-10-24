@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "يحتفظ بالمفاتيح حتى يُطلب منه التوقف.",
   "help.cmd.hold.usage": "<مفتاح...> [خيارات]",
-  "help.cmd.hold.desc": "يأخذ المفاتيح (بنفس خيارات acquire)، ويطبع مُنح، ثم يبقى يعمل ويجدد القفل. يحرر القفل ويخرج بالرمز 0 عندما يقرأ السطر release من دخله القياسي، أو عند CTRL+C، أو عند إنهائه. وأثناء عمله يقفل نظام التشغيل أيضًا holder.json، فيتحرر القفل لحظة موت العملية. إن انتُزع القفل يطبع فُقد ويخرج بالرمز 14.",
-  "help.cmd.hold.examples": "# الاحتفاظ بملفات مهمة أثناء تنفيذها (شغّله في الخلفية)\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42\n# لاحقًا، اكتب هذا السطر في دخله القياسي لتحريره:\nrelease",
+  "help.cmd.hold.desc": "يأخذ المفاتيح (بنفس خيارات acquire)، ويطبع مُنح، ثم يبقى يعمل ويجدد القفل. يحرر القفل ويخرج بالرمز 0 عندما يقرأ السطر release من دخله القياسي، أو عند CTRL+C، أو عند إنهائه؛ وينتهي أيضًا بالرمز 0 عندما يُرجع مالكه المفاتيح بـ jlock release. وأثناء عمله يقفل نظام التشغيل أيضًا holder.json، فيتحرر القفل لحظة موت العملية. إن انتُزع القفل يطبع فُقد ويخرج بالرمز 14. ومع --detach يجيب ويعود فورًا، وتحتفظ عملية ثانية بالقفل في الخلفية: أبسط طريقة لكي يحتفظ وكيل بملفات مهمة كاملة.",
+  "help.cmd.hold.examples": "# وكيل يأخذ ملفات مهمته: استدعاء واحد والجواب في يده\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42 --detach\n# ... ويُرجعها في النهاية\njlock release --group task-42 --owner agent-7\n# في الواجهة الأمامية، كتابة release في دخله القياسي تحرّره\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "يجيب ويعود مثل acquire (مُنح، مشغول، انتهت المهلة، بنفس رموز الخروج)، بينما يُبقي jlock hold ثانٍ القفل حيًا في الخلفية حتى jlock release أو --ttl أو unlock --force. استدعاء واحد للوكيل، والجواب في يده.",
   "help.exit.hold.0": "حُرّر، بعد release أو CTRL+C أو الإنهاء",
 
   "help.cmd.release.summary": "يُرجع المفاتيح.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "تعذّر إنشاء {path}",
   "error.run_needs_command": "run يحتاج إلى أمر بعد '--'",
   "error.cannot_run": "تعذّر تشغيل {cmd}",
+  "error.cannot_detach": "تعذّر تشغيل jlock hold في الخلفية",
   "error.waiting_for": "أثناء انتظار {cmd}",
   "error.release_needs": "release يحتاج إلى مفاتيح، أو --owner أو --group",
   "error.any_owner_group": "--any-owner لا يُستخدم إلا مع --group",

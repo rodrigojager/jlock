@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "Segura chaves até mandarem parar.",
   "help.cmd.hold.usage": "<chave...> [opções]",
-  "help.cmd.hold.desc": "Pega as chaves (com as mesmas opções do acquire), imprime concedida, e continua rodando e renovando a trava. Libera e sai com 0 quando lê a linha release na entrada padrão, com CTRL+C, ou quando é encerrado. Enquanto roda, o sistema operacional também trava o holder.json, então a trava é solta no instante em que o processo morre. Se a trava for tomada, imprime perdida e sai com 14.",
-  "help.cmd.hold.examples": "# Guarda os arquivos de uma tarefa enquanto ela anda (rode em segundo plano)\njlock hold src/a.ts src/b.ts --owner agente-7 --group tarefa-42\n# Depois, escreva esta linha na entrada padrão dele para soltar:\nrelease",
+  "help.cmd.hold.desc": "Pega as chaves (com as mesmas opções do acquire), imprime concedida, e continua rodando e renovando a trava. Libera e sai com 0 quando lê a linha release na entrada padrão, com CTRL+C, ou quando é encerrado; também termina com 0 quando o dono devolve as chaves com jlock release. Enquanto roda, o sistema operacional também trava o holder.json, então a trava é solta no instante em que o processo morre. Se a trava for tomada, imprime perdida e sai com 14. Com --detach ele responde e volta na hora, e um segundo processo mantém a trava em segundo plano: o jeito mais simples de um agente segurar os arquivos de uma tarefa inteira.",
+  "help.cmd.hold.examples": "# Um agente pega os arquivos da tarefa: uma chamada, a resposta na mão\njlock hold src/a.ts src/b.ts --owner agente-7 --group tarefa-42 --detach\n# ... e devolve no fim\njlock release --group tarefa-42 --owner agente-7\n# Em primeiro plano, escrever release na entrada padrão solta a trava\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "Responde e volta como o acquire (concedida, ocupada, tempo esgotado, com os mesmos códigos de saída), enquanto um segundo jlock hold mantém a trava viva em segundo plano até jlock release, o --ttl ou unlock --force. Uma chamada só para um agente, com a resposta na mão.",
   "help.exit.hold.0": "liberada, depois de release, CTRL+C ou encerramento",
 
   "help.cmd.release.summary": "Devolve chaves.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "não foi possível criar {path}",
   "error.run_needs_command": "run precisa de um comando depois de '--'",
   "error.cannot_run": "não foi possível executar {cmd}",
+  "error.cannot_detach": "não foi possível iniciar o jlock hold em segundo plano",
   "error.waiting_for": "esperando por {cmd}",
   "error.release_needs": "release precisa de chaves, --owner ou --group",
   "error.any_owner_group": "--any-owner só vale junto com --group",

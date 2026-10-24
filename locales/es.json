@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "Mantiene claves hasta que se le diga que pare.",
   "help.cmd.hold.usage": "<clave...> [opciones]",
-  "help.cmd.hold.desc": "Toma las claves (con las mismas opciones que acquire), imprime concedida y sigue ejecutándose y renovando el bloqueo. Libera y sale con 0 cuando lee la línea release en su entrada estándar, con CTRL+C, o cuando se le termina. Mientras se ejecuta, el sistema operativo también bloquea holder.json, así que el bloqueo se libera en el instante en que el proceso muere. Si le quitan el bloqueo, imprime perdida y sale con 14.",
-  "help.cmd.hold.examples": "# Conserva los archivos de una tarea mientras avanza (ejecútalo en segundo plano)\njlock hold src/a.ts src/b.ts --owner agente-7 --group tarea-42\n# Después, escribe esta línea en su entrada estándar para soltarlas:\nrelease",
+  "help.cmd.hold.desc": "Toma las claves (con las mismas opciones que acquire), imprime concedida y sigue ejecutándose y renovando el bloqueo. Libera y sale con 0 cuando lee la línea release en su entrada estándar, con CTRL+C, o cuando se le termina; también termina con 0 cuando su dueño devuelve las claves con jlock release. Mientras se ejecuta, el sistema operativo también bloquea holder.json, así que el bloqueo se libera en el instante en que el proceso muere. Si le quitan el bloqueo, imprime perdida y sale con 14. Con --detach responde y vuelve al momento, y un segundo proceso mantiene el bloqueo en segundo plano: la forma más sencilla de que un agente conserve los archivos de toda una tarea.",
+  "help.cmd.hold.examples": "# Un agente toma los archivos de su tarea: una llamada, la respuesta en mano\njlock hold src/a.ts src/b.ts --owner agente-7 --group tarea-42 --detach\n# ... y los devuelve al final\njlock release --group tarea-42 --owner agente-7\n# En primer plano, escribir release en su entrada estándar los suelta\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "Responde y vuelve como acquire (concedida, ocupada, tiempo agotado, con los mismos códigos de salida), mientras un segundo jlock hold mantiene vivo el bloqueo en segundo plano hasta jlock release, el --ttl o unlock --force. Una sola llamada para un agente, con la respuesta en mano.",
   "help.exit.hold.0": "liberada, tras release, CTRL+C o terminación",
 
   "help.cmd.release.summary": "Devuelve claves.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "no se puede crear {path}",
   "error.run_needs_command": "run necesita un comando después de '--'",
   "error.cannot_run": "no se puede ejecutar {cmd}",
+  "error.cannot_detach": "no se puede iniciar el jlock hold en segundo plano",
   "error.waiting_for": "esperando a {cmd}",
   "error.release_needs": "release necesita claves, --owner o --group",
   "error.any_owner_group": "--any-owner solo va con --group",

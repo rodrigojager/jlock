@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "止めるよう指示されるまでキーを保持する。",
   "help.cmd.hold.usage": "<キー...> [オプション]",
-  "help.cmd.hold.desc": "キーを取得し（オプションは acquire と同じ）、「取得」と表示した後も動き続けてロックを更新する。標準入力から release という行を読んだとき、CTRL+C のとき、または終了させられたときに、解放して 0 で終了する。実行中は OS も holder.json をロックするので、プロセスが死んだ瞬間にロックは解放される。ロックを奪われると「喪失」と表示して 14 で終了する。",
-  "help.cmd.hold.examples": "# タスク実行中そのファイルを保持（バックグラウンドで起動）\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42\n# 後で、この行を標準入力に書くと手放す:\nrelease",
+  "help.cmd.hold.desc": "キーを取得し（オプションは acquire と同じ）、「取得」と表示した後も動き続けてロックを更新する。標準入力から release という行を読んだとき、CTRL+C のとき、または終了させられたときに、解放して 0 で終了する。所有者が jlock release でキーを返したときも 0 で終了する。実行中は OS も holder.json をロックするので、プロセスが死んだ瞬間にロックは解放される。ロックを奪われると「喪失」と表示して 14 で終了する。--detach を付けると、すぐに答えて戻り、2 つ目のプロセスがバックグラウンドでロックを保持する。エージェントがタスク全体のファイルを保持する最も簡単な方法である。",
+  "help.cmd.hold.examples": "# エージェントがタスクのファイルを取得（1 回で答えが出る）\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42 --detach\n# ... 最後に返す\njlock release --group task-42 --owner agent-7\n# フォアグラウンドでは標準入力に release と書くと手放す\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "acquire と同じように答えて戻る（取得、使用中、タイムアウト、終了コードも同じ）。その間、2 つ目の jlock hold がバックグラウンドで、jlock release、--ttl、または unlock --force までロックを生かし続ける。エージェントにとっては 1 回の呼び出しで、答えが手に入る。",
   "help.exit.hold.0": "release、CTRL+C、または終了による解放",
 
   "help.cmd.release.summary": "キーを返す。",
@@ -357,6 +358,7 @@
   "error.cannot_create": "{path} を作成できない",
   "error.run_needs_command": "run には '--' の後にコマンドが必要",
   "error.cannot_run": "{cmd} を実行できない",
+  "error.cannot_detach": "バックグラウンドの jlock hold を起動できない",
   "error.waiting_for": "{cmd} を待機中",
   "error.release_needs": "release にはキー、--owner、または --group が必要",
   "error.any_owner_group": "--any-owner は --group と一緒にしか使えない",

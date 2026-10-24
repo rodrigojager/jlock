@@ -30,6 +30,8 @@ pub struct AcquireOpts {
     pub wait: bool,
     pub timeout: Option<Duration>,
     pub json: bool,
+    /// `hold --detach`: answer and return, leaving a second process to keep the lock.
+    pub detach: bool,
 }
 
 /// Parses the options shared by `acquire`, `hold` and `run`; returns what follows `--`.
@@ -44,6 +46,7 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
         wait: true,
         timeout: None,
         json: false,
+        detach: false,
     };
     let mut rest = Vec::new();
     while let Some(arg) = p.next() {
@@ -69,6 +72,7 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
                 "no-wait" => opts.wait = false,
                 "timeout" => opts.timeout = Some(parse_duration(&p.value(&f)?)?),
                 "json" => opts.json = true,
+                "detach" => opts.detach = true,
                 _ => return Err(unknown_option(cmd, &f)),
             },
         }

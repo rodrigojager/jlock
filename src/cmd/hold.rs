@@ -19,6 +19,8 @@ use std::time::{Duration, Instant};
 pub enum Trouble {
     /// Someone else holds it now, or nobody (forced, expired, deleted).
     Lost { key: Key, holder: Option<String> },
+    /// The owner gave it back with `jlock release` (the log says so): not a loss.
+    Released { key: Key },
     /// Our own ttl ran out.
     Ttl { key: Key },
 }
@@ -30,8 +32,8 @@ pub struct Keeper<'a> {
     pub owner: String,
     pub json: bool,
     next: Instant,
-    /// The OS locks on each `holder.json`, freed by the kernel if this process dies.
-    os: Vec<OsLock>,
+    /// The OS lock on each key's `holder.json`, freed by the kernel if this process dies.
+    os: Vec<(String, OsLock)>,
 }
 
 /// Takes the OS lock on a freshly granted `holder.json`. An expirer checking the lock may hold it
@@ -55,7 +57,7 @@ impl<'a> Keeper<'a> {
     pub fn new(store: &'a Store, keys: Vec<Key>, owner: &str, json: bool) -> Keeper<'a> {
         let os = keys
             .iter()
-            .filter_map(|k| os_lock(&store.key_dir(k), owner))
+            .filter_map(|k| os_lock(&store.key_dir(k), owner).map(|l| (k.text.clone(), l)))
             .collect();
         Keeper {
             store,
@@ -76,6 +78,9 @@ impl<'a> Keeper<'a> {
         for key in &self.keys {
             match beat(&self.store.key_dir(key), &self.owner) {
                 Ok(Beat::Renewed) => {}
+                Ok(Beat::Lost(None)) if released_by(&key.text, &self.owner) => {
+                    return Some(Trouble::Released { key: key.clone() })
+                }
                 Ok(Beat::Lost(holder)) => {
                     return Some(Trouble::Lost {
                         key: key.clone(),
@@ -88,6 +93,13 @@ impl<'a> Keeper<'a> {
             }
         }
         None
+    }
+
+    /// Stops keeping a key the owner released; true when none is left.
+    pub fn forget(&mut self, key: &Key) -> bool {
+        self.os.retain(|(k, _)| *k != key.text);
+        self.keys.retain(|k| k.text != key.text);
+        self.keys.is_empty()
     }
 
     /// Releases every key that is still ours.
@@ -103,6 +115,7 @@ impl<'a> Keeper<'a> {
         self.os.clear();
         let (key, holder, reason) = match trouble {
             Trouble::Lost { key, holder } => (key, holder.clone(), "lost"),
+            Trouble::Released { key } => (key, None, "released"),
             Trouble::Ttl { key } => {
                 let kd = self.store.key_dir(key);
                 if let Ok(Some(e)) = expire::expire_holder(&kd) {
@@ -140,6 +153,19 @@ impl<'a> Keeper<'a> {
     }
 }
 
+/// Was the lock on `key` given back by `owner` itself (`jlock release`), rather than broken or
+/// expired? The log tells; it is written right after the file goes, so it is read a few times.
+fn released_by(key: &str, owner: &str) -> bool {
+    for _ in 0..10 {
+        match crate::log::last_about(key) {
+            Some((event, who)) if event == "release" && who == owner => return true,
+            Some((event, _)) if event == "forced" || event == "expired" => return false,
+            _ => sleep(Duration::from_millis(20)),
+        }
+    }
+    false
+}
+
 fn watch_stdin() {
     std::thread::spawn(|| {
         for line in std::io::stdin().lock().lines() {
@@ -156,9 +182,15 @@ fn watch_stdin() {
 }
 
 pub fn run(args: Vec<String>) -> CmdResult {
+    let original = args.clone();
     let (opts, rest) = parse(args, "hold")?;
     if !rest.is_empty() {
         return Err(usage(txt!("error.rest_not_run", cmd = "hold")));
+    }
+    let child = crate::detach::is_child();
+    if opts.detach && !child {
+        normalize_keys(&opts.keys)?; // bad keys are refused here, not in the second process
+        return crate::detach::start(original);
     }
     wait::install_interrupt_handler();
     watch_stdin();
@@ -174,10 +206,28 @@ pub fn run(args: Vec<String>) -> CmdResult {
     let mut keeper = Keeper::new(&store, keys.clone(), &opts.ident.owner, opts.json);
     report(&opts, &outcome);
     let _ = crate::index::rewrite(&store);
+    if child {
+        crate::detach::ready();
+    }
     while !wait::interrupted() {
-        if let Some(trouble) = keeper.tick() {
-            keeper.lose(&trouble, false);
-            return Ok(EXIT_LOST);
+        match keeper.tick() {
+            // The owner gave a key back with `jlock release`: keep the others, end when none is left.
+            Some(Trouble::Released { key }) => {
+                if opts.json {
+                    print_json(&json!({ "result": "released", "keys": [key.text],
+                                        "owner": keeper.owner }));
+                } else {
+                    println!("{}", t!("result.released", key = key.text));
+                }
+                if keeper.forget(&key) {
+                    return Ok(EXIT_OK);
+                }
+            }
+            Some(trouble) => {
+                keeper.lose(&trouble, false);
+                return Ok(EXIT_LOST);
+            }
+            None => {}
         }
         sleep(Duration::from_millis(20));
     }

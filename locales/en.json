@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "Hold keys until told to stop.",
   "help.cmd.hold.usage": "<key...> [options]",
-  "help.cmd.hold.desc": "Takes the keys (with the same options as acquire), prints granted, then keeps running and renewing the lock. It releases and exits 0 when it reads the line release on its standard input, on CTRL+C, or when it is terminated. While it runs, the operating system also locks holder.json, so the lock is freed the moment the process dies. If the lock is taken away it prints lost and exits 14.",
-  "help.cmd.hold.examples": "# Keep the files of a task while it runs (start it in the background)\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42\n# Later, write this line to its standard input to let go:\nrelease",
+  "help.cmd.hold.desc": "Takes the keys (with the same options as acquire), prints granted, then keeps running and renewing the lock. It releases and exits 0 when it reads the line release on its standard input, on CTRL+C, or when it is terminated; it also ends with 0 when its owner gives the keys back with jlock release. While it runs, the operating system also locks holder.json, so the lock is freed the moment the process dies. If the lock is taken away it prints lost and exits 14. With --detach it answers and returns at once, and a second process keeps the lock in the background: the simplest way for an agent to hold the files of a whole task.",
+  "help.cmd.hold.examples": "# An agent takes the files of its task: one call, the answer in hand\njlock hold src/a.ts src/b.ts --owner agent-7 --group task-42 --detach\n# ... and gives them back at the end\njlock release --group task-42 --owner agent-7\n# In the foreground, writing release to its standard input lets go\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "Answer and return like acquire (granted, busy, timeout, with the same exit codes), while a second jlock hold keeps the lock alive in the background until jlock release, the --ttl, or unlock --force. One call for an agent, with the answer in hand.",
   "help.exit.hold.0": "released, after release, CTRL+C or termination",
 
   "help.cmd.release.summary": "Give keys back.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "cannot create {path}",
   "error.run_needs_command": "run needs a command after '--'",
   "error.cannot_run": "cannot run {cmd}",
+  "error.cannot_detach": "cannot start the background jlock hold",
   "error.waiting_for": "waiting for {cmd}",
   "error.release_needs": "release needs keys, --owner or --group",
   "error.any_owner_group": "--any-owner only goes with --group",

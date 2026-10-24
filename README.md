@@ -90,17 +90,39 @@ Without `--no-wait`, Bob would simply wait in line and get the lock the moment A
 ## Using it from an agent
 
 An agent (Claude Code, OpenCode, Codex or any other) takes what it is about to change, keeps it while it
-works, and gives it back at the end:
+works, and gives it back at the end. That takes two calls:
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   takes both files or neither, waiting its turn. `--owner` is the agent's identity across commands;
-   `--group` ties together everything one task holds.
-2. `jlock hold src/parser.rs src/lexer.rs --owner agent-7` in the background keeps the lock alive (it is
-   granted at once, since the owner already holds the files). Without it, call `jlock heartbeat` more often
-   than every 30 seconds.
-3. `jlock release --group task-42 --owner agent-7` at the end; or write the line `release` to `hold`'s
-   standard input.
-4. If `hold` exits with code 14 (`lost`), someone broke or expired the lock: stop editing.
+1. **Take:** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   takes both files or neither, waiting its turn if someone else has them, answers `granted` and returns.
+   A small jlock process stays in the background and keeps the lock alive, so the agent spends no calls,
+   and no tokens, on that. `--owner` is the agent's identity across commands; `--group` ties together
+   everything one task holds.
+2. **Give back:** `jlock release --group task-42 --owner agent-7` when the task is done. The background
+   process notices and ends.
+
+Options worth knowing:
+
+- `--no-wait`: do not wait in line. If a file is taken, the answer comes at once (`busy`, exit code 10)
+  with who has it, so the agent can pick other work instead of standing still.
+- `--timeout 2m`: wait at most this long, then give up (exit code 11).
+- `--ttl 2h`: a safety limit. The lock goes away by itself after this long, even if the agent never
+  releases it.
+
+Why not plain `jlock acquire`? A lock taken with `acquire` also outlives the command, but it has to be
+renewed (`jlock heartbeat`) at least every 30 seconds, or it is taken for dead and expires. An agent spends
+minutes between two commands, so `hold --detach` is the tool for it; `acquire` is for programs that renew
+by themselves. If someone breaks the lock (`jlock unlock --force`), the background process ends and
+`jlock heartbeat <file> --owner agent-7` answers `lost` (exit code 13): worth checking after a long pause.
+
+The whole cycle, on a name:
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+granted name:port-3000
+$ jlock release --group task-42 --owner agent-7
+released name:port-3000
+```
 
 With `--json`, every command prints one JSON object, the same in every language:
 
@@ -126,7 +148,7 @@ Here the command is jlock itself, so you can see the lock held while it runs:
 ```text
 $ jlock run name:nightly -- jlock list
 KEY           OWNER       GROUP  INTENT  HELD  HEARTBEAT  QUEUE
-name:nightly  pid:175424  -      -       26ms  25ms       0
+name:nightly  pid:170600  -      -       26ms  24ms       0
 
 1 lock, 0 waiting
 $ jlock list

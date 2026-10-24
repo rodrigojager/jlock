@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "Garde des clés jusqu'à ce qu'on lui dise d'arrêter.",
   "help.cmd.hold.usage": "<clé...> [options]",
-  "help.cmd.hold.desc": "Prend les clés (avec les mêmes options qu'acquire), affiche accordé, puis continue de tourner en renouvelant le verrou. Il libère et sort avec 0 quand il lit la ligne release sur son entrée standard, sur CTRL+C, ou quand il est terminé. Pendant qu'il tourne, le système d'exploitation verrouille aussi holder.json, si bien que le verrou est libéré dès que le processus meurt. Si le verrou lui est retiré, il affiche perdu et sort avec 14.",
-  "help.cmd.hold.examples": "# Garder les fichiers d'une tâche pendant qu'elle tourne (lancez-le en arrière-plan)\njlock hold src/a.ts src/b.ts --owner agent-7 --group tache-42\n# Plus tard, écrivez cette ligne sur son entrée standard pour lâcher:\nrelease",
+  "help.cmd.hold.desc": "Prend les clés (avec les mêmes options qu'acquire), affiche accordé, puis continue de tourner en renouvelant le verrou. Il libère et sort avec 0 quand il lit la ligne release sur son entrée standard, sur CTRL+C, ou quand il est terminé; il s'arrête aussi avec 0 quand son propriétaire rend les clés avec jlock release. Pendant qu'il tourne, le système d'exploitation verrouille aussi holder.json, si bien que le verrou est libéré dès que le processus meurt. Si le verrou lui est retiré, il affiche perdu et sort avec 14. Avec --detach, il répond et rend la main tout de suite, et un second processus garde le verrou en arrière-plan: la façon la plus simple pour un agent de garder les fichiers de toute une tâche.",
+  "help.cmd.hold.examples": "# Un agent prend les fichiers de sa tâche: un appel, la réponse en main\njlock hold src/a.ts src/b.ts --owner agent-7 --group tache-42 --detach\n# ... et les rend à la fin\njlock release --group tache-42 --owner agent-7\n# Au premier plan, écrire release sur son entrée standard lâche le verrou\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "Répondre et rendre la main comme acquire (accordé, occupé, délai dépassé, avec les mêmes codes de sortie), pendant qu'un second jlock hold garde le verrou en vie en arrière-plan jusqu'à jlock release, le --ttl ou unlock --force. Un seul appel pour un agent, avec la réponse en main.",
   "help.exit.hold.0": "libéré, après release, CTRL+C ou une terminaison",
 
   "help.cmd.release.summary": "Rend des clés.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "impossible de créer {path}",
   "error.run_needs_command": "run a besoin d'une commande après '--'",
   "error.cannot_run": "impossible de lancer {cmd}",
+  "error.cannot_detach": "impossible de lancer le jlock hold en arrière-plan",
   "error.waiting_for": "en attendant {cmd}",
   "error.release_needs": "release a besoin de clés, de --owner ou de --group",
   "error.any_owner_group": "--any-owner ne s'utilise qu'avec --group",

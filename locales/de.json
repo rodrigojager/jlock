@@ -78,8 +78,9 @@
 
   "help.cmd.hold.summary": "Hält Schlüssel, bis es gestoppt wird.",
   "help.cmd.hold.usage": "<schlüssel...> [optionen]",
-  "help.cmd.hold.desc": "Nimmt die Schlüssel (mit denselben Optionen wie acquire), gibt erteilt aus, läuft dann weiter und erneuert die Sperre. Es gibt frei und endet mit 0, wenn es die Zeile release auf seiner Standardeingabe liest, bei CTRL+C oder wenn es beendet wird. Solange es läuft, sperrt auch das Betriebssystem holder.json, sodass die Sperre in dem Moment frei wird, in dem der Prozess stirbt. Wird ihm die Sperre weggenommen, gibt es verloren aus und endet mit 14.",
-  "help.cmd.hold.examples": "# Die Dateien einer Aufgabe halten, solange sie läuft (im Hintergrund starten)\njlock hold src/a.ts src/b.ts --owner agent-7 --group aufgabe-42\n# Später diese Zeile auf seine Standardeingabe schreiben, um loszulassen:\nrelease",
+  "help.cmd.hold.desc": "Nimmt die Schlüssel (mit denselben Optionen wie acquire), gibt erteilt aus, läuft dann weiter und erneuert die Sperre. Es gibt frei und endet mit 0, wenn es die Zeile release auf seiner Standardeingabe liest, bei CTRL+C oder wenn es beendet wird; es endet auch mit 0, wenn sein Besitzer die Schlüssel mit jlock release zurückgibt. Solange es läuft, sperrt auch das Betriebssystem holder.json, sodass die Sperre in dem Moment frei wird, in dem der Prozess stirbt. Wird ihm die Sperre weggenommen, gibt es verloren aus und endet mit 14. Mit --detach antwortet es und kehrt sofort zurück, und ein zweiter Prozess hält die Sperre im Hintergrund: der einfachste Weg für einen Agenten, die Dateien einer ganzen Aufgabe zu halten.",
+  "help.cmd.hold.examples": "# Ein Agent nimmt die Dateien seiner Aufgabe: ein Aufruf, sofort die Antwort\njlock hold src/a.ts src/b.ts --owner agent-7 --group aufgabe-42 --detach\n# ... und gibt sie am Ende zurück\njlock release --group aufgabe-42 --owner agent-7\n# Im Vordergrund: release auf die Standardeingabe schreiben, um loszulassen\njlock hold name:deploy --owner ci",
+  "help.opt.hold.detach": "Antwortet und kehrt zurück wie acquire (erteilt, belegt, Zeitüberschreitung, mit denselben Exit-Codes), während ein zweites jlock hold die Sperre im Hintergrund am Leben hält, bis jlock release, --ttl oder unlock --force sie beenden. Ein einziger Aufruf für einen Agenten, mit sofortiger Antwort.",
   "help.exit.hold.0": "freigegeben, nach release, CTRL+C oder Beendigung",
 
   "help.cmd.release.summary": "Gibt Schlüssel zurück.",
@@ -357,6 +358,7 @@
   "error.cannot_create": "kann {path} nicht anlegen",
   "error.run_needs_command": "run braucht einen Befehl nach '--'",
   "error.cannot_run": "kann {cmd} nicht ausführen",
+  "error.cannot_detach": "kann das jlock hold im Hintergrund nicht starten",
   "error.waiting_for": "beim Warten auf {cmd}",
   "error.release_needs": "release braucht Schlüssel, --owner oder --group",
   "error.any_owner_group": "--any-owner geht nur zusammen mit --group",

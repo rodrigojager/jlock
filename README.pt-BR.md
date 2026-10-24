@@ -91,25 +91,48 @@ Sem `--no-wait`, Bob simplesmente esperaria na fila e receberia a trava no insta
 
 ## Usando a partir de um agente
 
-Um agente (Claude Code, OpenCode, Codex ou qualquer outro) pega o que vai alterar, mantém a trava enquanto
-trabalha e a devolve no fim:
+Um agente (Claude Code, OpenCode, Codex ou qualquer outro) pega o que vai mudar, segura enquanto trabalha
+e devolve no fim. São duas chamadas:
 
-1. `jlock acquire src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --json`
-   pega os dois arquivos ou nenhum, esperando a sua vez. `--owner` é a identidade do agente entre um comando
-   e outro; `--group` amarra tudo o que uma mesma tarefa tem.
-2. `jlock hold src/parser.rs src/lexer.rs --owner agent-7` em segundo plano mantém a trava viva (ela é
-   concedida na hora, já que o dono já tem os arquivos). Sem ele, chame `jlock heartbeat` com intervalo menor
-   que 30 segundos.
-3. `jlock release --group task-42 --owner agent-7` no fim; ou escreva a linha `release` na entrada padrão do
-   `hold`.
-4. Se o `hold` sair com o código 14 (`lost`), alguém quebrou ou expirou a trava: pare de editar.
+1. **Pegar:** `jlock hold src/parser.rs src/lexer.rs --owner agent-7 --group task-42 --intent "T4 parser" --detach`
+   pega os dois arquivos ou nenhum, esperando a vez se outro estiver com eles, responde `concedida` e
+   volta. Um pequeno processo do jlock fica em segundo plano mantendo a trava viva, então o agente não gasta
+   chamadas, nem tokens, com isso. `--owner` é a identidade do agente entre um comando e outro; `--group`
+   amarra tudo o que uma tarefa segura.
+2. **Devolver:** `jlock release --group task-42 --owner agent-7` quando a tarefa acaba. O processo em
+   segundo plano percebe e termina.
+
+Opções que vale conhecer:
+
+- `--no-wait`: não esperar na fila. Se um arquivo está ocupado, a resposta vem na hora (`ocupada`, código
+  de saída 10) dizendo quem está com ele, e o agente pode pegar outro trabalho em vez de ficar parado.
+- `--timeout 2m`: esperar no máximo esse tempo, depois desistir (código de saída 11).
+- `--ttl 2h`: um limite de segurança. A trava some sozinha depois desse tempo, mesmo que o agente nunca a
+  devolva.
+
+Por que não o `jlock acquire` puro? Uma trava pega com `acquire` também sobrevive ao comando, mas precisa
+ser renovada (`jlock heartbeat`) pelo menos a cada 30 segundos, senão é tida como morta e expira. Um agente
+passa minutos entre dois comandos, então o `hold --detach` é a ferramenta dele; o `acquire` é para programas
+que renovam sozinhos. Se alguém quebrar a trava (`jlock unlock --force`), o processo em segundo plano
+termina e `jlock heartbeat <arquivo> --owner agent-7` responde `perdida` (código de saída 13): vale conferir
+depois de uma pausa longa.
+
+O ciclo inteiro, num nome:
+
+<!-- jlock-example -->
+```text
+$ jlock hold name:port-3000 --owner agent-7 --group task-42 --ttl 2h --detach
+concedida name:port-3000
+$ jlock release --group task-42 --owner agent-7
+liberada name:port-3000
+```
 
 Com `--json`, todo comando imprime um objeto JSON, igual em todos os idiomas:
 
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":0}
+{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
 ```
 
 ## Usando a partir de um script
@@ -128,7 +151,7 @@ Aqui o comando é o próprio jlock, então dá para ver a trava segura enquanto 
 ```text
 $ jlock run name:nightly -- jlock list
 CHAVE         DONO        GRUPO  INTENÇÃO  HÁ    HEARTBEAT  FILA
-name:nightly  pid:176424  -      -         29ms  29ms       0
+name:nightly  pid:181176  -      -         21ms  21ms       0
 
 1 trava, 0 na fila
 $ jlock list

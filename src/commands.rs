@@ -57,6 +57,25 @@ pub const ACQUIRE_OPTS: &[Opt] = &[
     JSON,
 ];
 
+/// `hold` takes the options of `acquire`, and `--detach`.
+pub const HOLD_OPTS: &[Opt] = &[
+    opt("owner", Some("id"), "help.opt.acquire.owner", "agent-7"),
+    opt("group", Some("group"), "help.opt.acquire.group", "task-42"),
+    opt(
+        "intent",
+        Some("text"),
+        "help.opt.acquire.intent",
+        "\"refactor parser\"",
+    ),
+    opt("meta", Some("kv"), "help.opt.acquire.meta", "task=T04"),
+    opt("ttl", Some("time"), "help.opt.acquire.ttl", "2h"),
+    opt("wait", None, "help.opt.acquire.wait", ""),
+    opt("no-wait", None, "help.opt.acquire.no_wait", ""),
+    opt("timeout", Some("time"), "help.opt.acquire.timeout", "30s"),
+    opt("detach", None, "help.opt.hold.detach", ""),
+    JSON,
+];
+
 pub const TAKE: &str = "help.group.take";
 pub const SEE: &str = "help.group.see";
 pub const EMERGENCY: &str = "help.group.emergency";
@@ -84,7 +103,7 @@ pub const COMMANDS: &[Command] = &[
     Command {
         name: "hold",
         group: TAKE,
-        opts: ACQUIRE_OPTS,
+        opts: HOLD_OPTS,
         codes: &["0", "2", "10", "11", "12", "14", "20", "130"],
         see: &["acquire", "run", "release"],
     },
