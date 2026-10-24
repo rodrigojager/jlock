@@ -1,5 +1,4 @@
 //! Argument parsing by hand, exit codes (plan section 6) and command dispatch.
-#![allow(dead_code)] // the remaining exit codes and parsers are used as the commands land
 
 use std::time::Duration;
 
@@ -179,8 +178,11 @@ fn dispatch(args: Vec<String>) -> CmdResult {
             Ok(EXIT_OK)
         }
         "status" => status(rest),
-        "acquire" | "run" | "hold" | "release" | "heartbeat" | "list" | "graph" | "unlock"
-        | "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
+        "acquire" => crate::cmd::acquire::run(rest),
+        "release" => crate::cmd::release::run(rest),
+        "run" | "hold" | "heartbeat" | "list" | "graph" | "unlock" | "gc" => {
+            Err(usage(format!("{cmd}: not implemented yet")))
+        }
         other => Err(usage(format!(
             "unknown command '{other}' (see jlock --help)"
         ))),
