@@ -111,8 +111,9 @@ name:port-3000       dev      -       -         15s    1s         0
 ```
 
 Read straight from the folder, so it is always the truth. `--under` keeps paths at or below a folder;
-`--stale` only dead locks (heartbeat older than `JLOCK_STALE_MS`, or past their ttl); `--watch`
-redraws every second until CTRL+C.
+`--stale` only dead locks (heartbeat older than `JLOCK_STALE_MS` with nobody holding the OS lock, or past
+their ttl); `--watch` redraws every second until CTRL+C. A `hold`/`run` whose heartbeat is late but still
+has the OS lock is alive: it is shown as `late`, not `dead`, and the expiration leaves it alone.
 
 ### `graph` — who waits for whom
 

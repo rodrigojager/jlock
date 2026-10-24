@@ -10,6 +10,10 @@ checkout em paralelo. Mas o jlock não sabe o que é tarefa nem execução: serv
 qualquer agente (Claude Code, OpenCode, Codex, pi) por shell.
 
 Data do plano: 23/10/2026. Revisão 3 (Rust, identidade genérica, zero sobras, nota multiplataforma).
+Revisão 4, 24/10/2026: o plano absorve o que a implementação decidiu onde ele era omisso ou foi superado pelo
+ticket 09 (palavra solta é caminho; pedido repetido do mesmo dono; código 130; espera por hierarquia com uma senha
+só; tentativas curtas em derivados; trava do SO conta como vida). Os pontos estão marcados com **[rev. 4]**; o
+histórico de cada um está em `docs/DEVIATIONS.md`.
 
 ---
 
@@ -125,8 +129,9 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 - `owner` obrigatório (padrão `pid:<pid>`); quem apresenta o mesmo `owner` pode liberar.
 - `group`, `intent`, `meta`, `ttl` opcionais. `ttl` é prazo máximo de posse mesmo com heartbeat (processo vivo
   mas descontrolado); expira com registro, como a morte.
-- `pid`, `host`, `cwd`, `since` preenchidos pelo jlock. PID morto é uma segunda pista de morte (não substitui o
-  heartbeat: PID pode ser reutilizado).
+- `pid`, `host`, `cwd`, `since` preenchidos pelo jlock. **[rev. 4]** O `pid` é só informação: o jlock não confere
+  se o processo existe (PID pode ser reutilizado). A segunda pista de vida é a trava do SO sobre `holder.json`,
+  que `hold` e `run` mantêm (seção 7, "Trava do SO").
 
 ### Linha do `log.jsonl`
 
@@ -144,6 +149,9 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
   Linux, manter caixa; remover barra final; `\\?\` removido. Não exige que o caminho exista.
 - Entrada `name:<texto>`: chave literal, sem normalização além de aparar espaços.
 - `*`: chave universal.
+- **[rev. 4]** Qualquer outra entrada (uma palavra solta como `Cargo.toml` ou `build`) é caminho, relativo ao cwd.
+  Agentes passam nomes de arquivo sem `./`; tratá-los como nome faria dois agentes em pastas diferentes não
+  conflitarem em silêncio. Para um nome, escreva `name:`.
 - Hash: sha1 da chave normalizada, em hex, nome do diretório. O arquivo `key` guarda o texto.
 - Conflito hierárquico (só chaves-caminho): `a` conflita com `b` se `a == b`, `a` é prefixo de diretório de `b`
   (`a + "/"` prefixo de `b`) ou vice-versa. `*` conflita com tudo. `name:` só com igual.
@@ -154,7 +162,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 
 | Comando | O que faz |
 |---|---|
-| `jlock acquire <chave…> [--owner id] [--group g] [--intent "…"] [--meta k=v…] [--ttl 2h] [--wait\|--no-wait] [--timeout 30s] [--json]` | pega todas as chaves (ordem canônica, tudo ou nada). Padrão: espera sem limite. Saída: `granted`; `queued` (dono e posição) com `--no-wait` ou timeout; `deadlock` com a cadeia. |
+| `jlock acquire <chave…> [--owner id] [--group g] [--intent "…"] [--meta k=v…] [--ttl 2h] [--wait\|--no-wait] [--timeout 30s] [--json]` | pega todas as chaves (ordem canônica, tudo ou nada). Padrão: espera sem limite. Saída: `granted`; `queued` (dono e posição) com `--no-wait`; `timeout` (dono e posição) com `--timeout` vencido; `deadlock` com a cadeia. **[rev. 4]** Na linha de texto, `--no-wait` escreve `busy <chave> held by <dono> (position N)`; o `--json` diz `queued`. Pedir de novo uma chave que o mesmo `owner` já tem é `granted` na hora. |
 | `jlock run <chave…> [opções de acquire] -- <comando…>` | como `flock(1)`: pega, mantém heartbeat, roda o comando, libera ao terminar (ou ao morrer: expira). Código de saída do comando é repassado. |
 | `jlock hold <chave…> [opções de acquire]` | fica vivo renovando o heartbeat; encerra ao receber a linha `release` na entrada padrão, SIGINT/CTRL+C, ou ao ser encerrado. Imprime `granted` e depois eventos (`lost`). |
 | `jlock release [<chave…>] [--owner id] [--group g]` | libera (só o dono). Sem chaves: tudo do dono; com `--group`: tudo do grupo. |
@@ -177,7 +185,8 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | 13 | não é o dono (release/heartbeat) |
 | 14 | trava perdida (`hold`/`run` terminam com 14 se o dono descobriu `lost`) |
 | 2 | uso incorreto (argumentos) |
-| 20 | erro de sistema de arquivos (permissão, disco cheio, arquivo preso) |
+| 20 | erro de sistema de arquivos (permissão, disco cheio, arquivo preso); a mensagem traz o código do SO e o caminho |
+| 130 | **[rev. 4]** interrompido (CTRL+C/SIGINT/SIGTERM) durante a espera; a senha foi apagada antes de sair |
 
 Em `run`, o código do comando é repassado quando a trava foi concedida; os códigos acima aparecem só quando a
 trava não foi obtida ou foi perdida.
@@ -208,22 +217,35 @@ Os testes usam valores curtos por essas variáveis.
 ### acquire(key, owner)
 
 ```
-(1) hierarquia: coletar chaves-caminho travadas ou com fila que conflitam (ancestrais/descendentes) → a espera
-    é na chave do dono conflitante (uma senha em cada chave conflitante, em ordem canônica)
+(0) [rev. 4] holder.json já é do owner → granted na hora, sem tocar no arquivo (intent/meta/ttl do novo pedido
+    são ignorados). Travas e senhas do próprio owner nunca o bloqueiam, nem pela hierarquia.
+(1) hierarquia [rev. 4]: a senha é uma só, na própria chave. Em cada sondagem, além da própria fila, o esperador
+    lê as chaves conflitantes (ancestrais, descendentes, `*`) e só segue quando nenhuma delas tem holder.json de
+    outro dono nem senha de outro dono mais antiga que a sua. Como o nome da senha é a hora de chegada, a ordem
+    entre filas é a ordem de chegada. Logo depois do create_new, o novo dono relê as chaves conflitantes: se
+    outra foi tomada no mesmo instante por quem ainda não o via, apaga o próprio holder.json e volta a esperar;
+    a senha mais antiga vence na sondagem seguinte. (Por que não uma senha em cada chave conflitante: criar,
+    renovar e apagar várias juntas deixa estado parcial em chaves alheias se o processo morrer, e serializaria
+    `a.ts` e `b.ts` pela fila de `src` mesmo sem conflitarem entre si.)
 (2) deadlock: grafo = (senhas → donos das chaves) + aresta (owner → dono da chave); ciclo contendo owner → recusar
     { deadlock, chain }
 (3) garantir locks/<hash>/ e queue/ ; gravar `key` se não existir
 (4) senha ← criar queue/<agora-µs>-<4 hex aleatórios>.json com create_new (conteúdo: corpo da seção 4)
     ENOENT ao criar (a pasta foi apagada por um release neste instante) → voltar a (3)
+    [rev. 4] com --no-wait não há senha: chave livre, sem fila e sem conflito → criar holder.json; senão
+    queued { holder, position } com posição = tamanho da fila + 1
 (5) laço, a cada POLL_MS com jitter:
       renovar mtime da minha senha
       descartar senhas com heartbeat > STALE_MS (renomear para broken/: só um consegue; registrar)
       holder.json com heartbeat > STALE_MS, ou com ttl vencido → renomear para broken/ (só um consegue),
           registrar "expired", apagar o arquivo em broken/
-      se minha senha é a menor viva e holder.json não existe:
+          [rev. 4] antes de quebrar por heartbeat, tentar a trava do SO em holder.json: ocupada → o dono está
+          vivo (hold/run); não quebrar. O ttl vence mesmo com a trava do SO.
+      se minha senha é a menor viva, holder.json não existe e nenhuma chave conflitante bloqueia (passo 1):
           criar holder.json com create_new: conseguiu → apagar minha senha → granted
                                              EEXIST → outro passou à frente neste instante; registrar; continuar
-      senão → --no-wait, ou timeout vencido → apagar minha senha → queued { holder, position } / timeout
+      senão → timeout vencido → apagar minha senha → timeout { holder, position }
+      [rev. 4] CTRL+C/SIGINT/SIGTERM → apagar minha senha → sair com 130
       a cada 8 sondagens: refazer o teste de deadlock; ciclo e minha senha é a mais nova → apagar senha, deadlock
 ```
 
@@ -244,6 +266,16 @@ Ler `holder.json`; `owner` diferente ou arquivo ausente → `lost`; senão renov
 Renomear `holder.json` para `broken/<ts>-forced.json`, ler, registrar `forced` com `by` e `reason`, apagar.
 Senhas não são afetadas; o próximo da fila pega.
 
+### Trava do SO (`hold`/`run`) **[rev. 4]**
+
+`hold` e `run` mantêm `holder.json` aberto com uma trava do sistema operacional: `LockFileEx` exclusiva e sem
+espera no Windows (num byte alto, fora do conteúdo; handle com compartilhamento de leitura, escrita e exclusão, para
+não impedir `list` nem `rename`) e `flock(LOCK_EX | LOCK_NB)` em Unix. É tomada antes de anunciar `granted` e solta
+ao liberar; o kernel a solta no instante em que o processo morre. Serve de segunda pista de vida: quem expira a
+consulta antes de quebrar por heartbeat, e `list`/`status` mostram `late` (vivo, atrasado) em vez de `dead`. Não
+obtê-la (sistema de arquivos sem suporte) não impede nada: fica registrado `oslock: unsupported` e o heartbeat
+manda sozinho, como para travas de `acquire` puro, que nunca têm trava do SO.
+
 ### Varredura
 
 - Local, em toda chamada que toca uma chave: expirar senhas e trava mortas, consumir `broken/`, remover a pasta
@@ -257,9 +289,13 @@ Senhas não são afetadas; o próximo da fila pega.
 
 - Criação de trava e senha: `create_new` (atômico).
 - Quebra: `rename` (atômico; um só vence).
-- `index.json` e rotação do log: escrever `.tmp` e `rename` por cima.
-- Tentativas em `EBUSY`/`EPERM`/`EACCES` em operações de remoção/rename: 50, 100, 200, 400, 800, 1600 ms; depois
-  erro 20 com a mensagem do SO. Nunca matar processos.
+- `index.json` e rotação do log: escrever `.tmp` e `rename` por cima. **[rev. 4]** O `index.json` é derivado e
+  reescrito por todo comando que mudou algo; o rename dele faz só 4 tentativas de 10 ms e desiste (a próxima
+  mudança ou varredura reescreve), para não atrasar `acquire`/`release` por um arquivo que não é a verdade.
+- Tentativas em `EBUSY`/`EPERM`/`EACCES` em operações de remoção, rename, criação de pasta e leitura: 50, 100, 200,
+  400, 800, 1600 ms; depois erro 20 com a mensagem do SO e o caminho. Nunca matar processos. **[rev. 4]** No
+  Windows, uma pasta ou arquivo que outro processo está apagando responde `EACCES` ou "já existe" por um instante;
+  por isso a leitura e a criação de pasta também entram na escada.
 
 ---
 
@@ -286,7 +322,7 @@ inexistente, log dentro do limite.
 |---|---|
 | um dono por chave a qualquer instante | impedir quem não usa o jlock (consultivo; agentes são forçados pelas guardas do goal-tasks) |
 | ordem de chegada estrita entre esperadores vivos | entrega instantânea (até POLL_MS) |
-| trava de processo morto recuperada em ≤ STALE_MS, com registro | distinguir morto de congelado > STALE_MS (o congelado recebe `lost` e para) |
+| trava de processo morto recuperada em ≤ STALE_MS, com registro | **[rev. 4]** distinguir morto de congelado > STALE_MS numa trava de `acquire` puro (o congelado recebe `lost` e para). Com `hold`/`run`, a trava do SO distingue: o congelado mantém a trava até o `ttl` ou um `unlock --force` |
 | deadlock detectado e resolvido deterministicamente | coordenação entre máquinas |
 | a lista é sempre a verdade (é a pasta) | — |
 | funciona sem processo residente | limpeza sem nenhuma chamada: sobras ficam até a próxima chamada ou `gc` |
@@ -302,10 +338,10 @@ inexistente, log dentro do limite.
 | esperador morre | senha expira; a fila fecha o buraco |
 | dois pedidos no mesmo microssegundo | o aleatório desempata a ordem; `create_new` decide a posse |
 | dois participantes quebram a mesma trava morta | rename atômico: um consegue; o outro recebe `ENOENT` e segue |
-| dono congelado > STALE_MS mas vivo | trava quebrada; ele vê `lost` e para (código 14) |
+| dono congelado > STALE_MS mas vivo | **[rev. 4]** trava de `acquire` puro: quebrada; ele vê `lost` e para (código 14). `hold`/`run`: a trava do SO mostra que está vivo; a trava fica (`list` marca `late`) até o `ttl` ou um `unlock --force` |
 | `unlock --force` por engano | `log.jsonl` diz quem, quando, por quê; o dono para em vez de sobrescrever |
 | antivírus/editor segurando arquivo do jlock | tentativas com espera crescente; persistiu → código 20, mensagem do SO, sem matar processo |
-| relógio salta | pode expirar travas vivas uma vez; donos recebem `lost` e param |
+| relógio salta | pode expirar travas vivas de `acquire` puro uma vez; donos recebem `lost` e param. **[rev. 4]** `hold`/`run` ficam protegidos pela trava do SO |
 | caminho longo, maiúsculas, barras | chave normalizada; diretório usa o hash |
 | disco cheio / sem permissão em `JLOCK_HOME` | erro ≠ `EEXIST` é reportado (20), nunca lido como "ocupado" |
 | `index.json` corrompido ou velho | derivado: ignorado e reescrito |
