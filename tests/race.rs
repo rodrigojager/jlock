@@ -41,7 +41,7 @@ fn twelve_racers_exactly_one_winner_per_round() {
         assert_eq!(losers, RACERS - 1, "round {round}");
         let winner = winners[0].clone();
 
-        let dir = env.locks().join(sha1_dir(key));
+        let dir = env.key_dir(key);
         let holder: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(dir.join("holder.json")).unwrap())
                 .unwrap();
@@ -74,12 +74,4 @@ fn release_by_someone_else_is_refused() {
     assert_eq!(done.json()["result"], "not_owner");
     assert_eq!(env.run(&["release", "name:x", "--owner", "a"]).code, 0);
     assert!(env.lock_dirs().is_empty());
-}
-
-fn sha1_dir(text: &str) -> String {
-    use sha1::{Digest, Sha1};
-    Sha1::digest(text.as_bytes())
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
 }

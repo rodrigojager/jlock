@@ -21,3 +21,10 @@ Points where the implementation departs from the plan, or fills a gap the plan l
 - **What:** the plan does not say what happens when an owner asks for a key it already holds.
 - **Done instead:** it is granted at once and `holder.json` is left as is (no counting). Holders and
   tickets of the same owner never block that owner, including through the path hierarchy.
+
+## 4. Exit code for an interrupted wait
+
+- **What:** the plan says CTRL+C during the wait removes the ticket, but its exit-code table has no entry
+  for "interrupted".
+- **Done instead:** the ticket is removed and the command exits with 130 (the shell convention for SIGINT),
+  `--json` result `error` with `"error": "interrupted"`.

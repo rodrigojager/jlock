@@ -9,6 +9,14 @@ use std::time::{Duration, Instant};
 
 pub const JLOCK: &str = env!("CARGO_BIN_EXE_jlock");
 
+pub fn sha1_hex(text: &str) -> String {
+    use sha1::{Digest, Sha1};
+    Sha1::digest(text.as_bytes())
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
 pub struct Env {
     pub home: PathBuf,
     vars: Vec<(String, String)>,
@@ -94,6 +102,25 @@ impl Env {
                 .collect(),
             Err(_) => Vec::new(),
         }
+    }
+
+    /// The folder of a key, given its normalized text.
+    pub fn key_dir(&self, text: &str) -> PathBuf {
+        self.locks().join(sha1_hex(text))
+    }
+
+    /// Owner written in the key's `holder.json`, if any.
+    pub fn holder_owner(&self, text: &str) -> Option<String> {
+        let body = std::fs::read_to_string(self.key_dir(text).join("holder.json")).ok()?;
+        let v: serde_json::Value = serde_json::from_str(&body).ok()?;
+        v["owner"].as_str().map(str::to_string)
+    }
+
+    /// Number of tickets in the key's queue.
+    pub fn tickets(&self, text: &str) -> usize {
+        std::fs::read_dir(self.key_dir(text).join("queue"))
+            .map(|d| d.count())
+            .unwrap_or(0)
     }
 
     /// A path inside the test home, usable as a path key on any system.

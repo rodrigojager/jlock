@@ -6,7 +6,9 @@ mod fsx;
 mod holder;
 mod home;
 mod key;
+mod queue;
 mod store;
+mod wait;
 
 mod cmd {
     pub mod acquire;
