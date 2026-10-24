@@ -1,6 +1,3 @@
-// Helpers land before the commands that use them; this goes away once every command exists.
-#![allow(dead_code)]
-
 mod cli;
 mod conflict;
 mod expire;

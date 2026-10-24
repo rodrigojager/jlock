@@ -2,6 +2,13 @@
 name = "jlock"
 version = "0.1.0"
 edition = "2021"
+description = "Machine-wide locks for files, folders and names: fair queue, heartbeat recovery, deadlock detection, no server"
+license = "MIT"
+authors = ["Rodrigo Jäger <rodrigojager@gmail.com>"]
+repository = "https://github.com/rodrigojager/jlock"
+readme = "README.md"
+keywords = ["lock", "flock", "mutex", "cli", "concurrency"]
+categories = ["command-line-utilities", "concurrency"]
 
 [[bin]]
 name = "jlock"

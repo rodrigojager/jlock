@@ -126,7 +126,3 @@ pub fn age(path: &Path) -> io::Result<Duration> {
         .duration_since(modified)
         .unwrap_or(Duration::ZERO))
 }
-
-pub fn read_string(path: &Path) -> io::Result<String> {
-    retry(path, || fs::read_to_string(path))
-}
