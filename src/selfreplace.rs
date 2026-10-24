@@ -14,7 +14,9 @@ pub fn old_path(exe: &Path) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// Deletes the `.old` an update left next to this executable because it was still running.
+/// Deletes the `.old` an update left next to this executable because it was still running (only
+/// Windows keeps one: a running file there cannot be deleted).
+#[cfg(windows)]
 pub fn cleanup_old() {
     if let Ok(exe) = std::env::current_exe() {
         let old = old_path(&exe);

@@ -137,6 +137,7 @@ fn interrupt_while_waiting_removes_the_ticket() {
         env.run(&["acquire", key, "--no-wait", "--owner", "a"]).code,
         0
     );
+    #[allow(unused_mut)] // only Windows changes it
     let mut cmd = env.cmd(&["acquire", key, "--owner", "b"]);
     #[cfg(windows)]
     {
