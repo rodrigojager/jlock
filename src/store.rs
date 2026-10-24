@@ -3,6 +3,7 @@
 use crate::cli::{fs_error, usage, Failure};
 use crate::fsx;
 use crate::holder::Holder;
+use crate::i18n::txt;
 use crate::key::Key;
 use std::fs;
 use std::io;
@@ -25,12 +26,10 @@ pub struct Store {
 
 impl Store {
     pub fn open() -> Result<Store, Failure> {
-        let root = crate::home::root().map_err(usage)?;
+        let root = crate::home::root().map_err(|k| usage(txt!(k)))?;
         let locks = fsx::retry(&root, || crate::home::locks_dir(&root)).map_err(|e| {
-            fs_error(
-                format!("cannot create {}", root.join("locks").display()),
-                &e,
-            )
+            let path = root.join("locks").display().to_string();
+            fs_error(txt!("error.cannot_create", path = path), &e)
         })?;
         crate::log::init(&root);
         OPENED.store(true, Ordering::SeqCst);

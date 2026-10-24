@@ -4,6 +4,7 @@
 use crate::cli::{fs_error, usage, CmdResult, Failure, EXIT_LOST, EXIT_USAGE};
 use crate::cmd::acquire::{acquire_all, normalize_keys, parse, report, SetOutcome};
 use crate::cmd::hold::Keeper;
+use crate::i18n::txt;
 use crate::store::Store;
 use crate::wait;
 use std::process::{Command, ExitStatus};
@@ -24,7 +25,7 @@ fn exit_code(status: ExitStatus) -> i32 {
 pub fn run(args: Vec<String>) -> CmdResult {
     let (opts, command) = parse(args, "run")?;
     if command.is_empty() {
-        return Err(usage("run needs a command after '--'"));
+        return Err(usage(txt!("error.run_needs_command")));
     }
     // CTRL+C reaches the command too; jlock keeps the lock until the command is gone.
     wait::install_interrupt_handler();
@@ -32,7 +33,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     let store = Store::open()?;
     let deadline = opts.timeout.map(|t| Instant::now() + t);
     let outcome = acquire_all(&store, &keys, &opts.ident, opts.wait, deadline)
-        .map_err(|e| fs_error("cannot lock", &e))?;
+        .map_err(|e| fs_error(txt!("error.cannot_lock"), &e))?;
     let SetOutcome::Granted { keys, .. } = outcome else {
         return Ok(report(&opts, &outcome));
     };
@@ -44,7 +45,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
             keeper.release_all();
             return Err(Failure {
                 code: EXIT_USAGE,
-                msg: format!("cannot run {}: {e}", command[0]),
+                msg: txt!("error.cannot_run", cmd = command[0]).with(e),
             });
         }
     };
@@ -54,7 +55,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
             Ok(None) => {}
             Err(e) => {
                 keeper.release_all();
-                return Err(fs_error(format!("waiting for {}", command[0]), &e));
+                return Err(fs_error(txt!("error.waiting_for", cmd = command[0]), &e));
             }
         }
         if let Some(trouble) = keeper.tick() {

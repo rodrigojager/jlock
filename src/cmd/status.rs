@@ -1,13 +1,16 @@
 //! `jlock status <key>`: holder and queue of one key, and the keys that block it through the
 //! hierarchy (a folder above it, files inside it) or `*`.
 
-use crate::cli::{fs_error, print_json, usage, Arg, CmdResult, Parser, EXIT_OK};
+use crate::cli::{
+    fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
+};
 use crate::cmd::acquire::normalize_keys;
 use crate::conflict::conflicting_dirs;
 use crate::expire;
 use crate::fsx;
 use crate::heartbeat::stale_after;
 use crate::holder::{now_micros, Holder};
+use crate::i18n::{t, txt, Text};
 use crate::index;
 use crate::key::Key;
 use crate::oslock;
@@ -58,25 +61,25 @@ pub fn holder_json(kd: &KeyDir, h: &Holder) -> Value {
 }
 
 fn describe(kd: &KeyDir, h: &Holder) -> String {
-    let mut line = format!(
-        "by {} since {} ({} ago)",
-        h.owner,
-        h.since,
-        human(ms_since(&h.since))
+    let mut line = t!(
+        "status.by",
+        owner = h.owner,
+        since = h.since,
+        ago = human(ms_since(&h.since))
     );
     if let Some(hb) = heartbeat_ms(&kd.holder_path()) {
-        line += &format!(", heartbeat {} ago", human(hb));
+        line += &t!("status.heartbeat", ago = human(hb));
         match liveness(&kd.holder_path(), h) {
-            (true, _) => line += " (dead)",
-            (false, true) => line += " (late, process alive)",
+            (true, _) => line += &t!("status.dead"),
+            (false, true) => line += &t!("status.late"),
             _ => {}
         }
     }
     if let Some(g) = &h.group {
-        line += &format!(", group {g}");
+        line += &t!("status.group", group = g);
     }
     if let Some(i) = &h.intent {
-        line += &format!(", intent \"{i}\"");
+        line += &t!("status.intent", intent = i);
     }
     line
 }
@@ -90,20 +93,26 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
     let st = index::state(store.key_dir(&key))?;
     let mut text = String::new();
     match &st.holder {
-        Some(h) => text += &format!("held {}\n  {}\n", key.text, describe(&kd, h)),
-        None => text += &format!("free {}\n", key.text),
+        Some(h) => {
+            text += &t!("status.held", key = key.text);
+            text += &format!("\n  {}\n", describe(&kd, h));
+        }
+        None => text += &format!("{}\n", t!("status.free", key = key.text)),
     }
     let mut queue = Vec::new();
     if !st.tickets.is_empty() {
-        text += "queue:\n";
+        text += &format!("{}\n", t!("status.queue"));
     }
     for (i, t) in st.tickets.iter().enumerate() {
         let waiting = ms_since(&t.body.since);
         text += &format!(
-            "  {}. {} (waiting {})\n",
-            i + 1,
-            t.body.owner,
-            human(waiting)
+            "  {}\n",
+            t!(
+                "status.queue_item",
+                position = i + 1,
+                owner = t.body.owner,
+                time = human(waiting)
+            )
         );
         queue.push(
             json!({ "position": i + 1, "owner": t.body.owner, "since": t.body.since,
@@ -118,14 +127,21 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
             continue;
         }
         if conflicts.is_empty() {
-            text += "conflicts:\n";
+            text += &format!("{}\n", t!("status.conflicts"));
         }
+        text += "  ";
         match &cs.holder {
-            Some(h) => text += &format!("  {} held by {}", cs.dir.key.text, h.owner),
-            None => text += &format!("  {} (not held)", cs.dir.key.text),
+            Some(h) => {
+                text += &t!(
+                    "status.conflict_held",
+                    key = cs.dir.key.text,
+                    owner = h.owner
+                )
+            }
+            None => text += &t!("status.conflict_free", key = cs.dir.key.text),
         }
         if !cs.tickets.is_empty() {
-            text += &format!(", {} waiting", cs.tickets.len());
+            text += &crate::i18n::trn("status.conflict_waiting", cs.tickets.len() as u64, &[]);
         }
         text += "\n";
         conflicts.push(json!({
@@ -153,15 +169,15 @@ pub fn run(args: Vec<String>) -> CmdResult {
         match arg {
             Arg::Flag(f) if f == "json" => json = true,
             Arg::Pos(k) if input.is_none() => input = Some(k),
-            Arg::Pos(k) => return Err(usage(format!("status takes one key (extra '{k}')"))),
-            Arg::Flag(f) => return Err(usage(format!("status: unknown option --{f}"))),
-            Arg::Rest(_) => return Err(usage("status: unexpected '--'")),
+            Arg::Pos(k) => return Err(usage(txt!("error.status_extra", key = k))),
+            Arg::Flag(f) => return Err(unknown_option("status", &f)),
+            Arg::Rest(_) => return Err(unexpected_rest("status")),
         }
     }
-    let input = input.ok_or_else(|| usage("status needs a key"))?;
+    let input = input.ok_or_else(|| usage(txt!("error.status_needs")))?;
     let key = normalize_keys(std::slice::from_ref(&input))?.remove(0);
     let store = Store::open()?;
-    let (text, value) = status(&store, key).map_err(|e| fs_error(&input, &e))?;
+    let (text, value) = status(&store, key).map_err(|e| fs_error(Text::plain(&input), &e))?;
     if json {
         print_json(&value);
     } else {

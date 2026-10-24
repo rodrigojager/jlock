@@ -1,5 +1,6 @@
 //! Argument parsing by hand, exit codes (plan section 6) and command dispatch.
 
+use crate::i18n::{t, txt, Text};
 use std::time::Duration;
 
 pub const EXIT_OK: i32 = 0;
@@ -11,49 +12,38 @@ pub const EXIT_NOT_OWNER: i32 = 13;
 pub const EXIT_LOST: i32 = 14;
 pub const EXIT_FS: i32 = 20;
 
-pub const HELP: &str = "\
-jlock - machine-wide locks for files, folders and names
-
-Usage:
-  jlock acquire <key...> [--owner id] [--group g] [--intent \"...\"] [--meta k=v...]
-                [--ttl 2h] [--wait|--no-wait] [--timeout 30s] [--json]
-  jlock run <key...> [acquire options] -- <command...>
-  jlock hold <key...> [acquire options]
-  jlock release [<key...>] [--owner id] [--group g] [--any-owner] [--json]
-  jlock heartbeat <key> --owner id [--json]
-  jlock status <key> [--json]
-  jlock list [--owner x] [--group g] [--under path] [--stale] [--json] [--watch]
-  jlock graph [--json]
-  jlock unlock (<key> | --owner x | --group g) --force [--reason \"...\"] [--by id] [--json]
-  jlock gc [--json]
-  jlock --version | --help
-
-Keys: a path (file or folder, any form), name:<text>, or * (conflicts with everything).
-
-Exit codes: 0 ok, 2 usage, 10 busy, 11 timeout, 12 deadlock, 13 not owner,
-            14 lock lost, 20 file system error.
-";
-
 #[derive(Debug)]
 pub struct Failure {
     pub code: i32,
-    pub msg: String,
+    pub msg: Text,
 }
 
 pub type CmdResult = Result<i32, Failure>;
 
-pub fn usage(msg: impl Into<String>) -> Failure {
+pub fn usage(msg: Text) -> Failure {
     Failure {
         code: EXIT_USAGE,
-        msg: msg.into(),
+        msg,
     }
 }
 
-pub fn fs_error(context: impl std::fmt::Display, err: &std::io::Error) -> Failure {
+/// A file system failure: what jlock was doing, then the OS message (which comes in the OS's own
+/// language and names the path).
+pub fn fs_error(context: Text, err: &std::io::Error) -> Failure {
     Failure {
         code: EXIT_FS,
-        msg: format!("{context}: {err}"),
+        msg: context.with(err),
     }
+}
+
+/// `<cmd>: unknown option --<flag>`.
+pub fn unknown_option(cmd: &str, flag: &str) -> Failure {
+    usage(txt!("error.unknown_option", cmd = cmd, flag = flag))
+}
+
+/// `<cmd>: unexpected '--'`.
+pub fn unexpected_rest(cmd: &str) -> Failure {
+    usage(txt!("error.unexpected_rest", cmd = cmd))
 }
 
 pub enum Arg {
@@ -111,7 +101,7 @@ impl Parser {
                 self.pos += 1;
                 Ok(v.clone())
             }
-            None => Err(usage(format!("--{flag} needs a value"))),
+            None => Err(usage(txt!("error.needs_value", flag = flag))),
         }
     }
 }
@@ -123,20 +113,15 @@ pub fn parse_duration(text: &str) -> Result<Duration, Failure> {
         .find(|c: char| !c.is_ascii_digit() && c != '.')
         .unwrap_or(t.len());
     let (num, unit) = t.split_at(split);
-    let n: f64 = num
-        .parse()
-        .map_err(|_| usage(format!("bad duration '{text}' (use 500ms, 30s, 2m, 2h)")))?;
+    let bad = || usage(txt!("error.bad_duration", text = text));
+    let n: f64 = num.parse().map_err(|_| bad())?;
     let ms = match unit {
         "ms" => n,
         "" | "s" => n * 1000.0,
         "m" => n * 60_000.0,
         "h" => n * 3_600_000.0,
         "d" => n * 86_400_000.0,
-        _ => {
-            return Err(usage(format!(
-                "bad duration '{text}' (use 500ms, 30s, 2m, 2h)"
-            )))
-        }
+        _ => return Err(bad()),
     };
     Ok(Duration::from_millis(ms as u64))
 }
@@ -146,7 +131,8 @@ pub fn print_json(value: &serde_json::Value) {
 }
 
 /// Runs the command line and returns the process exit code.
-pub fn main(args: Vec<String>) -> i32 {
+pub fn main(mut args: Vec<String>) -> i32 {
+    crate::i18n::select(&mut args);
     let json = args.iter().any(|a| a == "--json");
     let result = dispatch(args);
     // Commands that reached the registry keep it tidy: the index after a change, and the global
@@ -163,9 +149,9 @@ pub fn main(args: Vec<String>) -> i32 {
         Ok(code) => code,
         Err(f) => {
             if json {
-                print_json(&serde_json::json!({ "result": "error", "error": f.msg }));
+                print_json(&serde_json::json!({ "result": "error", "error": f.msg.en }));
             } else {
-                eprintln!("jlock: {}", f.msg);
+                eprintln!("jlock: {}", f.msg.local);
             }
             f.code
         }
@@ -175,8 +161,8 @@ pub fn main(args: Vec<String>) -> i32 {
 fn dispatch(args: Vec<String>) -> CmdResult {
     let mut iter = args.into_iter();
     let Some(cmd) = iter.next() else {
-        print!("{HELP}");
-        return Err(usage("missing command"));
+        print!("{}", t!("help.usage"));
+        return Err(usage(txt!("error.missing_command")));
     };
     let rest: Vec<String> = iter.collect();
     match cmd.as_str() {
@@ -185,7 +171,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
             Ok(EXIT_OK)
         }
         "--help" | "-h" | "help" => {
-            print!("{HELP}");
+            print!("{}", t!("help.usage"));
             Ok(EXIT_OK)
         }
         "status" => crate::cmd::status::run(rest),
@@ -198,8 +184,6 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "list" => crate::cmd::list::run(rest),
         "unlock" => crate::cmd::unlock::run(rest),
         "gc" => crate::cmd::gc::run(rest),
-        other => Err(usage(format!(
-            "unknown command '{other}' (see jlock --help)"
-        ))),
+        other => Err(usage(txt!("error.unknown_command", cmd = other))),
     }
 }

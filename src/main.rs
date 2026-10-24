@@ -6,6 +6,7 @@ mod graph;
 mod heartbeat;
 mod holder;
 mod home;
+mod i18n;
 mod index;
 mod key;
 mod log;

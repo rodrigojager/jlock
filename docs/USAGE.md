@@ -151,7 +151,28 @@ log bytes:       48211
 
 Any command already does this at most once per `JLOCK_SWEEP_MS`; `gc` does it now and reports.
 
-### `--version`, `--help`
+### `--version`, `--help`, `--lang`
+
+`--lang <tag>` can go with any command and sets the language of its text output (see below).
+
+## Language
+
+Text output (help, result lines, errors, table headers) comes in the language chosen by, in order:
+the `--lang <tag>` option (anywhere on the line, also as `--lang=<tag>`; never after the `--` of `run`),
+the `JLOCK_LANG` variable, the system's language (`LC_ALL`, `LC_MESSAGES`, `LANG` on Unix;
+the user's locale on Windows), and finally English.
+
+```
+jlock --lang pt-BR status name:x
+livre name:x
+```
+
+Accepted tags: `en`, `pt-BR`. A tag is matched exactly first, then by its main language
+(`pt`, `pt_PT.UTF-8` → `pt-BR`); an unknown tag prints a warning and the run goes on in English.
+
+What never changes with the language: command and option names, every `--json` output, `log.jsonl`,
+`index.json` and the exit codes. Scripts should read `--json`; the text is for people. The OS message
+inside a file system error (exit 20) comes from the system, in the system's language.
 
 ## Exit codes
 
@@ -179,6 +200,7 @@ Any command already does this at most once per `JLOCK_SWEEP_MS`; `gc` does it no
 | `JLOCK_POLL_MS` | 250 | how often a waiter looks (±40% jitter) |
 | `JLOCK_SWEEP_MS` | 60000 | minimum time between global sweeps |
 | `JLOCK_LOG_MAX_BYTES` | 5242880 | log rotation size |
+| `JLOCK_LANG` | system language, else `en` | language of the text output (see [Language](#language)) |
 | `JLOCK_DEBUG` | unset | any value: trace to stderr |
 
 ## On disk

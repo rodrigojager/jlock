@@ -1,7 +1,8 @@
 //! `jlock graph`: who waits for whom, and the cycles.
 
-use crate::cli::{fs_error, print_json, usage, Arg, CmdResult, Parser, EXIT_OK};
+use crate::cli::{fs_error, print_json, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK};
 use crate::graph::{chain_text, cycles, edges, Via};
+use crate::i18n::{t, txt};
 use crate::index;
 use crate::store::Store;
 use serde_json::json;
@@ -12,12 +13,12 @@ pub fn run(args: Vec<String>) -> CmdResult {
     while let Some(arg) = p.next() {
         match arg {
             Arg::Flag(f) if f == "json" => json = true,
-            Arg::Flag(f) => return Err(usage(format!("graph: unknown option --{f}"))),
-            _ => return Err(usage("graph takes no arguments")),
+            Arg::Flag(f) => return Err(unknown_option("graph", &f)),
+            _ => return Err(usage(txt!("error.takes_no_args", cmd = "graph"))),
         }
     }
     let store = Store::open()?;
-    let states = index::scan(&store).map_err(|e| fs_error("cannot read the locks", &e))?;
+    let states = index::scan(&store).map_err(|e| fs_error(txt!("error.cannot_read"), &e))?;
     let all = edges(&states);
     let found = cycles(&all);
     if json {
@@ -26,20 +27,23 @@ pub fn run(args: Vec<String>) -> CmdResult {
         return Ok(EXIT_OK);
     }
     if all.is_empty() {
-        println!("no waiters");
+        println!("{}", t!("graph.no_waiters"));
         return Ok(EXIT_OK);
     }
     for e in &all {
         let how = match e.via {
-            Via::Held => "held by",
-            Via::Queued => "queued behind",
+            Via::Held => "graph.edge_held",
+            Via::Queued => "graph.edge_queued",
         };
-        println!("{} -> {}  ({} {how} {})", e.from, e.to, e.key, e.to);
+        println!(
+            "{}",
+            t!(how, from = e.from, to = e.to, key = e.key, holder = e.to)
+        );
     }
     if found.is_empty() {
-        println!("no cycles");
+        println!("{}", t!("graph.no_cycles"));
     } else {
-        println!("cycles:");
+        println!("{}", t!("graph.cycles"));
         for c in &found {
             println!("  {}", chain_text(c));
         }

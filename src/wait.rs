@@ -16,7 +16,11 @@ pub fn env_ms(name: &str, default: u64) -> u64 {
         Ok(v) => match v.trim().parse::<u64>() {
             Ok(n) if n > 0 => n,
             _ => {
-                eprintln!("jlock: ignoring {name}={v:?} (want a positive number of ms)");
+                let value = format!("{v:?}");
+                eprintln!(
+                    "jlock: {}",
+                    crate::i18n::t!("warn.bad_ms", name = name, value = value)
+                );
                 default
             }
         },

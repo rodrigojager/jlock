@@ -21,7 +21,12 @@ fn times() -> &'static Times {
         let stale = env_ms("JLOCK_STALE_MS", 30000);
         if stale <= heartbeat {
             eprintln!(
-                "jlock: JLOCK_STALE_MS ({stale}) should be well above JLOCK_HEARTBEAT_MS ({heartbeat})"
+                "jlock: {}",
+                crate::i18n::t!(
+                    "warn.stale_vs_heartbeat",
+                    stale = stale,
+                    heartbeat = heartbeat
+                )
             );
         }
         Times { heartbeat, stale }

@@ -9,17 +9,18 @@ fn env_path(name: &str) -> Option<PathBuf> {
     }
 }
 
-/// The registry root. Not created here.
-pub fn root() -> Result<PathBuf, String> {
+/// The registry root. Not created here. An error is a catalog key (`error.no_localappdata`,
+/// `error.no_home`).
+pub fn root() -> Result<PathBuf, &'static str> {
     if let Some(p) = env_path("JLOCK_HOME") {
         return Ok(p);
     }
     if cfg!(windows) {
         return env_path("LOCALAPPDATA")
             .map(|p| p.join("jlock"))
-            .ok_or_else(|| "LOCALAPPDATA is not set; set JLOCK_HOME".to_string());
+            .ok_or("error.no_localappdata");
     }
-    let home = env_path("HOME").ok_or_else(|| "HOME is not set; set JLOCK_HOME".to_string());
+    let home = env_path("HOME").ok_or("error.no_home");
     if cfg!(target_os = "macos") {
         return Ok(home?
             .join("Library")

@@ -62,7 +62,8 @@ pub fn sha1_hex(text: &str) -> String {
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// Normalizes a key given on the command line, relative to `cwd`, for the running system.
+/// Normalizes a key given on the command line, relative to `cwd`, for the running system. An error
+/// is a catalog key (`error.empty_key`, `error.empty_name`), turned into text by the caller.
 pub fn normalize(input: &str, cwd: &std::path::Path) -> Result<Key, String> {
     let home =
         std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).unwrap_or_default();
@@ -78,7 +79,7 @@ pub fn normalize_for(
 ) -> Result<Key, String> {
     let input = input.trim();
     if input.is_empty() {
-        return Err("empty key".into());
+        return Err("error.empty_key".into());
     }
     if input == "*" {
         return Ok(Key::from_text("*"));
@@ -86,7 +87,7 @@ pub fn normalize_for(
     if let Some(name) = input.strip_prefix("name:") {
         let name = name.trim();
         if name.is_empty() {
-            return Err("empty name in key 'name:'".into());
+            return Err("error.empty_name".into());
         }
         return Ok(Key::from_text(&format!("name:{name}")));
     }

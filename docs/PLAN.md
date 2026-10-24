@@ -173,6 +173,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | `jlock unlock (<chave> \| --owner x \| --group g) --force [--reason "…"]` | quebra travas de outrem, registrando quem forçou; o dono recebe `lost` no próximo heartbeat. |
 | `jlock gc [--json]` | varredura global agora: expira travas e senhas mortas, consome `broken\`, remove pastas de chave vazias, rotaciona o log, reescreve o índice; imprime o que removeu. |
 | `jlock --version`, `jlock --help` | — |
+| `--lang <tag>` (global, em qualquer posição antes de `--`) | **[rev. 5]** idioma das saídas de texto desta execução: `en`, `pt-BR`, `es`, `fr`, `de`, `it`, `zh-CN`, `ja`, `ru`, `ar`, `hi`. Prioridade: `--lang` > `JLOCK_LANG` > idioma do sistema > `en`. Comandos, opções, `--json`, `log.jsonl`, `index.json` e códigos de saída não mudam com o idioma. |
 
 ### Códigos de saída
 
@@ -207,6 +208,7 @@ uma linha curta por chave.
 | `JLOCK_POLL_MS` | 250 | intervalo base de sondagem (com jitter de ±40%) |
 | `JLOCK_SWEEP_MS` | 60000 | intervalo mínimo entre varreduras globais |
 | `JLOCK_LOG_MAX_BYTES` | 5242880 | rotação do log |
+| `JLOCK_LANG` | idioma do sistema, senão `en` | **[rev. 5]** idioma das saídas de texto (tag exata, depois a língua primária: `pt` → `pt-BR`); tag desconhecida → aviso e inglês |
 
 Os testes usam valores curtos por essas variáveis.
 

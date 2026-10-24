@@ -1,9 +1,12 @@
 //! `jlock unlock (<key> | --owner x | --group g) --force`: breaks someone else's locks, writing
 //! down who forced and why. The owner finds out on its next heartbeat (`lost`) and stops.
 
-use crate::cli::{fs_error, print_json, usage, Arg, CmdResult, Parser, EXIT_OK};
+use crate::cli::{
+    fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
+};
 use crate::cmd::acquire::normalize_keys;
 use crate::expire::break_file;
+use crate::i18n::{t, txt};
 use crate::index;
 use crate::log;
 use crate::store::{KeyDir, Store};
@@ -50,23 +53,20 @@ pub fn run(args: Vec<String>) -> CmdResult {
                 "by" => by = p.value(&f)?,
                 "force" => force = true,
                 "json" => json = true,
-                _ => return Err(usage(format!("unlock: unknown option --{f}"))),
+                _ => return Err(unknown_option("unlock", &f)),
             },
-            Arg::Rest(_) => return Err(usage("unlock: unexpected '--'")),
+            Arg::Rest(_) => return Err(unexpected_rest("unlock")),
         }
     }
     if inputs.is_empty() && owner.is_none() && group.is_none() {
-        return Err(usage("unlock needs a key, --owner or --group"));
+        return Err(usage(txt!("error.unlock_needs")));
     }
     if !force {
-        return Err(usage(
-            "unlock breaks other people's locks: add --force if that is what you mean \
-             (to give back your own lock, use jlock release)",
-        ));
+        return Err(usage(txt!("error.unlock_needs_force")));
     }
     let keys = normalize_keys(&inputs)?;
     let store = Store::open()?;
-    let failed = |e: io::Error| fs_error("cannot force", &e);
+    let failed = |e: io::Error| fs_error(txt!("error.cannot_force"), &e);
     let mut targets: Vec<KeyDir> = keys.iter().map(|k| store.key_dir(k)).collect();
     if owner.is_some() || group.is_some() {
         for st in index::scan(&store).map_err(failed)? {
@@ -82,7 +82,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     for kd in &targets {
         if let Some(was) = force_key(kd, &by, reason.as_deref()).map_err(failed)? {
             if !json {
-                println!("forced {} (was {was})", kd.key.text);
+                println!("{}", t!("unlock.forced", key = kd.key.text, owner = was));
             }
             forced.push(json!({ "key": kd.key.text, "owner": was }));
         }
@@ -90,7 +90,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     if json {
         print_json(&json!({ "result": "ok", "forced": forced, "by": by, "reason": reason }));
     } else if forced.is_empty() {
-        println!("nothing to force");
+        println!("{}", t!("unlock.nothing"));
     }
     Ok(EXIT_OK)
 }

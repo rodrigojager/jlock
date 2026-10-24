@@ -6,6 +6,7 @@ use crate::cmd::acquire::{acquire_all, normalize_keys, parse, report, SetOutcome
 use crate::cmd::release::release_key;
 use crate::expire;
 use crate::heartbeat::{beat, heartbeat_interval, Beat};
+use crate::i18n::{t, txt};
 use crate::key::Key;
 use crate::oslock::{self, OsLock, Try};
 use crate::store::{KeyDir, Store};
@@ -123,7 +124,7 @@ impl<'a> Keeper<'a> {
                     "holder": holder, "reason": reason })
             .to_string()
         } else {
-            format!("lost {}", key.text)
+            t!("result.lost", key = key.text)
         };
         if quiet_stdout {
             eprintln!("{line}");
@@ -156,7 +157,7 @@ fn watch_stdin() {
 pub fn run(args: Vec<String>) -> CmdResult {
     let (opts, rest) = parse(args, "hold")?;
     if !rest.is_empty() {
-        return Err(usage("hold: unexpected '--' (did you mean jlock run?)"));
+        return Err(usage(txt!("error.rest_not_run", cmd = "hold")));
     }
     wait::install_interrupt_handler();
     watch_stdin();
@@ -164,7 +165,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     let store = Store::open()?;
     let deadline = opts.timeout.map(|t| Instant::now() + t);
     let outcome = acquire_all(&store, &keys, &opts.ident, opts.wait, deadline)
-        .map_err(|e| fs_error("cannot lock", &e))?;
+        .map_err(|e| fs_error(txt!("error.cannot_lock"), &e))?;
     let SetOutcome::Granted { keys, .. } = &outcome else {
         return Ok(report(&opts, &outcome));
     };
@@ -185,7 +186,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
         print_json(&json!({ "result": "released", "keys": texts, "owner": keeper.owner }));
     } else {
         for k in &keeper.keys {
-            println!("released {}", k.text);
+            println!("{}", t!("result.released", key = k.text));
         }
     }
     Ok(EXIT_OK)

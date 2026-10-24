@@ -2,14 +2,15 @@
 //! ticket is the oldest one alive and no conflicting key is taken (plan section 7).
 
 use crate::cli::{
-    fs_error, parse_duration, print_json, usage, Arg, CmdResult, Failure, Parser, EXIT_BUSY,
-    EXIT_DEADLOCK, EXIT_OK, EXIT_TIMEOUT,
+    fs_error, parse_duration, print_json, unknown_option, usage, Arg, CmdResult, Failure, Parser,
+    EXIT_BUSY, EXIT_DEADLOCK, EXIT_OK, EXIT_TIMEOUT,
 };
 use crate::conflict;
 use crate::expire;
 use crate::fsx;
 use crate::graph;
 use crate::holder::{iso, now_micros, Holder, Ident};
+use crate::i18n::{t, txt};
 use crate::index;
 use crate::key::{self, Key};
 use crate::log;
@@ -56,7 +57,7 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
                     let kv = p.value(&f)?;
                     let (k, v) = kv
                         .split_once('=')
-                        .ok_or_else(|| usage(format!("--meta wants key=value, got '{kv}'")))?;
+                        .ok_or_else(|| usage(txt!("error.meta_kv", value = kv)))?;
                     opts.ident.meta.insert(k.to_string(), v.to_string());
                 }
                 "ttl" => {
@@ -67,30 +68,30 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
                 "no-wait" => opts.wait = false,
                 "timeout" => opts.timeout = Some(parse_duration(&p.value(&f)?)?),
                 "json" => opts.json = true,
-                _ => return Err(usage(format!("{cmd}: unknown option --{f}"))),
+                _ => return Err(unknown_option(cmd, &f)),
             },
         }
     }
     if opts.keys.is_empty() {
-        return Err(usage(format!("{cmd} needs at least one key")));
+        return Err(usage(txt!("error.needs_key", cmd = cmd)));
     }
     Ok((opts, rest))
 }
 
 fn nonempty(v: String, flag: &str) -> Result<String, Failure> {
     if v.trim().is_empty() {
-        Err(usage(format!("--{flag} must not be empty")))
+        Err(usage(txt!("error.empty_value", flag = flag)))
     } else {
         Ok(v)
     }
 }
 
 pub fn normalize_keys(inputs: &[String]) -> Result<Vec<Key>, Failure> {
-    let cwd =
-        std::env::current_dir().map_err(|e| fs_error("cannot read the current directory", &e))?;
+    let cwd = std::env::current_dir().map_err(|e| fs_error(txt!("error.cwd"), &e))?;
     let mut keys = Vec::new();
     for input in inputs {
-        keys.push(key::normalize(input, &cwd).map_err(usage)?);
+        // key.rs answers with a catalog key: it is pure string work and knows no languages.
+        keys.push(key::normalize(input, &cwd).map_err(|k| usage(txt!(&k)))?);
     }
     Ok(keys)
 }
@@ -514,7 +515,7 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
                 print_json(&out);
             } else {
                 for k in keys {
-                    println!("granted {}", k.text);
+                    println!("{}", t!("acquire.granted", key = k.text));
                 }
             }
             EXIT_OK
@@ -525,10 +526,10 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
             released,
         } => {
             let (result, word, code) = match outcome {
-                Outcome::Busy { .. } => ("queued", "busy", EXIT_BUSY),
-                Outcome::Timeout { .. } => ("timeout", "timeout", EXIT_TIMEOUT),
-                Outcome::Interrupted => ("error", "interrupted", EXIT_INTERRUPTED),
-                Outcome::Deadlock { .. } => ("deadlock", "deadlock", EXIT_DEADLOCK),
+                Outcome::Busy { .. } => ("queued", "acquire.busy", EXIT_BUSY),
+                Outcome::Timeout { .. } => ("timeout", "acquire.timeout", EXIT_TIMEOUT),
+                Outcome::Interrupted => ("error", "acquire.interrupted", EXIT_INTERRUPTED),
+                Outcome::Deadlock { .. } => ("deadlock", "acquire.deadlock", EXIT_DEADLOCK),
                 Outcome::Granted { .. } => unreachable!("a granted key is not a failure"),
             };
             let mut out = json!({
@@ -554,24 +555,32 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
                     if !opts.json {
                         let by = holder
                             .as_ref()
-                            .map_or("nobody (queue ahead)", |h| h.owner.as_str());
-                        let through = via.as_ref().map_or(String::new(), |v| format!(" via {v}"));
+                            .map_or_else(|| t!("acquire.nobody"), |h| h.owner.clone());
+                        let through = via
+                            .as_ref()
+                            .map_or(String::new(), |v| t!("acquire.via", key = v));
                         println!(
-                            "{word} {} held by {by}{through} (position {position})",
-                            key.text
+                            "{}",
+                            t!(
+                                word,
+                                key = key.text,
+                                owner = by,
+                                via = through,
+                                position = position
+                            )
                         );
                     }
                 }
                 Outcome::Deadlock { chain } => {
                     out["chain"] = json!(chain);
                     if !opts.json {
-                        println!("{word} {}: {chain}", key.text);
+                        println!("{}", t!(word, key = key.text, chain = chain));
                     }
                 }
                 _ => {
                     out["error"] = json!("interrupted");
                     if !opts.json {
-                        println!("{word} {}", key.text);
+                        println!("{}", t!(word, key = key.text));
                     }
                 }
             }
@@ -579,7 +588,7 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
                 print_json(&out);
             } else {
                 for k in released {
-                    println!("released {}", k.text);
+                    println!("{}", t!("result.released", key = k.text));
                 }
             }
             code
@@ -594,13 +603,13 @@ fn opts_keys(opts: &AcquireOpts) -> Vec<Key> {
 pub fn run(args: Vec<String>) -> CmdResult {
     let (opts, rest) = parse(args, "acquire")?;
     if !rest.is_empty() {
-        return Err(usage("acquire: unexpected '--' (did you mean jlock run?)"));
+        return Err(usage(txt!("error.rest_not_run", cmd = "acquire")));
     }
     wait::install_interrupt_handler();
     let keys = normalize_keys(&opts.keys)?;
     let store = Store::open()?;
     let deadline = opts.timeout.map(|t| Instant::now() + t);
     let outcome = acquire_all(&store, &keys, &opts.ident, opts.wait, deadline)
-        .map_err(|e| fs_error("cannot lock", &e))?;
+        .map_err(|e| fs_error(txt!("error.cannot_lock"), &e))?;
     Ok(report(&opts, &outcome))
 }

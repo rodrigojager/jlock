@@ -1,11 +1,14 @@
 //! `jlock list`: everything locked on this machine, read from the folder (never the index).
 
-use crate::cli::{fs_error, print_json, usage, Arg, CmdResult, Parser, EXIT_OK};
+use crate::cli::{
+    fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
+};
 use crate::cmd::acquire::normalize_keys;
 use crate::cmd::status::{heartbeat_ms, human, liveness, ms_since};
 use crate::conflict::is_ancestor;
 use crate::heartbeat::stale_after;
 use crate::holder::now_micros;
+use crate::i18n::{pad, t, txt, width};
 use crate::index::{self, KeyState};
 use crate::key::Kind;
 use crate::store::Store;
@@ -91,27 +94,27 @@ fn rows(store: &Store, f: &Filters) -> std::io::Result<Vec<Value>> {
 
 fn table(rows: &[Value]) -> String {
     if rows.is_empty() {
-        return "nothing locked\n".into();
+        return format!("{}\n", t!("list.nothing"));
     }
     let ms = |v: &Value| v.as_u64().map_or("-".to_string(), human);
     let text = |v: &Value| v.as_str().unwrap_or("-").to_string();
     let mut lines = vec![[
-        "KEY",
-        "OWNER",
-        "GROUP",
-        "INTENT",
-        "HELD",
-        "HEARTBEAT",
-        "QUEUE",
+        "list.col_key",
+        "list.col_owner",
+        "list.col_group",
+        "list.col_intent",
+        "list.col_held",
+        "list.col_heartbeat",
+        "list.col_queue",
     ]
-    .map(String::from)];
+    .map(|k| t!(k))];
     for r in rows {
         let h = &r["holder"];
         let mut beat = ms(&h["heartbeat_ms"]);
         if h["stale"] == json!(true) {
-            beat += " (dead)";
+            beat += &t!("list.dead");
         } else if h["late"] == json!(true) {
-            beat += " (late)";
+            beat += &t!("list.late");
         }
         lines.push([
             text(&r["key"]),
@@ -123,21 +126,16 @@ fn table(rows: &[Value]) -> String {
             r["queue"].as_array().map_or(0, Vec::len).to_string(),
         ]);
     }
+    // Columns are counted as the terminal shows them: CJK text takes two columns a character.
     let widths: Vec<usize> = (0..7)
-        .map(|c| {
-            lines
-                .iter()
-                .map(|l| l[c].chars().count())
-                .max()
-                .unwrap_or(0)
-        })
+        .map(|c| lines.iter().map(|l| width(&l[c])).max().unwrap_or(0))
         .collect();
     let mut out = String::new();
     for l in &lines {
         let cells: Vec<String> = l
             .iter()
             .zip(&widths)
-            .map(|(cell, w)| format!("{cell:<w$}"))
+            .map(|(cell, w)| format!("{cell}{}", pad(cell, *w)))
             .collect();
         out += cells.join("  ").trim_end();
         out += "\n";
@@ -175,21 +173,21 @@ pub fn run(args: Vec<String>) -> CmdResult {
                 "stale" => f.stale = true,
                 "json" => json = true,
                 "watch" => watch = true,
-                _ => return Err(usage(format!("list: unknown option --{flag}"))),
+                _ => return Err(unknown_option("list", &flag)),
             },
-            Arg::Pos(x) => return Err(usage(format!("list takes no keys (got '{x}')"))),
-            Arg::Rest(_) => return Err(usage("list: unexpected '--'")),
+            Arg::Pos(x) => return Err(usage(txt!("error.list_no_keys", key = x))),
+            Arg::Rest(_) => return Err(unexpected_rest("list")),
         }
     }
     if let Some(u) = under {
         let key = normalize_keys(&[u])?.remove(0);
         if key.kind != Kind::Path {
-            return Err(usage("--under wants a path"));
+            return Err(usage(txt!("error.under_path")));
         }
         f.under = Some(key.text);
     }
     let store = Store::open()?;
-    let failed = |e: std::io::Error| fs_error("cannot read the locks", &e);
+    let failed = |e: std::io::Error| fs_error(txt!("error.cannot_read"), &e);
     if !watch {
         let rows = rows(&store, &f).map_err(failed)?;
         if json {
@@ -208,8 +206,8 @@ pub fn run(args: Vec<String>) -> CmdResult {
         } else {
             print!("\x1b[2J\x1b[H{}", table(&rows));
             println!(
-                "\n{}  (every 1s, CTRL+C to stop)",
-                crate::holder::iso(now_micros())
+                "\n{}",
+                t!("list.watch_footer", time = crate::holder::iso(now_micros()))
             );
         }
         let _ = std::io::stdout().flush();

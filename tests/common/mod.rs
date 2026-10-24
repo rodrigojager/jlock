@@ -61,9 +61,12 @@ impl Env {
         self.vars.push((name.to_string(), value.to_string()));
     }
 
-    /// Gives `cmd` this environment: `JLOCK_HOME` and the short times.
+    /// Gives `cmd` this environment: `JLOCK_HOME`, the short times, and English text (so the
+    /// expected outputs do not depend on the language of the machine running the tests).
     pub fn apply(&self, cmd: &mut Command) {
-        cmd.env("JLOCK_HOME", &self.home).env_remove("JLOCK_DEBUG");
+        cmd.env("JLOCK_HOME", &self.home)
+            .env("JLOCK_LANG", "en")
+            .env_remove("JLOCK_DEBUG");
         for (k, v) in &self.vars {
             cmd.env(k, v);
         }

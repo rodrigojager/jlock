@@ -90,6 +90,7 @@ fn status_of_free_key_creates_no_key_folder() {
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_jlock"))
         .args(["status", r"D:\x\a.ts"])
         .env("JLOCK_HOME", &home)
+        .env("JLOCK_LANG", "en")
         .output()
         .unwrap();
     assert_eq!(out.status.code(), Some(0));
