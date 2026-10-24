@@ -36,6 +36,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     let SetOutcome::Granted { keys, .. } = outcome else {
         return Ok(report(&opts, &outcome));
     };
+    let _ = crate::index::rewrite(&store);
     let mut keeper = Keeper::new(&store, keys, &opts.ident.owner, opts.json);
     let mut child = match Command::new(&command[0]).args(&command[1..]).spawn() {
         Ok(child) => child,

@@ -6,7 +6,7 @@ use crate::key::{Key, Kind};
 use crate::store::{KeyDir, Store};
 use std::io;
 
-fn is_ancestor(a: &str, b: &str) -> bool {
+pub fn is_ancestor(a: &str, b: &str) -> bool {
     b.len() > a.len() && b.starts_with(a) && (a.ends_with('/') || b[a.len()..].starts_with('/'))
 }
 

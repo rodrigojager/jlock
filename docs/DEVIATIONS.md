@@ -41,3 +41,13 @@ Points where the implementation departs from the plan, or fills a gap the plan l
   same instant by requests that could not see each other are caught right after the `create_new`: each
   side re-reads the conflicting holders, and one that finds a clash withdraws its `holder.json` and keeps
   waiting.
+
+## 6. `index.json` rename: short retries only
+
+- **What:** section 7.5 asks for retries of 50 → 1600 ms on `EBUSY`/`EPERM`/`EACCES` for renames.
+- **Why not for the index:** every command that changes something rewrites `index.json`; under load the
+  rename over it collides with the other writers, and waiting up to 3 s for a file that is only derived
+  would slow every acquire and release.
+- **Done instead:** the index rename is tried 4 times 10 ms apart, then given up (the `.tmp` is removed);
+  the next change or the global sweep writes it again. It is skipped when its content would not change.
+  Lock files, tickets, `broken/` and the log rotation keep the full retry ladder.

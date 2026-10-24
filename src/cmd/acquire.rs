@@ -12,6 +12,7 @@ use crate::graph;
 use crate::holder::{iso, now_micros, Holder, Ident};
 use crate::index;
 use crate::key::{self, Key};
+use crate::log;
 use crate::queue::{self, Ticket};
 use crate::store::{KeyDir, Store};
 use crate::wait;
@@ -256,6 +257,34 @@ pub fn acquire_one(
     wait_turn: bool,
     deadline: Option<Instant>,
 ) -> io::Result<Outcome> {
+    let outcome = acquire_inner(store, key, ident, wait_turn, deadline)?;
+    let mut fields = log::about(&key.text, &ident.owner, ident.group.as_deref());
+    let event = match &outcome {
+        Outcome::Granted { waited_ms } => {
+            fields["waited_ms"] = json!(waited_ms);
+            "acquire"
+        }
+        Outcome::Timeout { holder, .. } => {
+            fields["reason"] = json!(holder.as_ref().map(|h| format!("held by {}", h.owner)));
+            "timeout"
+        }
+        Outcome::Deadlock { chain } => {
+            fields["reason"] = json!(chain);
+            "deadlock"
+        }
+        Outcome::Busy { .. } | Outcome::Interrupted => return Ok(outcome),
+    };
+    log::event(event, fields);
+    Ok(outcome)
+}
+
+fn acquire_inner(
+    store: &Store,
+    key: &Key,
+    ident: &Ident,
+    wait_turn: bool,
+    deadline: Option<Instant>,
+) -> io::Result<Outcome> {
     let start = Instant::now();
     let kd = store.key_dir(key);
     let body = Holder::new(&key.text, ident);
@@ -301,6 +330,10 @@ pub fn acquire_one(
     }
     let mut ticket = queue::create(&kd, &body)?;
     wait::debug(format!("queued {} as {}", key.text, ticket.name));
+    log::event(
+        "queued",
+        log::about(&key.text, owner, ident.group.as_deref()),
+    );
     let result = wait_turn_loop(store, &kd, &body, &mut ticket, start, deadline);
     if result.is_err() {
         let _ = queue::remove(&ticket);
@@ -349,10 +382,11 @@ fn wait_turn_loop(
                             return granted(ticket);
                         }
                     }
-                    Take::Held(h) => wait::debug(format!(
-                        "EEXIST on {}: {} got in first",
-                        kd.key.text, h.owner
-                    )),
+                    Take::Held(h) => {
+                        let mut fields = log::about(&kd.key.text, owner, body.group.as_deref());
+                        fields["reason"] = json!(format!("EEXIST: {} got in first", h.owner));
+                        log::event("queued", fields);
+                    }
                 }
             }
             _ => {}

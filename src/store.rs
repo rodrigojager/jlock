@@ -24,6 +24,7 @@ impl Store {
                 &e,
             )
         })?;
+        crate::log::init(&root);
         Ok(Store { root, locks })
     }
 

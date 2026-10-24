@@ -11,6 +11,7 @@ mod holder;
 mod home;
 mod index;
 mod key;
+mod log;
 mod queue;
 mod store;
 mod wait;
@@ -20,9 +21,11 @@ mod cmd {
     pub mod graph;
     pub mod heartbeat;
     pub mod hold;
+    pub mod list;
     pub mod release;
     pub mod run;
     pub mod status;
+    pub mod unlock;
 }
 
 fn main() {

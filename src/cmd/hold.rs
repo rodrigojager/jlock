@@ -85,6 +85,12 @@ impl<'a> Keeper<'a> {
             }
         };
         wait::debug(format!("lost {} ({reason})", key.text));
+        let mut fields = crate::log::about(&key.text, &self.owner, None);
+        fields["reason"] = json!(match &holder {
+            Some(h) => format!("{reason}: now held by {h}"),
+            None => reason.to_string(),
+        });
+        crate::log::event("lost", fields);
         let line = if self.json {
             json!({ "result": "lost", "key": key.text, "owner": self.owner,
                     "holder": holder, "reason": reason })
@@ -136,6 +142,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     let SetOutcome::Granted { keys, .. } = outcome else {
         return Ok(code);
     };
+    let _ = crate::index::rewrite(&store);
     let mut keeper = Keeper::new(&store, keys, &opts.ident.owner, opts.json);
     while !wait::interrupted() {
         if let Some(trouble) = keeper.tick() {

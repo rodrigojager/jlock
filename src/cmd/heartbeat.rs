@@ -48,6 +48,9 @@ pub fn run(args: Vec<String>) -> CmdResult {
             (None, "ttl")
         }
     };
+    let mut fields = crate::log::about(&key.text, &owner, None);
+    fields["reason"] = json!(reason);
+    crate::log::event("lost", fields);
     if json {
         print_json(&json!({ "result": "lost", "key": key.text, "owner": owner,
                             "holder": holder, "reason": reason }));

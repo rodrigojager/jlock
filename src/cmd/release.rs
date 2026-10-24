@@ -4,6 +4,7 @@ use crate::cli::{fs_error, print_json, usage, Arg, CmdResult, Parser, EXIT_NOT_O
 use crate::cmd::acquire::normalize_keys;
 use crate::fsx;
 use crate::holder::Ident;
+use crate::index;
 use crate::store::{KeyDir, Store};
 use serde_json::json;
 use std::io;
@@ -18,6 +19,9 @@ pub fn release_key(kd: &KeyDir, owner: &str) -> io::Result<Released> {
     match kd.read_holder()? {
         Some(h) if h.owner == owner => {
             fsx::remove_with_retry(&kd.holder_path())?;
+            let mut fields = crate::log::about(&kd.key.text, owner, h.group.as_deref());
+            fields["held_ms"] = json!(crate::cmd::status::ms_since(&h.since));
+            crate::log::event("release", fields);
             kd.cleanup()?;
             Ok(Released::Released)
         }
@@ -29,45 +33,76 @@ pub fn release_key(kd: &KeyDir, owner: &str) -> io::Result<Released> {
 pub fn run(args: Vec<String>) -> CmdResult {
     let mut p = Parser::new(args);
     let mut inputs = Vec::new();
-    let mut owner = Ident::default_owner();
-    let mut json = false;
+    let mut owner = None;
+    let mut group = None;
+    let (mut any_owner, mut json) = (false, false);
     while let Some(arg) = p.next() {
         match arg {
             Arg::Pos(k) => inputs.push(k),
-            Arg::Flag(f) if f == "owner" => owner = p.value(&f)?,
+            Arg::Flag(f) if f == "owner" => owner = Some(p.value(&f)?),
+            Arg::Flag(f) if f == "group" => group = Some(p.value(&f)?),
+            Arg::Flag(f) if f == "any-owner" => any_owner = true,
             Arg::Flag(f) if f == "json" => json = true,
             Arg::Flag(f) => return Err(usage(format!("release: unknown option --{f}"))),
             Arg::Rest(_) => return Err(usage("release: unexpected '--'")),
         }
     }
-    if inputs.is_empty() {
-        return Err(usage("release needs a key"));
+    if inputs.is_empty() && owner.is_none() && group.is_none() {
+        return Err(usage("release needs keys, --owner or --group"));
     }
+    if any_owner && group.is_none() {
+        return Err(usage("--any-owner only goes with --group"));
+    }
+    let owner = owner.unwrap_or_else(Ident::default_owner);
     let keys = normalize_keys(&inputs)?;
     let store = Store::open()?;
-    let mut released = Vec::new();
-    let mut refused = Vec::new();
-    for key in &keys {
-        let kd = store.key_dir(key);
-        match release_key(&kd, &owner)
-            .map_err(|e| fs_error(format!("cannot release {}", key.text), &e))?
-        {
-            Released::Released => {
-                if !json {
-                    println!("released {}", key.text);
-                }
-                released.push(key.text.clone());
-            }
-            Released::NotOwner(holder) => {
-                if !json {
-                    match &holder {
-                        Some(h) => println!("not_owner {} held by {h}", key.text),
-                        None => println!("not_owner {} (not locked)", key.text),
-                    }
-                }
-                refused.push(json!({ "key": key.text, "holder": holder }));
+    let failed = |e: io::Error| fs_error("cannot release", &e);
+
+    // Explicit keys are released (or refused) one by one; without keys, every lock of the owner,
+    // or of the group, is released and the others are left alone.
+    let mut targets: Vec<(KeyDir, String)> = Vec::new();
+    if keys.is_empty() {
+        for st in index::scan(&store).map_err(failed)? {
+            let Some(h) = &st.holder else { continue };
+            let in_group = group.as_ref().is_none_or(|g| h.group.as_ref() == Some(g));
+            if in_group && (h.owner == owner || any_owner) {
+                let who = h.owner.clone();
+                targets.push((st.dir, who));
             }
         }
+    } else {
+        targets = keys
+            .iter()
+            .map(|k| (store.key_dir(k), owner.clone()))
+            .collect();
+    }
+
+    let mut released = Vec::new();
+    let mut refused = Vec::new();
+    for (kd, who) in &targets {
+        match release_key(kd, who).map_err(failed)? {
+            Released::Released => {
+                if !json {
+                    println!("released {}", kd.key.text);
+                }
+                released.push(kd.key.text.clone());
+            }
+            Released::NotOwner(holder) => {
+                if keys.is_empty() {
+                    continue; // changed hands while we looked: not ours to report
+                }
+                if !json {
+                    match &holder {
+                        Some(h) => println!("not_owner {} held by {h}", kd.key.text),
+                        None => println!("not_owner {} (not locked)", kd.key.text),
+                    }
+                }
+                refused.push(json!({ "key": kd.key.text, "holder": holder }));
+            }
+        }
+    }
+    if !json && targets.is_empty() {
+        println!("nothing to release");
     }
     let ok = refused.is_empty();
     if json {

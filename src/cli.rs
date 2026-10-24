@@ -148,7 +148,13 @@ pub fn print_json(value: &serde_json::Value) {
 /// Runs the command line and returns the process exit code.
 pub fn main(args: Vec<String>) -> i32 {
     let json = args.iter().any(|a| a == "--json");
-    match dispatch(args) {
+    let result = dispatch(args);
+    if crate::log::changed() {
+        if let Ok(store) = crate::store::Store::open() {
+            let _ = crate::index::rewrite(&store);
+        }
+    }
+    match result {
         Ok(code) => code,
         Err(f) => {
             if json {
@@ -184,7 +190,9 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "run" => crate::cmd::run::run(rest),
         "heartbeat" => crate::cmd::heartbeat::run(rest),
         "graph" => crate::cmd::graph::run(rest),
-        "list" | "unlock" | "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
+        "list" => crate::cmd::list::run(rest),
+        "unlock" => crate::cmd::unlock::run(rest),
+        "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
         other => Err(usage(format!(
             "unknown command '{other}' (see jlock --help)"
         ))),
