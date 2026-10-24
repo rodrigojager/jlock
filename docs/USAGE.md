@@ -1,12 +1,9 @@
-# jlock usage
+# jlock command reference
 
-`jlock` gives out machine-wide locks on keys: files, folders, or plain names. One owner per key, a fair
-queue in order of arrival, locks of dead processes recovered by heartbeat, deadlocks refused, a list of
-everything locked and by whom, and `unlock --force` for emergencies. There is no server: the state is a
-folder on disk, so nothing has to stay running and nothing is lost if any process crashes.
-
-The design is in [`PLAN.md`](PLAN.md) (Portuguese); departures from it are in
-[`DEVIATIONS.md`](DEVIATIONS.md).
+Every command, option, exit code, variable and file of jlock. Why jlock exists, how to install it and a
+first tour are in the [README](../README.md) (in eleven languages); `jlock help <command>` prints the
+same reference in the terminal, in your language. The design is in [`PLAN.md`](PLAN.md) (Portuguese);
+the decisions taken while building it are in [`DEVIATIONS.md`](DEVIATIONS.md).
 
 ## Keys
 
