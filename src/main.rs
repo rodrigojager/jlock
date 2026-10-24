@@ -21,6 +21,7 @@ mod wait;
 mod cmd {
     pub mod about;
     pub mod acquire;
+    pub mod doctor;
     pub mod gc;
     pub mod graph;
     pub mod heartbeat;

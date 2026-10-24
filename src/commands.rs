@@ -165,6 +165,13 @@ pub const COMMANDS: &[Command] = &[
         see: &["list"],
     },
     Command {
+        name: "doctor",
+        group: MAINTENANCE,
+        opts: &[JSON],
+        codes: &["0", "2", "20"],
+        see: &["gc", "list"],
+    },
+    Command {
         name: "help",
         group: HELP,
         opts: &[],

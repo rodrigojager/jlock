@@ -156,6 +156,39 @@ log bytes:       48211
 
 Any command already does this at most once per `JLOCK_SWEEP_MS`; `gc` does it now and reports.
 
+### `doctor` — is this machine ready for locks?
+
+```
+jlock doctor [--json]
+ok    version          jlock 0.1.0, running from C:\Users\me\.cargo\bin\jlock.exe
+ok    registry folder  C:\Users\me\AppData\Local\jlock (the default for this system): a writable folder
+ok    primitives       create_new refuses an existing file, rename replaces one, remove deletes
+ok    OS lock          taken, refused to a second handle, then released
+ok    file system      NTFS
+ok    variables        heartbeat 5000 ms, stale after 30000 ms, poll 250 ms, sweep every 60000 ms,
+                       log up to 5242880 bytes, language en
+ok    PATH             this jlock is the first one in PATH
+ok    registry         0 held, 0 with a queue, 0 dead; last sweep: 12s ago; log: 4096 bytes
+ok    curl             found: C:\Windows\system32\curl.exe (jlock update uses it)
+
+ok: 9, warnings: 0, failures: 0
+```
+
+Nine checks, in this order: the version and the executable running; the registry folder (`JLOCK_HOME`
+or the system default), whether it exists, is a folder and is writable; the three file operations of
+the protocol in that folder (`create_new` and its refusal of an existing file, `rename` over a file,
+`remove`); the OS lock used by `hold` and `run` (`warn` when the file system has none: network or
+FUSE); the file system; the `JLOCK_*` variables (`warn` for invalid values, `JLOCK_STALE_MS` not above
+`JLOCK_HEARTBEAT_MS`, `JLOCK_POLL_MS` above `JLOCK_STALE_MS`, unknown names); whether another `jlock`
+comes first in `PATH`; what the registry holds (`warn` with a suggestion of `jlock gc` for folders
+without a readable key or leftovers in `broken/`); and `curl`, which `update` uses.
+
+Each `warn` and `fail` comes with what to do. Exit 0 when nothing failed (warnings do not change the
+code), 20 when something did. `--json` prints `{ "result": "ok" | "error", "checks": [{name, status,
+detail, fix}], "summary": {ok, warn, fail} }`. The doctor only suggests: it never creates `JLOCK_HOME`
+(a missing one is a `fail` with the command that creates it), never runs `gc`, never touches `PATH`,
+and the temporary files it uses in the registry folder are removed even when a check fails.
+
 ### `help` — explain jlock or one command
 
 ```

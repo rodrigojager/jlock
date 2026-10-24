@@ -254,6 +254,19 @@ impl Text {
         }
     }
 
+    /// Like [`Text::new`], with some values that are themselves texts: each language gets its own.
+    pub fn nested(key: &str, args: &[(&str, &dyn Display)], inner: &[(&str, &Text)]) -> Text {
+        let with = |pick: fn(&Text) -> &String| {
+            let mut all: Vec<(&str, &dyn Display)> = args.to_vec();
+            all.extend(inner.iter().map(|(n, t)| (*n, pick(t) as &dyn Display)));
+            all
+        };
+        Text {
+            local: fill(&template(lang(), key), &with(|t| &t.local)),
+            en: fill(&template("en", key), &with(|t| &t.en)),
+        }
+    }
+
     /// A text that is the same in every language (a path, a key).
     pub fn plain(text: &str) -> Text {
         Text {
