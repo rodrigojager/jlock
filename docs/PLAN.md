@@ -173,6 +173,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | `jlock unlock (<chave> \| --owner x \| --group g) --force [--reason "…"]` | quebra travas de outrem, registrando quem forçou; o dono recebe `lost` no próximo heartbeat. |
 | `jlock gc [--json]` | varredura global agora: expira travas e senhas mortas, consome `broken\`, remove pastas de chave vazias, rotaciona o log, reescreve o índice; imprime o que removeu. |
 | `jlock doctor [--json]` | **[rev. 5]** diagnostica sem consertar: versão e executável, `JLOCK_HOME` (origem, existe, é pasta, gravável), as primitivas `create_new`/`rename`/`remove` nele, a trava do SO, o sistema de arquivos, as variáveis `JLOCK_*`, outro `jlock` antes no `PATH`, o estado do registro (sugere `gc` para sobras) e o `curl`. Cada `warn`/`fail` traz a correção. Saída 0 sem `fail` (avisos não mudam o código), 20 com `fail`. Não cria `JLOCK_HOME`, não roda `gc`, não mexe no `PATH`; seus temporários são apagados mesmo em falha. |
+| `jlock update [--check] [--version vX.Y.Z] [--json]` | **[rev. 5]** último Release (ou a versão pedida) → baixa o arquivo do alvo atual → confere com o `SHA256SUMS` do Release → troca o próprio executável (Windows: o antigo vira `jlock.exe.old`, apagado pelo próximo jlock) → roda o novo com `--version` e, se não bater, repõe o antigo. `--check` só compara (código 0). Usa o `curl` do sistema (PowerShell no Windows como reserva); sem nenhum, código 20. **O jlock só acessa a rede em `update`, e só quando chamado.** Sem release publicado: código 20, "no release found". |
 | `jlock help [<comando>]`, `jlock <comando> --help` | **[rev. 5]** ajuda geral agrupada por intenção (pegar e soltar, ver, emergência, manutenção, ajuda); por comando: sinopse, descrição, uma linha por opção (o que faz, padrão, exemplo), exemplos, códigos de saída, veja também. Gerada da mesma tabela de comandos e opções que o despacho usa para recusar opções desconhecidas (código 2, com sugestão do nome mais parecido). Quebrada em 100 colunas. |
 | `jlock about [--json]` | **[rev. 5]** nome, versão, descrição, autor (Rodrigo Jäger), GitHub `https://github.com/rodrigojager`, LinkedIn `https://www.linkedin.com/in/rodrigojager`, repositório, licença, links da documentação; sem rede |
 | `jlock --version`, `jlock --help` | `--version` é uma linha só (`jlock 0.1.0`), estável para scripts; o rodapé do `--help` traz o autor e os links |
@@ -213,6 +214,7 @@ uma linha curta por chave.
 | `JLOCK_LOG_MAX_BYTES` | 5242880 | rotação do log |
 | `JLOCK_LANG` | idioma do sistema, senão `en` | **[rev. 5]** idioma das saídas de texto (tag exata, depois a língua primária: `pt` → `pt-BR`); tag desconhecida → aviso e inglês |
 | `JLOCK_HINTS` | `1` | **[rev. 5]** `0` desliga as dicas (`tip: ...`, no stderr) que algumas saídas de texto trazem; nunca aparecem no `--json` |
+| `JLOCK_UPDATE_BASE` | GitHub do projeto | **[rev. 5]** origem alternativa para `update`: `<base>/releases/latest` e `<base>/releases/download/<tag>/`; aceita `file://` (os testes usam uma pasta) |
 
 Os testes usam valores curtos por essas variáveis.
 

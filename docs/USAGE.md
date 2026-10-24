@@ -189,6 +189,29 @@ detail, fix}], "summary": {ok, warn, fail} }`. The doctor only suggests: it neve
 (a missing one is a `fail` with the command that creates it), never runs `gc`, never touches `PATH`,
 and the temporary files it uses in the registry folder are removed even when a check fails.
 
+### `update` — install the latest release
+
+```
+jlock update --check          # this version, the latest release, and whether to update
+jlock update                  # install the latest release over this jlock
+jlock update --version v0.1.0 # install one exact version (also an older one)
+```
+
+Asks GitHub for the latest release (or takes `--version`), downloads the archive for this system,
+checks it against the release's `SHA256SUMS`, puts the new executable in place of the running one, and
+runs it once (`--version`) before saying it worked; if that fails the old one is put back. On Windows
+the old file is renamed to `jlock.exe.old` (a running executable cannot be deleted) and the next jlock
+that starts deletes it. Without write permission in the executable's folder it stops with exit 20 and
+says so; it never asks for more privileges by itself.
+
+Downloads go through the system's `curl` (Windows 10 and later, macOS and Linux have it), or PowerShell
+on Windows when there is no curl; without either it stops with exit 20. **jlock only uses the network
+in `update`, and only when you run it**: no other command checks for new versions. `--json` prints
+`{ "result": "ok", "current", "latest", "update_available" }` with `--check`, `"updated": true|false`
+otherwise. Until a first release is published, `update` answers exit 20, "no release found".
+`JLOCK_UPDATE_BASE` points it somewhere else (`<base>/releases/latest` and
+`<base>/releases/download/<tag>/`; `file://` works).
+
 ### `help` — explain jlock or one command
 
 ```
@@ -270,6 +293,7 @@ inside a file system error (exit 20) comes from the system, in the system's lang
 | `JLOCK_LOG_MAX_BYTES` | 5242880 | log rotation size |
 | `JLOCK_LANG` | system language, else `en` | language of the text output (see [Language](#language)) |
 | `JLOCK_HINTS` | `1` | `0` turns off the tips printed after some results |
+| `JLOCK_UPDATE_BASE` | the project on GitHub | where `update` looks for releases (`file://` works; the tests use a folder) |
 | `JLOCK_DEBUG` | unset | any value: trace to stderr |
 
 ## On disk

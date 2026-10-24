@@ -45,6 +45,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
         print_json(&json!({
             "result": "ok", "name": "jlock", "version": version,
             "description": env!("CARGO_PKG_DESCRIPTION"),
+            "target": crate::cmd::update::TARGET,
             "author": AUTHOR, "github": GITHUB, "linkedin": LINKEDIN,
             "repository": REPOSITORY, "license": LICENSE,
             "docs": { "usage": USAGE_URL, "readme": README_URL, "roadmap": ROADMAP_URL },

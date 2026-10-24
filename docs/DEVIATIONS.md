@@ -90,3 +90,28 @@ what was decided during implementation and why.
 - **Done instead:** the Intel binary is cross-built on `macos-14` (Apple's toolchain targets both
   architectures). The test suite still runs on that runner, for arm64; the Intel binary is not tested
   natively before it is published.
+
+## 11. SHA-256 written in `src/sha256.rs`, not the `sha2` crate (ticket 15)
+
+- **What:** ticket 15 lets `update` check the download with its own SHA-256 or with `sha2`, and prefers
+  `sha2`.
+- **Why not `sha2`:** the phase-2 rules allow no new dependency besides `windows-sys` features; `sha2` is
+  not already in the tree (`sha1` does not pull it in).
+- **Done instead:** a FIPS 180-4 implementation of about 80 lines, checked against the standard test
+  vectors (empty, `abc`, the 448-bit message, one million `a`).
+
+## 12. `update` unpacks with the system's `tar` (ticket 15)
+
+- **What:** the archives are `.zip` (Windows) and `.tar.gz` (the rest), and the ticket does not say how
+  `update` takes the binary out of them; jlock has no archive code.
+- **Done instead:** the system's `tar` does it: `%SystemRoot%\System32\tar.exe` on Windows 10 and later
+  (bsdtar, which reads zip files), `tar` from `PATH` on Unix. On a Windows without it, PowerShell's .NET
+  `ZipFile`. No new dependency, as for `curl`.
+
+## 13. `JLOCK_FAKE_VERSION` is read by debug builds (ticket 15)
+
+- **What:** the update test needs the installed "new" binary to answer `--version` with the fake
+  release's version.
+- **Done instead:** `--version` prints `JLOCK_FAKE_VERSION` when it is set **and** the binary is a debug
+  build (the one `cargo test` runs). Release builds ignore it, so the version a user sees is always the
+  real one.

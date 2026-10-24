@@ -158,6 +158,17 @@ pub fn main(mut args: Vec<String>) -> i32 {
     }
 }
 
+/// The version `--version` prints. Debug builds (the ones the tests run) take `JLOCK_FAKE_VERSION`,
+/// so the update test can tell an installed "new" binary from the old one; release builds never do.
+fn version() -> String {
+    if cfg!(debug_assertions) {
+        if let Ok(v) = std::env::var("JLOCK_FAKE_VERSION") {
+            return v;
+        }
+    }
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 /// `jlock help [<command>]`.
 fn help(args: Vec<String>) -> CmdResult {
     let me = crate::commands::find("help").expect("help is in the table");
@@ -184,7 +195,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
     let rest: Vec<String> = iter.collect();
     match cmd.as_str() {
         "--version" | "-V" | "version" => {
-            println!("jlock {}", env!("CARGO_PKG_VERSION"));
+            println!("jlock {}", version());
             return Ok(EXIT_OK);
         }
         "--help" | "-h" | "help" => return help(rest),
@@ -202,6 +213,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
     match cmd.as_str() {
         "about" => crate::cmd::about::run(rest),
         "doctor" => crate::cmd::doctor::run(rest),
+        "update" => crate::cmd::update::run(rest),
         "status" => crate::cmd::status::run(rest),
         "acquire" => crate::cmd::acquire::run(rest),
         "release" => crate::cmd::release::run(rest),

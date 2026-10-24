@@ -172,6 +172,22 @@ pub const COMMANDS: &[Command] = &[
         see: &["gc", "list"],
     },
     Command {
+        name: "update",
+        group: MAINTENANCE,
+        opts: &[
+            opt("check", None, "help.opt.update.check", ""),
+            opt(
+                "version",
+                Some("version"),
+                "help.opt.update.version",
+                "v0.2.0",
+            ),
+            JSON,
+        ],
+        codes: &["0", "2", "20"],
+        see: &["doctor", "about"],
+    },
+    Command {
         name: "help",
         group: HELP,
         opts: &[],
