@@ -183,7 +183,8 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "hold" => crate::cmd::hold::run(rest),
         "run" => crate::cmd::run::run(rest),
         "heartbeat" => crate::cmd::heartbeat::run(rest),
-        "list" | "graph" | "unlock" | "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
+        "graph" => crate::cmd::graph::run(rest),
+        "list" | "unlock" | "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
         other => Err(usage(format!(
             "unknown command '{other}' (see jlock --help)"
         ))),

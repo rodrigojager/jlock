@@ -5,6 +5,7 @@ mod cli;
 mod conflict;
 mod expire;
 mod fsx;
+mod graph;
 mod heartbeat;
 mod holder;
 mod home;
@@ -16,6 +17,7 @@ mod wait;
 
 mod cmd {
     pub mod acquire;
+    pub mod graph;
     pub mod heartbeat;
     pub mod hold;
     pub mod release;

@@ -3,12 +3,14 @@
 
 use crate::cli::{
     fs_error, parse_duration, print_json, usage, Arg, CmdResult, Failure, Parser, EXIT_BUSY,
-    EXIT_OK, EXIT_TIMEOUT,
+    EXIT_DEADLOCK, EXIT_OK, EXIT_TIMEOUT,
 };
 use crate::conflict;
 use crate::expire;
 use crate::fsx;
+use crate::graph;
 use crate::holder::{iso, now_micros, Holder, Ident};
+use crate::index;
 use crate::key::{self, Key};
 use crate::queue::{self, Ticket};
 use crate::store::{KeyDir, Store};
@@ -140,6 +142,31 @@ pub enum Outcome {
         via: Option<String>,
     },
     Interrupted,
+    /// Waiting would close a cycle in "who waits for whom".
+    Deadlock {
+        chain: String,
+    },
+}
+
+/// Would `owner` waiting for `key` (with a ticket younger than all others) close a cycle?
+fn deadlock_before_queueing(store: &Store, key: &Key, owner: &str) -> io::Result<Option<String>> {
+    let states = index::scan(store)?;
+    let all = graph::edges(&states);
+    let proposed = graph::edges_for(owner, key, None, &states);
+    let proposed: Vec<&graph::Edge> = proposed.iter().collect();
+    Ok(graph::cycle_through(&all, &proposed).map(|c| graph::chain_text(&c)))
+}
+
+/// Is my ticket part of a cycle in which it is the newest ticket (the one that gives up)?
+fn deadlock_while_waiting(store: &Store, ticket: &Ticket) -> io::Result<Option<String>> {
+    let states = index::scan(store)?;
+    let all = graph::edges(&states);
+    let mine: Vec<&graph::Edge> = all.iter().filter(|e| e.ticket == ticket.name).collect();
+    let Some(cycle) = graph::cycle_through(&all, &mine) else {
+        return Ok(None);
+    };
+    let newest = cycle.iter().map(|e| e.ticket.as_str()).max();
+    Ok((newest == Some(ticket.name.as_str())).then(|| graph::chain_text(&cycle)))
 }
 
 /// What the waiter sees on one poll.
@@ -269,6 +296,9 @@ pub fn acquire_one(
         };
     }
 
+    if let Some(chain) = deadlock_before_queueing(store, key, owner)? {
+        return Ok(Outcome::Deadlock { chain });
+    }
     let mut ticket = queue::create(&kd, &body)?;
     wait::debug(format!("queued {} as {}", key.text, ticket.name));
     let result = wait_turn_loop(store, &kd, &body, &mut ticket, start, deadline);
@@ -288,6 +318,7 @@ fn wait_turn_loop(
 ) -> io::Result<Outcome> {
     let poll = wait::poll_ms();
     let owner = body.owner.as_str();
+    let mut polls: u64 = 0;
     let granted = |ticket: &Ticket| -> io::Result<Outcome> {
         queue::remove(ticket)?;
         Ok(Outcome::Granted {
@@ -338,6 +369,13 @@ fn wait_turn_loop(
                 position: view.position,
                 via,
             });
+        }
+        polls += 1;
+        if polls.is_multiple_of(8) {
+            if let Some(chain) = deadlock_while_waiting(store, ticket)? {
+                queue::remove(ticket)?;
+                return Ok(Outcome::Deadlock { chain });
+            }
         }
         wait::pause(poll, deadline);
     }
@@ -447,6 +485,7 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
                 Outcome::Busy { .. } => ("queued", "busy", EXIT_BUSY),
                 Outcome::Timeout { .. } => ("timeout", "timeout", EXIT_TIMEOUT),
                 Outcome::Interrupted => ("error", "interrupted", EXIT_INTERRUPTED),
+                Outcome::Deadlock { .. } => ("deadlock", "deadlock", EXIT_DEADLOCK),
                 Outcome::Granted { .. } => unreachable!("a granted key is not a failure"),
             };
             let mut out = json!({
@@ -478,6 +517,12 @@ pub fn report(opts: &AcquireOpts, outcome: &SetOutcome) -> i32 {
                             "{word} {} held by {by}{through} (position {position})",
                             key.text
                         );
+                    }
+                }
+                Outcome::Deadlock { chain } => {
+                    out["chain"] = json!(chain);
+                    if !opts.json {
+                        println!("{word} {}: {chain}", key.text);
                     }
                 }
                 _ => {
