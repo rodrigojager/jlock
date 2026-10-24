@@ -91,6 +91,15 @@ fn late_heartbeat_of_a_live_hold_is_not_broken() {
     assert_eq!(done.json()["holder"]["owner"], "a");
     assert_eq!(env.holder_owner(key).as_deref(), Some("a"));
     assert!(kid.running());
+    // list and status agree with the expiration: late, not dead.
+    let row = env.run(&["list", "--json"]).json()["locks"][0]["holder"].clone();
+    assert_eq!(row["late"], true, "{row}");
+    assert_eq!(row["stale"], false, "{row}");
+    let stale = env.run(&["list", "--stale", "--json"]).json();
+    assert!(stale["locks"].as_array().unwrap().is_empty(), "{stale}");
+    assert!(env.run(&["list"]).stdout.contains("(late)"));
+    let st = env.run(&["status", key]).stdout;
+    assert!(st.contains("(late, process alive)"), "{st}");
     kid.send("release");
     assert_eq!(kid.wait(SECS5), Some(0));
     assert!(env.lock_dirs().is_empty(), "{:?}", env.lock_dirs());

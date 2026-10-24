@@ -154,6 +154,15 @@ fn stale_filter_shows_only_dead_locks() {
     std::thread::sleep(Duration::from_millis(600));
     let stale = listed(&env, &["--stale"]);
     assert_eq!(stale.keys().collect::<Vec<_>>(), vec!["name:dead"]);
+    let text = env.run(&["list"]).stdout;
+    assert!(
+        text.contains("(dead)") && !text.contains("(late)"),
+        "{text}"
+    );
+    // `status` cleans up as it goes: the dead lock is expired and reported free.
+    let st = env.run(&["status", "name:dead"]).stdout;
+    assert!(st.starts_with("free"), "{st}");
+    assert!(env.holder_owner("name:dead").is_none());
     hold.send("release");
     assert_eq!(hold.wait(SECS5), Some(0));
 }

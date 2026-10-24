@@ -2,7 +2,7 @@
 
 use crate::cli::{fs_error, print_json, usage, Arg, CmdResult, Parser, EXIT_OK};
 use crate::cmd::acquire::normalize_keys;
-use crate::cmd::status::{heartbeat_ms, human, ms_since};
+use crate::cmd::status::{heartbeat_ms, human, liveness, ms_since};
 use crate::conflict::is_ancestor;
 use crate::heartbeat::stale_after;
 use crate::holder::now_micros;
@@ -27,11 +27,11 @@ fn row(st: &KeyState) -> Value {
     let stale_ms = stale_after().as_millis() as u64;
     let holder = st.holder.as_ref().map(|h| {
         let hb = heartbeat_ms(&st.dir.holder_path());
-        let dead = hb.is_some_and(|ms| ms > stale_ms) || h.ttl_expired(now_micros());
+        let (dead, late) = liveness(&st.dir.holder_path(), h);
         json!({
             "owner": h.owner, "group": h.group, "intent": h.intent, "meta": h.meta,
             "pid": h.pid, "host": h.host, "cwd": h.cwd, "since": h.since, "ttl_secs": h.ttl_secs,
-            "held_ms": ms_since(&h.since), "heartbeat_ms": hb, "stale": dead,
+            "held_ms": ms_since(&h.since), "heartbeat_ms": hb, "stale": dead, "late": late,
         })
     });
     let queue: Vec<Value> = st
@@ -110,6 +110,8 @@ fn table(rows: &[Value]) -> String {
         let mut beat = ms(&h["heartbeat_ms"]);
         if h["stale"] == json!(true) {
             beat += " (dead)";
+        } else if h["late"] == json!(true) {
+            beat += " (late)";
         }
         lines.push([
             text(&r["key"]),
