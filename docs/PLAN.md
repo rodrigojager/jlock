@@ -431,6 +431,15 @@ aprovados e executados. O roadmap público está em `ROADMAP.md`; Linux e macOS 
 5. **`update` pelo `curl` do sistema.** Sem cliente HTTP em Rust (regra de dependências mínimas). PowerShell como
    reserva no Windows. O jlock só acessa a rede em `update`, e só quando chamado.
 6. **READMEs** nos onze idiomas, com exemplos reexecutados por teste.
+7. **Caminhos: symlinks e caixa (todos os sistemas).** Symlinks resolvidos por padrão, canonicalizando o maior
+   prefixo existente (`JLOCK_CANONICAL=0` desliga): só junta nomes do mesmo arquivo numa chave, nunca separa.
+   Caixa dobrada no Windows e no macOS, preservada no Linux; `JLOCK_CASE=sensitive` para volumes sensíveis no
+   macOS. Entra na seção 5 quando implementado (U5 em `docs/PLAN-LINUX-MACOS.md`).
+8. **`run` e sinais.** `SIGTERM`/`SIGINT` recebido pelo `run` é repassado ao comando; prazo `JLOCK_KILL_GRACE_MS`
+   (5000) antes do `SIGKILL`; só então libera e sai com `128 + sinal`. Hoje o `run` ignora o sinal e segura até o
+   comando terminar (U2).
+9. **Pacotes Unix.** 0.2: `install.sh`, Homebrew, `cargo binstall`. `.deb`/`.rpm` e AUR só no 0.3, depois da suíte
+   verde em Linux de verdade (U1, U7).
 
 ### Acréscimos ao CLI (seção 6)
 

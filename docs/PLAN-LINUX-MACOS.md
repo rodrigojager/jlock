@@ -3,7 +3,7 @@
 Complemento de `docs/PLAN.md` (que continua sendo a fonte de verdade do protocolo). Este plano cobre só o que
 falta para o jlock ser tão confiável em Linux e macOS quanto é no Windows, e como empacotá-lo lá.
 
-Data: 24/10/2026. Estado: proposta, para revisão antes de virar tickets.
+Data: 24/10/2026. Estado: proposta; as decisões da seção 6 foram tomadas em 24/10/2026 (delegadas pelo autor).
 
 ---
 
@@ -41,14 +41,14 @@ daí: o primeiro resultado útil é a primeira execução da matriz.
 | **Nunca executado** | Pode haver erro de compilação em ramo `cfg(unix)` que o Windows não vê, ou teste com suposição do Windows (`\`, `.exe`, `CREATE_NEW_PROCESS_GROUP`) | Rodar a matriz com `--no-fail-fast`, guardar logs como artefato, corrigir um a um (U1) |
 | **`SIGPIPE` / `EPIPE`** | O Rust ignora `SIGPIPE`; `println!` entra em pânico com `Broken pipe` quando o leitor fecha (`jlock list \| head -3`, `jlock list --watch \| grep`) | Tratar `BrokenPipe` como fim normal da saída (código 0) nos caminhos de impressão; não restaurar `SIG_DFL` globalmente, porque mataria um `hold` cujo leitor de stdout sumiu (U2) |
 | **`signal()` vs `sigaction()`** | `libc::signal` tem semântica que varia entre libcs; sem `SA_RESTART` uma leitura de stdin pode voltar `EINTR` | Trocar por `sigaction` com `SA_RESTART`; manter o handler só gravando num atômico (U2) |
-| **Sinais e o filho do `run`** | `CTRL+C` no terminal chega ao jlock e ao filho (mesmo grupo); `kill -TERM <jlock>` chega só ao jlock, e hoje o jlock libera a trava enquanto o filho continua | No `run`, ao receber `SIGTERM`/`SIGINT`, repassar ao filho, esperar até um prazo (`JLOCK_KILL_GRACE_MS`, 5000) e então `SIGKILL`; só depois liberar (U2) |
+| **Sinais e o filho do `run`** | `CTRL+C` no terminal chega ao jlock e ao filho (mesmo grupo). `kill -TERM <jlock>` chega só ao jlock: hoje o `run` instala o tratador e **ignora** o sinal, segurando a trava até o filho terminar sozinho (seguro, mas `kill` no jlock não para o comando) | **Decidido:** repassar. `SIGTERM`/`SIGINT` recebido pelo `run` vai ao filho; espera até `JLOCK_KILL_GRACE_MS` (5000) e então `SIGKILL`; só depois libera e sai com `128 + sinal`. No Windows, `CTRL_CLOSE`/`taskkill` sem `/F` → `TerminateProcess` no filho (não há sinal gracioso para filhos de console) e o mesmo caminho (U2) |
 | **Heartbeat é só do dono** | `set_modified(agora)` passa um tempo explícito: `utimensat` exige ser o dono do arquivo (ou `CAP_FOWNER`), não basta permissão de escrita | Já está correto: só o dono renova. Quem expira só renomeia e apaga, que dependem da permissão da **pasta**. Documentar (U3) |
 | **`JLOCK_HOME` compartilhado entre usuários** | O padrão é por usuário (XDG), sem problema. Para dois usuários coordenarem, a pasta precisa ser gravável pelo grupo com `setgid` (2775) e **sem sticky bit** (`1777` impede renomear/apagar arquivos alheios, logo impede quebrar trava morta de outro usuário) | `doctor`: detectar sticky bit, pasta não gravável pelo grupo, `umask` que gera arquivos 0600; documentar a receita (`chmod 2775`, `umask 002`) (U3) |
 | **Sistemas de arquivos de rede** | `O_EXCL` é atômico em NFSv3+ e SMB, não em NFSv2; `flock` em NFS é emulado por travas `fcntl` (Linux ≥ 2.6.12) ou devolve `ENOLCK`/`EOPNOTSUPP`; em SMB e 9p (WSL `/mnt/c`) costuma não existir; `hard_link` não existe em FAT/exFAT | `doctor` lê o tipo do sistema de arquivos (`statfs` → `f_type` no Linux, `f_fstypename` no macOS) e avisa: rede = "funciona, mas sem trava do SO; só heartbeat"; 9p/FAT = "não recomendado". `Unsupported` já é tratado (U4) |
 | **WSL** | O mesmo `/mnt/c/...` visto do Windows (`c:/...`) e do Linux (`/mnt/c/...`) dá chaves diferentes; o 9p não garante `O_EXCL` | Documentar: um `JLOCK_HOME` por lado da fronteira; `doctor` avisa quando `JLOCK_HOME` está em `/mnt/<letra>` dentro do WSL (U4) |
 | **Restauração em `break_file`** | Quando o rename venceu mas o arquivo estava vivo, ele volta por `hard_link`; sem hardlink (FAT/exFAT, alguns FUSE) a trava viva é quebrada | Em Linux, tentar `renameat2(RENAME_NOREPLACE)` antes do `hard_link`; caso contrário, aceitar e documentar (raro: exige corrida + sistema de arquivos sem hardlink) (U4) |
-| **Symlinks e `/private/tmp`** | O jlock não canonicaliza (o caminho não precisa existir): `/tmp/x` e `/private/tmp/x` são chaves diferentes; idem qualquer symlink | Decidir: canonicalizar o maior prefixo existente (`fs::canonicalize` do ancestral) custa um `stat` por componente e muda a chave quando o caminho passa a existir. Proposta: opt-in `JLOCK_CANONICAL=1`, padrão desligado, documentado (U5) |
-| **Caixa no macOS** | APFS é insensível por padrão, mas volumes sensíveis existem; o jlock dobra para minúsculas sempre → `A.ts` e `a.ts` num volume sensível caem na mesma chave (conflitam a mais, nunca a menos) | Aceitar o conservador como padrão; opt-in `JLOCK_CASE=sensitive`. Linux fica sensível (U5) |
+| **Symlinks e `/private/tmp`** | O jlock não canonicaliza (o caminho não precisa existir): `/tmp/x` e `/private/tmp/x` são chaves diferentes; idem qualquer symlink ou pasta ligada | **Decidido:** resolver por padrão, nos três sistemas: canonicalizar o maior prefixo que existe (`fs::canonicalize` do ancestral) e juntar o resto léxico; `JLOCK_CANONICAL=0` desliga. Só pode juntar nomes do mesmo arquivo numa chave, nunca separar; custa microssegundos. Se a canonicalização falhar (disco de rede desconectado), cai na normalização léxica de hoje (U5) |
+| **Caixa no macOS** | APFS é insensível por padrão, mas volumes sensíveis existem; o jlock dobra para minúsculas sempre → `A.ts` e `a.ts` num volume sensível caem na mesma chave (conflitam a mais, nunca a menos) | **Decidido:** dobrar sempre no macOS e no Windows (conservador: só gera espera a mais, nunca uma edição simultânea); `JLOCK_CASE=sensitive` para quem usa volume sensível. Linux sempre sensível (U5) |
 | **Granularidade do mtime** | FUSE e alguns FS de rede têm mtime em segundos | Irrelevante com `HEARTBEAT_MS` ≥ 1000; `doctor` avisa se alguém configurou menos (U4) |
 | **Terminal** | `list --watch` usa `ESC[2J ESC[H`; `enable_ansi` é vazio no Unix | Nada a fazer; testar que não suja quando stdout não é TTY (U2) |
 | **Runners mais lentos** | O teste de estresse leva ~2 min no Windows local; macOS no CI é mais lento | `JLOCK_TEST_CYCLES=200` no CI (ticket 14); tempos dos testes já vêm das variáveis `JLOCK_*` (U1) |
@@ -62,9 +62,9 @@ daí: o primeiro resultado útil é a primeira execução da matriz.
 | Canal | Como | Observações |
 |---|---|---|
 | `install.sh` | ticket 14 | detecta `uname -s`/`uname -m`; `~/.local/bin` por padrão |
-| Homebrew | tap `rodrigojager/homebrew-tap` com `Formula/jlock.rb` apontando para os `.tar.gz` do Release; o `release.yml` abre um PR no tap com a versão e as somas | `brew install rodrigojager/tap/jlock` |
-| `.deb` / `.rpm` | `cargo-deb` e `cargo-generate-rpm` **só no CI** (não entram nas dependências do produto), a partir do binário musl; anexados ao Release | metadados em `[package.metadata.deb]`/`[package.metadata.generate-rpm]` |
-| AUR | `jlock-bin` com `PKGBUILD` que baixa o `.tar.gz` do Release; atualização por `git push` no repositório do AUR a partir do `release.yml` | precisa de uma chave SSH do AUR como secret |
+| Homebrew (0.2) | tap `rodrigojager/homebrew-tap` com `Formula/jlock.rb` apontando para os `.tar.gz` do Release; o `release.yml` abre um PR no tap com a versão e as somas | `brew install rodrigojager/tap/jlock` |
+| `.deb` / `.rpm` (0.3, depois de U1) | `cargo-deb` e `cargo-generate-rpm` **só no CI** (não entram nas dependências do produto), a partir do binário musl; anexados ao Release | metadados em `[package.metadata.deb]`/`[package.metadata.generate-rpm]` |
+| AUR (0.3, depois de U1) | `jlock-bin` com `PKGBUILD` que baixa o `.tar.gz` do Release; atualização por `git push` no repositório do AUR a partir do `release.yml` | precisa de uma chave SSH do AUR como secret |
 | `cargo binstall` | ticket 14 | já cobre Unix |
 | nixpkgs | depois, por contribuição | — |
 | Completions | `jlock completions bash\|zsh\|fish\|powershell` gerado da mesma tabela de comandos/opções do `help` (ticket 12); pacotes instalam em `share/bash-completion/completions`, `share/zsh/site-functions`, `share/fish/vendor_completions.d` | sem `clap`: gerador próprio, ~100 linhas |
@@ -77,22 +77,31 @@ daí: o primeiro resultado útil é a primeira execução da matriz.
 | # | Entrega | Bloqueado por | Critério de pronto |
 |---|---|---|---|
 | U1 | Suíte verde em Linux e macOS | 14 (CI com `--no-fail-fast` e `JLOCK_TEST_CYCLES`) | matriz verde três vezes seguidas; cada correção com teste que falhava antes; `docs/DEVIATIONS.md` se algo do plano não valer em Unix |
-| U2 | Sinais e pipes | U1 | `jlock list \| head -1` sai 0 sem pânico; `kill -TERM` num `run` repassa ao filho e libera depois; `sigaction` com `SA_RESTART`; testes com filhos nossos |
+| U2 | Sinais e pipes | U1 | `jlock list \| head -1` sai 0 sem pânico; `kill -TERM` num `run` repassa ao filho, espera `JLOCK_KILL_GRACE_MS`, mata, libera e sai `128 + sinal`; `sigaction` com `SA_RESTART`; testes com filhos nossos nos três sistemas |
 | U3 | Multiusuário e permissões | 13 (`doctor`) | `doctor` avisa sticky bit, pasta sem escrita de grupo e `umask` restritiva; `docs/USAGE.md` com a receita; teste unitário da lógica de checagem (dois UIDs não dá no CI) |
 | U4 | Sistemas de arquivos | 13 | `doctor` mostra o tipo do FS e avisa rede/9p/FAT; `renameat2(RENAME_NOREPLACE)` no Linux em `break_file`; aviso de WSL; tabela de garantias por FS em `docs/USAGE.md` |
-| U5 | Normalização Unix | — | `JLOCK_CANONICAL` e `JLOCK_CASE` opt-in, com testes unitários por plataforma e documentação do padrão conservador |
+| U5 | Normalização: symlinks e caixa (três sistemas) | — | canonicalização do maior prefixo existente ligada por padrão (`JLOCK_CANONICAL=0` desliga), `JLOCK_CASE=sensitive` opt-in; testes unitários por plataforma e teste com symlink real; `docs/PLAN.md` §5 atualizado |
 | U6 | Builds estáticos e arm64 | 14 | musl x64/arm64 e macOS x64/arm64 no Release; `file` confere "statically linked"; tamanho < 2 MB; partida < 20 ms medida no CI |
-| U7 | Homebrew, `.deb`/`.rpm`, AUR | U6 | `brew install` numa VM limpa; `.deb` instala e `jlock doctor` passa; PKGBUILD validado com `namcap` |
+| U7 | Homebrew no 0.2; `.deb`/`.rpm` e AUR no 0.3 | U6 (Homebrew); U1 (os demais) | `brew install` numa VM limpa; depois: `.deb` instala e `jlock doctor` passa; PKGBUILD validado com `namcap` |
 | U8 | Completions e man page | 12 | completions para os quatro shells geradas da tabela do help; `jlock.1` commitado e conferido por teste; pacotes de U7 os instalam |
 
-Ordem sugerida: U1 → U2 → U6 → U4 → U3 → U5 → U8 → U7. U1 e U6 são os que destravam usuários reais; U7 depende
-de haver releases.
+Ordem sugerida: U1 → U2 → U6 → U5 → U4 → U3 → U8 → U7. U1 e U6 são os que destravam usuários reais; U7 depende
+de haver releases, e a parte `.deb`/`.rpm`/AUR espera a suíte verde em Linux de verdade (U1).
 
 ---
 
-## 6. Decisões em aberto (para você)
+## 6. Decisões tomadas (24/10/2026, delegadas pelo autor)
 
-1. Canonicalização de symlinks: opt-in (proposta) ou padrão ligado?
-2. Caixa no macOS: dobrar sempre (proposta, conservador) ou detectar o volume?
-3. `run` e sinais: repassar `SIGTERM` ao filho e esperar (proposta) ou manter o comportamento atual (liberar e sair)?
-4. Pacotes `.deb`/`.rpm` já no 0.2 ou só Homebrew + `install.sh` primeiro?
+1. **Symlinks: resolver por padrão, nos três sistemas** (`JLOCK_CANONICAL=0` desliga). Um symlink é um segundo
+   nome para a mesma pasta ou arquivo. Sem resolver, dois agentes podem travar "coisas diferentes" que são o mesmo
+   arquivo e editá-lo ao mesmo tempo: o erro que o jlock existe para impedir. Resolver só pode juntar nomes do mesmo
+   arquivo numa chave, nunca separar, e custa microssegundos. Se falhar, vale a regra léxica de hoje.
+2. **Caixa: dobrar sempre no macOS e no Windows; Linux sensível** (`JLOCK_CASE=sensitive` para volumes sensíveis
+   no macOS). Dobrar é o lado seguro: no pior caso dois arquivos distintos (`A.ts` e `a.ts`) esperam um pelo outro
+   sem precisar; o contrário (não dobrar num volume insensível) deixaria dois nomes do mesmo arquivo serem editados
+   juntos.
+3. **`run` repassa o sinal ao comando.** Quem manda `kill` no `jlock run` quer parar o comando e soltar a trava,
+   como faz o `timeout(1)`. O `run` avisa o comando (`SIGTERM`), dá `JLOCK_KILL_GRACE_MS` (5 s) para ele fechar,
+   mata se não fechou, e só então libera e sai com `128 + sinal`. Nunca libera com o comando ainda vivo.
+4. **Pacotes Unix em duas etapas.** 0.2: `install.sh`, Homebrew e `cargo binstall`. `.deb`/`.rpm` e AUR só no 0.3,
+   depois da suíte rodar verde num Linux de verdade (U1): não faz sentido empacotar o que nunca rodou lá.

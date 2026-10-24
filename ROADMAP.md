@@ -56,16 +56,17 @@ The code compiles for Unix and the design is portable, but it has only ever run 
 
 - Run the full suite on real Linux and macOS in CI and fix what breaks.
 - Signals and pipes: `SIGPIPE`/`EPIPE` when output is piped (`jlock list | head`), `sigaction` instead of
-  `signal`, `SIGHUP`, signal pass-through in `run`.
+  `signal`, `SIGHUP`; `run` forwards `SIGTERM`/`SIGINT` to its command, waits a grace period, then releases.
 - Shared `JLOCK_HOME` between Unix users: directory permissions (setgid group, no sticky bit), `doctor` checks,
   documentation.
 - Network and special file systems: what `create_new`, `rename` and `flock` guarantee on NFS, SMB, 9p (WSL),
   FUSE; `doctor` detects the file-system type and warns.
-- Path normalization on Unix: symlinks (`/tmp` → `/private/tmp` on macOS), case-sensitive APFS volumes, an
-  opt-in canonicalization.
+- Path normalization on every system: symlinks resolved by default (`/tmp` → `/private/tmp` on macOS;
+  `JLOCK_CANONICAL=0` to disable); case folded on macOS and Windows, with `JLOCK_CASE=sensitive` for
+  case-sensitive volumes.
 - Static musl builds, arm64 for Linux and macOS, size and startup checks.
-- Packaging: Homebrew tap, `.deb`/`.rpm`, AUR; shell completions for bash/zsh/fish/PowerShell; a man page
-  generated from the same help table.
+- Packaging: Homebrew tap first; `.deb`/`.rpm` and AUR once the suite is green on real Linux; shell
+  completions for bash/zsh/fish/PowerShell; a man page generated from the same help table.
 
 ## Later / ideas
 
