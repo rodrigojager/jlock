@@ -14,10 +14,12 @@ mod key;
 mod log;
 mod queue;
 mod store;
+mod sweep;
 mod wait;
 
 mod cmd {
     pub mod acquire;
+    pub mod gc;
     pub mod graph;
     pub mod heartbeat;
     pub mod hold;

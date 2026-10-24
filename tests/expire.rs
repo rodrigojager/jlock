@@ -39,6 +39,13 @@ fn dead_holder_is_recovered_within_two_stale_periods() {
     );
     assert_eq!(env.holder_owner(key).as_deref(), Some("b"));
     assert!(no_broken_left(&env, key));
+    let log = std::fs::read_to_string(env.home.join("log.jsonl")).unwrap();
+    let expired: Vec<&str> = log
+        .lines()
+        .filter(|l| l.contains("\"event\":\"expired\""))
+        .collect();
+    assert_eq!(expired.len(), 1, "{log}");
+    assert!(expired[0].contains("\"owner\":\"a\"") && expired[0].contains("\"what\":\"holder\""));
     assert_eq!(env.run(&["release", key, "--owner", "b"]).code, 0);
     assert!(env.lock_dirs().is_empty(), "{:?}", env.lock_dirs());
 }

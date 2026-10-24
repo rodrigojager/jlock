@@ -61,17 +61,21 @@ impl Env {
         self.vars.push((name.to_string(), value.to_string()));
     }
 
-    pub fn cmd(&self, args: &[&str]) -> Command {
-        let mut cmd = Command::new(JLOCK);
-        cmd.args(args)
-            .env("JLOCK_HOME", &self.home)
-            .env_remove("JLOCK_DEBUG")
-            .stdin(Stdio::null())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+    /// Gives `cmd` this environment: `JLOCK_HOME` and the short times.
+    pub fn apply(&self, cmd: &mut Command) {
+        cmd.env("JLOCK_HOME", &self.home).env_remove("JLOCK_DEBUG");
         for (k, v) in &self.vars {
             cmd.env(k, v);
         }
+    }
+
+    pub fn cmd(&self, args: &[&str]) -> Command {
+        let mut cmd = Command::new(JLOCK);
+        cmd.args(args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        self.apply(&mut cmd);
         cmd
     }
 

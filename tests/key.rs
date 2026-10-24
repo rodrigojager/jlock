@@ -101,10 +101,14 @@ fn status_of_free_key_creates_no_key_folder() {
     assert!(String::from_utf8_lossy(&out.stdout).starts_with(expected));
     let entries: Vec<_> = std::fs::read_dir(home.join("locks")).unwrap().collect();
     assert!(entries.is_empty());
-    let top: Vec<_> = std::fs::read_dir(&home)
-        .unwrap()
-        .map(|e| e.unwrap().file_name())
-        .collect();
-    assert_eq!(top, vec![std::ffi::OsString::from("locks")]);
+    // Besides `locks/`, only the registry's own bookkeeping (the global sweep's `last-sweep` and the
+    // derived `index.json`) may appear; never a key folder or a lock.
+    for entry in std::fs::read_dir(&home).unwrap() {
+        let name = entry.unwrap().file_name().to_string_lossy().into_owned();
+        assert!(
+            ["locks", "last-sweep", "index.json"].contains(&name.as_str()),
+            "unexpected {name}"
+        );
+    }
     std::fs::remove_dir_all(&home).unwrap();
 }

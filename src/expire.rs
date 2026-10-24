@@ -44,7 +44,7 @@ pub fn break_file(
     alive: impl Fn(Option<&Holder>, Duration) -> bool,
 ) -> io::Result<Option<Option<Holder>>> {
     for _ in 0..5 {
-        fsx::retry(|| fs::create_dir_all(kd.broken_dir()))?;
+        fsx::ensure_dir(&kd.broken_dir())?;
         let target = kd.broken_dir().join(format!(
             "{:016}-{:04x}-{suffix}",
             now_micros(),

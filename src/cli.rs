@@ -149,9 +149,14 @@ pub fn print_json(value: &serde_json::Value) {
 pub fn main(args: Vec<String>) -> i32 {
     let json = args.iter().any(|a| a == "--json");
     let result = dispatch(args);
-    if crate::log::changed() {
+    // Commands that reached the registry keep it tidy: the index after a change, and the global
+    // sweep when it is due. Neither changes the command's result.
+    if crate::store::opened() {
         if let Ok(store) = crate::store::Store::open() {
-            let _ = crate::index::rewrite(&store);
+            if crate::log::changed() {
+                let _ = crate::index::rewrite(&store);
+            }
+            crate::sweep::maybe_sweep(&store);
         }
     }
     match result {
@@ -192,7 +197,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "graph" => crate::cmd::graph::run(rest),
         "list" => crate::cmd::list::run(rest),
         "unlock" => crate::cmd::unlock::run(rest),
-        "gc" => Err(usage(format!("{cmd}: not implemented yet"))),
+        "gc" => crate::cmd::gc::run(rest),
         other => Err(usage(format!(
             "unknown command '{other}' (see jlock --help)"
         ))),

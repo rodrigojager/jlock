@@ -248,6 +248,37 @@ fn granted_now(body: &Holder) -> Holder {
     b
 }
 
+/// One attempt without waiting: granted, or busy with who is in the way.
+fn try_now(store: &Store, kd: &KeyDir, body: &Holder) -> io::Result<Outcome> {
+    let owner = body.owner.as_str();
+    expire::expire_key(kd, None)?;
+    let view = look(store, kd, owner, None)?;
+    let position = view.position;
+    let busy = |holder, via| Outcome::Busy {
+        holder,
+        position,
+        via,
+    };
+    if let Some((via, holder)) = view.blocker {
+        let _ = kd.cleanup();
+        return Ok(busy(holder, Some(via)));
+    }
+    if view.holder.is_some() || view.ahead > 0 {
+        return Ok(busy(view.holder, None));
+    }
+    match try_take(kd, body)? {
+        Take::Already => Ok(Outcome::Granted { waited_ms: 0 }),
+        Take::Granted => match confirm(store, kd, owner)? {
+            None => Ok(Outcome::Granted { waited_ms: 0 }),
+            Some((via, h)) => {
+                let _ = kd.cleanup();
+                Ok(busy(Some(h), Some(via)))
+            }
+        },
+        Take::Held(h) => Ok(busy(Some(*h), None)),
+    }
+}
+
 /// Takes one key for `ident`: at once or never with `wait == false`; otherwise in arrival order,
 /// up to `deadline`. Conflicting keys (a folder and what is inside it, `*`) are waited for too.
 pub fn acquire_one(
@@ -296,33 +327,11 @@ fn acquire_inner(
         }
     }
 
-    if !wait_turn {
-        expire::expire_key(&kd, None)?;
-        let view = look(store, &kd, owner, None)?;
-        let position = view.position;
-        let busy = |holder, via| Outcome::Busy {
-            holder,
-            position,
-            via,
-        };
-        if let Some((via, holder)) = view.blocker {
-            let _ = kd.cleanup();
-            return Ok(busy(holder, Some(via)));
-        }
-        if view.holder.is_some() || view.ahead > 0 {
-            return Ok(busy(view.holder, None));
-        }
-        return match try_take(&kd, &body)? {
-            Take::Already => Ok(Outcome::Granted { waited_ms: 0 }),
-            Take::Granted => match confirm(store, &kd, owner)? {
-                None => Ok(Outcome::Granted { waited_ms: 0 }),
-                Some((via, h)) => {
-                    let _ = kd.cleanup();
-                    Ok(busy(Some(h), Some(via)))
-                }
-            },
-            Take::Held(h) => Ok(busy(Some(*h), None)),
-        };
+    // Free, nobody in line, no conflicting key taken: take it now, without a ticket. Otherwise
+    // `--no-wait` answers busy, and a waiter gets in line.
+    let now = try_now(store, &kd, &body)?;
+    if !wait_turn || matches!(now, Outcome::Granted { .. }) {
+        return Ok(now);
     }
 
     if let Some(chain) = deadlock_before_queueing(store, key, owner)? {

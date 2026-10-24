@@ -7,8 +7,16 @@ use crate::key::Key;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::sleep;
 use std::time::Duration;
+
+static OPENED: AtomicBool = AtomicBool::new(false);
+
+/// Whether this process opened the registry (a command that got past argument checking).
+pub fn opened() -> bool {
+    OPENED.load(Ordering::SeqCst)
+}
 
 pub struct Store {
     pub root: PathBuf,
@@ -18,13 +26,14 @@ pub struct Store {
 impl Store {
     pub fn open() -> Result<Store, Failure> {
         let root = crate::home::root().map_err(usage)?;
-        let locks = fsx::retry(|| crate::home::locks_dir(&root)).map_err(|e| {
+        let locks = fsx::retry(&root, || crate::home::locks_dir(&root)).map_err(|e| {
             fs_error(
                 format!("cannot create {}", root.join("locks").display()),
                 &e,
             )
         })?;
         crate::log::init(&root);
+        OPENED.store(true, Ordering::SeqCst);
         Ok(Store { root, locks })
     }
 
@@ -71,7 +80,7 @@ impl KeyDir {
 
     /// Creates the key folder and its `key` file if missing.
     pub fn ensure(&self) -> io::Result<()> {
-        fsx::retry(|| fs::create_dir_all(&self.path))?;
+        fsx::ensure_dir(&self.path)?;
         self.ensure_key_file()
     }
 
@@ -112,23 +121,18 @@ impl KeyDir {
 
 /// Reads a holder or ticket body; `None` if the file does not exist.
 pub fn read_body(path: &Path, key: &str) -> io::Result<Option<Holder>> {
-    let mut last_err = None;
     for _ in 0..20 {
-        match fs::read_to_string(path) {
+        // A file being deleted while someone reads it answers "access denied" for a moment.
+        match fsx::retry(path, || fs::read_to_string(path)) {
             Ok(text) => {
                 if let Some(h) = Holder::parse(&text) {
                     return Ok(Some(h));
                 }
-                last_err = None;
             }
             Err(e) if fsx::is_not_found(&e) => return Ok(None),
-            Err(e) if fsx::is_transient(&e) => last_err = Some(e),
             Err(e) => return Err(e),
         }
         sleep(Duration::from_millis(5));
     }
-    match last_err {
-        Some(e) => Err(e),
-        None => Ok(Some(Holder::unreadable(key))),
-    }
+    Ok(Some(Holder::unreadable(key)))
 }

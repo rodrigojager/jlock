@@ -26,7 +26,7 @@ pub fn new_name() -> String {
 pub fn create(kd: &KeyDir, body: &Holder) -> io::Result<Ticket> {
     let bytes = body.to_bytes();
     loop {
-        fsx::retry(|| fs::create_dir_all(kd.queue_dir()))?;
+        fsx::ensure_dir(&kd.queue_dir())?;
         kd.ensure_key_file()?;
         let name = new_name();
         let path = kd.queue_dir().join(format!("{name}.json"));
@@ -47,7 +47,7 @@ pub fn create(kd: &KeyDir, body: &Holder) -> io::Result<Ticket> {
 
 /// The ticket names in the queue, in order (bodies not read).
 pub fn names(kd: &KeyDir) -> io::Result<Vec<String>> {
-    let entries = match fs::read_dir(kd.queue_dir()) {
+    let entries = match fsx::retry(&kd.queue_dir(), || fs::read_dir(kd.queue_dir())) {
         Ok(entries) => entries,
         Err(e) if fsx::is_not_found(&e) => return Ok(Vec::new()),
         Err(e) => return Err(e),

@@ -41,21 +41,44 @@ pub fn is_not_empty(e: &io::Error) -> bool {
     }
 }
 
-/// Runs `op`, waiting and retrying while it fails with a transient error.
-pub fn retry<T>(mut op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
+/// Runs `op` on `path`, waiting and retrying while it fails with a transient error. If it still
+/// fails that way after the last wait, the error names the path (the OS message alone does not).
+pub fn retry<T>(path: &Path, mut op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
     for delay in RETRY_DELAYS_MS {
         match op() {
             Err(e) if is_transient(&e) => sleep(Duration::from_millis(delay)),
             other => return other,
         }
     }
-    op()
+    op().map_err(|e| {
+        if is_transient(&e) {
+            io::Error::new(e.kind(), format!("{}: {e}", path.display()))
+        } else {
+            e
+        }
+    })
+}
+
+/// Creates a folder and its parents. Unlike plain `create_dir_all`, a folder that a concurrent
+/// cleanup removes between "already exists" and the check that follows is simply created again.
+pub fn ensure_dir(path: &Path) -> io::Result<()> {
+    let mut last = None;
+    for _ in 0..20 {
+        match retry(path, || fs::create_dir_all(path)) {
+            Ok(()) => return Ok(()),
+            Err(e) if is_exists(&e) || is_not_found(&e) => last = Some(e),
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last.expect("loop ran"))
 }
 
 /// Creates `path` only if it does not exist (`create_new`), with `bytes` as content.
 /// `AlreadyExists` and `NotFound` come back at once; the caller decides what they mean.
 pub fn create_exclusive(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let mut file = retry(|| OpenOptions::new().write(true).create_new(true).open(path))?;
+    let mut file = retry(path, || {
+        OpenOptions::new().write(true).create_new(true).open(path)
+    })?;
     if let Err(e) = file.write_all(bytes) {
         drop(file);
         let _ = fs::remove_file(path);
@@ -66,7 +89,7 @@ pub fn create_exclusive(path: &Path, bytes: &[u8]) -> io::Result<()> {
 
 /// Removes a file. `Ok(false)` if it was already gone.
 pub fn remove_with_retry(path: &Path) -> io::Result<bool> {
-    match retry(|| fs::remove_file(path)) {
+    match retry(path, || fs::remove_file(path)) {
         Ok(()) => Ok(true),
         Err(e) if is_not_found(&e) => Ok(false),
         Err(e) => Err(e),
@@ -75,7 +98,7 @@ pub fn remove_with_retry(path: &Path) -> io::Result<bool> {
 
 /// Renames `from` over `to`. `NotFound` comes back at once (someone else got there first).
 pub fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
-    retry(|| fs::rename(from, to))
+    retry(from, || fs::rename(from, to))
 }
 
 /// Removes an empty directory. `Ok(false)` if it is gone, not empty, or busy right now:
@@ -90,7 +113,7 @@ pub fn rmdir_if_empty(path: &Path) -> io::Result<bool> {
 
 /// Sets the modification time to now (the heartbeat).
 pub fn touch(path: &Path) -> io::Result<()> {
-    retry(|| {
+    retry(path, || {
         let file = OpenOptions::new().write(true).open(path)?;
         file.set_modified(SystemTime::now())
     })
@@ -98,12 +121,12 @@ pub fn touch(path: &Path) -> io::Result<()> {
 
 /// How long ago `path` was last modified (zero if the clock is behind the file).
 pub fn age(path: &Path) -> io::Result<Duration> {
-    let modified = fs::metadata(path)?.modified()?;
+    let modified = retry(path, || fs::metadata(path))?.modified()?;
     Ok(SystemTime::now()
         .duration_since(modified)
         .unwrap_or(Duration::ZERO))
 }
 
 pub fn read_string(path: &Path) -> io::Result<String> {
-    retry(|| fs::read_to_string(path))
+    retry(path, || fs::read_to_string(path))
 }

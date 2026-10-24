@@ -59,7 +59,9 @@ pub fn event(event: &str, fields: Value) {
 fn append(root: &Path, bytes: &[u8]) -> std::io::Result<()> {
     let log = path(root);
     rotate_if_needed(root, bytes.len() as u64)?;
-    let mut file = fsx::retry(|| OpenOptions::new().append(true).create(true).open(&log))?;
+    let mut file = fsx::retry(&log, || {
+        OpenOptions::new().append(true).create(true).open(&log)
+    })?;
     file.write_all(bytes)
 }
 
