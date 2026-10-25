@@ -42,6 +42,9 @@ also use jlock, so take them every time, even when you think you are alone.
    - `--timeout 2m` waits at most two minutes for others to finish; `--no-wait` does not wait at all.
    - `--ttl 2h` is a safety limit: the lock goes away by itself after two hours even if you never
      release it.
+     If the task may take longer, push the limit back before it ends: `jlock renew --owner claude:k7f2`
+     renews every lock of that owner for the same length (`--ttl 3h` sets another). A lock already past
+     its limit cannot be renewed (exit 14): take it again.
    - A folder key covers every file inside it; lock the folder when the task changes many files there.
 
 2. Read the exit code:

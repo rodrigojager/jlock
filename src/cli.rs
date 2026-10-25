@@ -220,6 +220,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "hold" => crate::cmd::hold::run(rest),
         "run" => crate::cmd::run::run(rest),
         "heartbeat" => crate::cmd::heartbeat::run(rest),
+        "renew" => crate::cmd::renew::run(rest),
         "graph" => crate::cmd::graph::run(rest),
         "list" => crate::cmd::list::run(rest),
         "unlock" => crate::cmd::unlock::run(rest),

@@ -4,7 +4,7 @@ use crate::cli::{
     fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
 };
 use crate::cmd::acquire::normalize_keys;
-use crate::cmd::status::{heartbeat_ms, human, liveness, ms_since};
+use crate::cmd::status::{expires, heartbeat_ms, human, liveness, ms_since};
 use crate::conflict::is_ancestor;
 use crate::heartbeat::stale_after;
 use crate::holder::now_micros;
@@ -30,10 +30,11 @@ fn row(st: &KeyState) -> Value {
     let stale_ms = stale_after().as_millis() as u64;
     let holder = st.holder.as_ref().map(|h| {
         let hb = heartbeat_ms(&st.dir.holder_path());
-        let (dead, late) = liveness(&st.dir.holder_path(), h);
+        let (dead, late) = liveness(&st.dir, h);
         json!({
             "owner": h.owner, "group": h.group, "intent": h.intent, "meta": h.meta,
             "pid": h.pid, "host": h.host, "cwd": h.cwd, "since": h.since, "ttl_secs": h.ttl_secs,
+            "expires": expires(&st.dir, h),
             "held_ms": ms_since(&h.since), "heartbeat_ms": hb, "stale": dead, "late": late,
         })
     });

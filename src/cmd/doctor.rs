@@ -492,7 +492,7 @@ fn check_registry(root: &Path) -> Check {
         .filter(|s| {
             s.holder
                 .as_ref()
-                .is_some_and(|h| crate::cmd::status::liveness(&s.dir.holder_path(), h).0)
+                .is_some_and(|h| crate::cmd::status::liveness(&s.dir, h).0)
         })
         .count();
     let sweep = fs::read_to_string(root.join("last-sweep"))

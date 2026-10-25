@@ -39,7 +39,8 @@ granted d:/proj/src/a.ts
   `{a,b}` and `{b,a}` never block each other.
 - `--owner` defaults to `pid:<pid>`; whoever presents the same owner can release. Asking again for a
   key you already hold is granted at once.
-- `--ttl` is a hard limit on how long the lock may be held, even with a heartbeat.
+- `--ttl` is a hard limit on how long the lock may be held, even with a heartbeat. `jlock renew`
+  pushes it back for work that takes longer.
 - A lock taken by `acquire` stays after the command exits. Keep it alive with `jlock heartbeat`
   (at least every `JLOCK_STALE_MS`), or use `hold`/`run`, which do that for you.
 
@@ -109,6 +110,24 @@ renewed d:/proj/src/a.ts
 ```
 
 Exit 13 with `lost` if the lock is not yours any more.
+
+### `renew` — push back the deadline of locks you hold
+
+```
+jlock renew [<key...>] [--owner id] [--group g] [--ttl 2h] [--json]
+jlock renew --owner agent-7 --ttl 2h
+renewed d:/proj/src/a.ts until 2026-10-25T23:40:00.000Z
+```
+
+Moves the deadline (`--ttl`) of the owner's locks to now plus the ttl and renews their heartbeat.
+Without `--ttl` it reuses the ttl the lock was taken with; without keys it renews every lock of the owner
+(only those of the group, with `--group`). The lock is never let go while it is renewed: `holder.json` is
+not rewritten, so a `hold`/`run` keeping it, and its OS lock, go on as before. A key that is not yours is
+exit 13; a lock already past its deadline expires right there (exit 14, `lost`) and has to be taken again.
+A lock without a ttl only gets its heartbeat. `status` shows how long is left (`expires in 1h59m`) and
+`status --json`/`list --json` carry `expires`.
+
+A `hold` started by a jlock older than 0.2.0 does not read the new deadline and still ends at the old one.
 
 ### `status` — one key
 
@@ -181,7 +200,7 @@ Any command already does this at most once per `JLOCK_SWEEP_MS`; `gc` does it no
 
 ```
 jlock doctor [--json]
-ok    version          jlock 0.1.1, running from C:\Users\me\.cargo\bin\jlock.exe
+ok    version          jlock 0.2.0, running from C:\Users\me\.cargo\bin\jlock.exe
 ok    registry folder  C:\Users\me\AppData\Local\jlock (the default for this system): a writable folder
 ok    primitives       create_new refuses an existing file, rename replaces one, remove deletes
 ok    OS lock          taken, refused to a second handle, then released
@@ -257,7 +276,7 @@ the README and the roadmap. It does not use the network.
 
 ### `--version`, `--help`, `--lang`
 
-`jlock --version` prints one line, `jlock 0.1.1`, stable for scripts. `--help` (or `-h`) goes with any
+`jlock --version` prints one line, `jlock 0.2.0`, stable for scripts. `--help` (or `-h`) goes with any
 command and shows its help page. `--lang <tag>` can go with any command and sets the language of its
 text output (see below).
 
@@ -306,8 +325,8 @@ inside a file system error (exit 20) comes from the system, in the system's lang
 | 10 | busy: not taken with `--no-wait` |
 | 11 | timeout waiting |
 | 12 | deadlock |
-| 13 | not the owner (`release`, `heartbeat`) |
-| 14 | lock lost (`hold`, `run`) |
+| 13 | not the owner (`release`, `heartbeat`, `renew`) |
+| 14 | lock lost (`hold`, `run`), or past its deadline (`renew`) |
 | 2 | wrong usage |
 | 20 | file system error (permission, disk full, file held by another program); the OS message is shown |
 | 130 | interrupted (CTRL+C) while waiting; the ticket was removed |
@@ -336,11 +355,12 @@ inside a file system error (exit 20) comes from the system, in the system's lang
 ├─ locks/<sha1 of the key>/
 │  ├─ key            the key, as text
 │  ├─ holder.json    exists = taken; content = who; mtime = heartbeat
+│  ├─ lease.json     the deadline set by `renew` (owner, since of the grant, until); only counts for that grant
 │  ├─ queue/<µs>-<rand>.json   one ticket per waiter, in arrival order
 │  └─ broken/        only a rename target while breaking a dead lock; normally absent
 ├─ index.json        derived summary, rewritten after changes; never trusted
 ├─ last-sweep        time of the last global sweep
-└─ log.jsonl         acquire, release, queued, timeout, expired, forced, deadlock, lost, gc
+└─ log.jsonl         acquire, release, renew, queued, timeout, expired, forced, deadlock, lost, gc
                      (rotated to log.1.jsonl at JLOCK_LOG_MAX_BYTES)
 ```
 
@@ -362,7 +382,8 @@ jlock run name:port-3000 --timeout 2m -- ./serve  # give up after 2 minutes (exi
    It answers (`granted`, or `timeout`/exit 11 if someone else kept them past `--timeout`; with
    `--no-wait`, `busy`/exit 10 at once) and returns; a background `jlock hold` keeps the lock alive.
 2. After a long pause, `jlock heartbeat <key> --owner agent-7` says whether the lock is still yours
-   (exit 13 `lost` if it was broken or expired).
+   (exit 13 `lost` if it was broken or expired). A task that may outlast its `--ttl` runs
+   `jlock renew --owner agent-7` before the deadline: same length again, the lock never let go.
 3. When done (or when the task fails): `jlock release --group task-42 --owner agent-7`. The background
    process notices and ends.
 

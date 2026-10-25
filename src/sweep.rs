@@ -93,7 +93,15 @@ fn sweep_unknown(dir: &Path, report: &mut Report) -> io::Result<()> {
         }
         fsx::rmdir_if_empty(&dir.join(sub))?;
     }
-    for file in ["holder.json", "key"] {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for e in entries.filter_map(|e| e.ok()) {
+            let name = e.file_name().to_string_lossy().into_owned();
+            if name.starts_with("lease.") && name.ends_with(".tmp") && old(&e.path()) {
+                fsx::remove_with_retry(&e.path())?;
+            }
+        }
+    }
+    for file in ["holder.json", "lease.json", "key"] {
         let path = dir.join(file);
         if path.exists() && old(&path) {
             fsx::remove_with_retry(&path)?;

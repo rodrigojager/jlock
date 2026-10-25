@@ -141,6 +141,8 @@ Opciones que conviene conocer:
   instante. Las llamadas cortas usan `--detach`; un programa que sigue abierto usa `--release-on-eof`.
 - `--ttl 2h`: un límite de seguridad. El bloqueo desaparece solo pasado este tiempo, aunque el agente nunca
   lo devuelva.
+  Para un trabajo que puede tardar más, `jlock renew --owner agent-7` aplaza ese plazo sin soltar nunca el
+  bloqueo.
 
 ¿Por qué no un simple `jlock acquire`? Un bloqueo tomado con `acquire` también sobrevive al comando, pero
 hay que renovarlo (`jlock heartbeat`) al menos cada 30 segundos, o se da por muerto y caduca. Un agente pasa
@@ -273,7 +275,7 @@ bloquean entre sí.
 | 11 | tiempo agotado (con `--timeout`) |
 | 12 | deadlock: la petición cerraría un ciclo |
 | 13 | no es el dueño |
-| 14 | bloqueo perdido (`hold`/`run`) |
+| 14 | bloqueo perdido (`hold`/`run`/`renew`) |
 | 20 | error del sistema de archivos; el mensaje incluye el error del SO |
 | 130 | interrumpido (CTRL+C) durante la espera |
 

@@ -106,7 +106,7 @@ pub const COMMANDS: &[Command] = &[
         group: TAKE,
         opts: HOLD_OPTS,
         codes: &["0", "2", "10", "11", "12", "14", "20", "130"],
-        see: &["acquire", "run", "release"],
+        see: &["acquire", "run", "renew", "release"],
     },
     Command {
         name: "release",
@@ -119,6 +119,18 @@ pub const COMMANDS: &[Command] = &[
         ],
         codes: &["0", "2", "13", "20"],
         see: &["acquire", "unlock"],
+    },
+    Command {
+        name: "renew",
+        group: TAKE,
+        opts: &[
+            opt("owner", Some("id"), "help.opt.renew.owner", "agent-7"),
+            opt("group", Some("group"), "help.opt.renew.group", "task-42"),
+            opt("ttl", Some("time"), "help.opt.renew.ttl", "2h"),
+            JSON,
+        ],
+        codes: &["0", "2", "13", "14", "20"],
+        see: &["hold", "heartbeat", "status"],
     },
     Command {
         name: "heartbeat",

@@ -144,6 +144,8 @@ Les options à connaître:
   Les appels courts utilisent `--detach` ; un programme qui reste ouvert, `--release-on-eof`.
 - `--ttl 2h`: une limite de sécurité. Le verrou disparaît de lui-même passé ce délai, même si l'agent ne
   le rend jamais.
+  Pour un travail qui peut durer plus longtemps, `jlock renew --owner agent-7` repousse ce délai sans jamais
+  lâcher le verrou.
 
 Pourquoi pas simplement `jlock acquire`? Un verrou pris avec `acquire` survit lui aussi à la commande, mais
 il doit être renouvelé (`jlock heartbeat`) au moins toutes les 30 secondes, sinon il est considéré comme
@@ -278,7 +280,7 @@ se bloquent jamais entre elles.
 | 11 | délai dépassé (avec `--timeout`) |
 | 12 | interblocage: la demande fermerait un cycle |
 | 13 | non propriétaire |
-| 14 | verrou perdu (`hold`/`run`) |
+| 14 | verrou perdu (`hold`/`run`/`renew`) |
 | 20 | erreur du système de fichiers; le message contient l'erreur du SE |
 | 130 | interrompu (CTRL+C) pendant l'attente |
 

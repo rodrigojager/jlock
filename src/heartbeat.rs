@@ -45,7 +45,7 @@ pub enum Beat {
     Renewed,
     /// The lock is not ours any more; the current owner if there is one.
     Lost(Option<String>),
-    /// Ours, but past `since + ttl`.
+    /// Ours, but past its deadline (`since + ttl`, or the one `renew` set).
     TtlExpired,
 }
 
@@ -54,7 +54,7 @@ pub fn beat(kd: &KeyDir, owner: &str) -> io::Result<Beat> {
     match kd.read_holder()? {
         None => Ok(Beat::Lost(None)),
         Some(h) if h.owner != owner => Ok(Beat::Lost(Some(h.owner))),
-        Some(h) if h.ttl_expired(now_micros()) => Ok(Beat::TtlExpired),
+        Some(h) if crate::lease::expired(kd, &h, now_micros()) => Ok(Beat::TtlExpired),
         Some(_) => match fsx::touch(&kd.holder_path()) {
             Ok(()) => Ok(Beat::Renewed),
             Err(e) if fsx::is_not_found(&e) => Ok(Beat::Lost(None)),

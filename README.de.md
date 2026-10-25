@@ -142,6 +142,8 @@ Optionen, die du kennen solltest:
   freigegeben. Kurze Aufrufe nutzen `--detach`; ein Programm, das offen bleibt, `--release-on-eof`.
 - `--ttl 2h`: eine Sicherheitsgrenze. Die Sperre verschwindet nach dieser Zeit von selbst, auch wenn der
   Agent sie nie freigibt.
+  Für Arbeit, die länger dauern kann, verschiebt `jlock renew --owner agent-7` diese Grenze, ohne die Sperre
+  je loszulassen.
 
 Warum nicht einfach `jlock acquire`? Eine mit `acquire` genommene Sperre überdauert den Befehl ebenfalls, muss
 aber mindestens alle 30 Sekunden erneuert werden (`jlock heartbeat`), sonst gilt sie als tot und läuft ab. Ein
@@ -274,7 +276,7 @@ Reihenfolge, sodass sie sich nie gegenseitig blockieren.
 | 11 | Zeitüberschreitung (mit `--timeout`) |
 | 12 | Deadlock: Die Anfrage würde einen Zyklus schließen |
 | 13 | nicht der Besitzer |
-| 14 | Sperre verloren (`hold`/`run`) |
+| 14 | Sperre verloren (`hold`/`run`/`renew`) |
 | 20 | Dateisystemfehler; die Meldung enthält den Fehler des Betriebssystems |
 | 130 | beim Warten unterbrochen (CTRL+C) |
 

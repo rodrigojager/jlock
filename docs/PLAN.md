@@ -17,6 +17,8 @@ histórico de cada um está em `docs/DEVIATIONS.md`.
 Revisão 5, 24/10/2026: a fase 2 da seção 14 (idiomas, help didático, `about`, `doctor`, releases, instaladores,
 `update`, READMEs) deixa de ser proposta e passa a descrever o que foi implementado; comandos e variáveis novos
 entram nas tabelas da seção 6. Os pontos estão marcados com **[rev. 5]**.
+Revisão 6, 25/10/2026: `jlock renew` (ticket 19) estende o prazo (`ttl`) de uma trava viva sem soltá-la; o prazo
+novo fica em `lease.json`, ao lado de `holder.json`. Os pontos estão marcados com **[rev. 6]**.
 
 ---
 
@@ -107,6 +109,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 │  └─ 3f9a…c21\                     ← uma chave: sha1 da chave normalizada (hex)
 │     ├─ key                         ← a chave em texto ("d:/temp/spybrowser/src/humanizer/types.ts")
 │     ├─ holder.json                 ← existe = ocupada; conteúdo = quem; mtime = heartbeat
+│     ├─ lease.json                  ← [rev. 6] prazo dado por `renew`; só vale para a concessão que nomeia
 │     ├─ queue\
 │     │   ├─ 1792794410123456-7c1e.json   ← senha: hora-µs + aleatório; conteúdo = quem; mtime = heartbeat
 │     │   └─ 1792794411004211-02bd.json
@@ -131,7 +134,19 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 
 - `owner` obrigatório (padrão `pid:<pid>`); quem apresenta o mesmo `owner` pode liberar.
 - `group`, `intent`, `meta`, `ttl` opcionais. `ttl` é prazo máximo de posse mesmo com heartbeat (processo vivo
-  mas descontrolado); expira com registro, como a morte.
+  mas descontrolado); expira com registro, como a morte. **[rev. 6]** O dono pode adiar esse prazo com
+  `jlock renew` (seção 7, "renew"): o prazo efetivo passa a ser o `until` de `lease.json`.
+
+### Corpo de `lease.json` **[rev. 6]**
+
+```json
+{ "owner": "claude:a8ec2aca", "since": "2026-10-23T23:06:50.123Z", "until": "2026-10-24T03:06:50.123Z" }
+```
+
+- `owner` e `since` são os do `holder.json` da concessão que ele estende. Só vale enquanto os dois batem: um
+  `lease.json` que sobrou de outra concessão (mesmo do mesmo dono) é ignorado e sai junto com a pasta da chave.
+- Gravado por `.tmp` + rename (`lease.<pid>-<rand>.tmp` na pasta da chave): quem lê vê o antigo ou o novo.
+  Ilegível conta como ausente, e o prazo volta a ser `since + ttl`.
 - `pid`, `host`, `cwd`, `since` preenchidos pelo jlock. **[rev. 4]** O `pid` é só informação: o jlock não confere
   se o processo existe (PID pode ser reutilizado). A segunda pista de vida é a trava do SO sobre `holder.json`,
   que `hold` e `run` mantêm (seção 7, "Trava do SO").
@@ -139,7 +154,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 ### Linha do `log.jsonl`
 
 ```json
-{ "at": "2026-10-23T23:06:50.123Z", "event": "acquire|release|queued|expired|forced|deadlock|lost|gc",
+{ "at": "2026-10-23T23:06:50.123Z", "event": "acquire|release|renew|queued|expired|forced|deadlock|lost|gc",
   "key": "…", "owner": "…", "group": "…", "by": "…", "reason": "…", "waited_ms": 1234 }
 ```
 
@@ -169,6 +184,7 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | `jlock run <chave…> [opções de acquire] -- <comando…>` | como `flock(1)`: pega, mantém heartbeat, roda o comando, libera ao terminar (ou ao morrer: expira). Código de saída do comando é repassado. |
 | `jlock hold <chave…> [opções de acquire] [--detach \| --release-on-eof]` | fica vivo renovando o heartbeat; encerra ao receber a linha `release` na entrada padrão, SIGINT/CTRL+C, ou ao ser encerrado. Imprime `granted` e depois eventos (`lost`). **[rev. 5]** Quando o próprio dono devolve uma chave com `jlock release` (o log diz `release` dele), o `hold` imprime `released`, segue com as outras e sai com 0 quando não sobra nenhuma; `lost`/14 fica para trava quebrada ou expirada. Com `--detach`, responde como o `hold` (mesma saída, mesmo código) e volta, enquanto um segundo `jlock hold`, desligado do terminal, mantém a trava até `release`, `--ttl` ou `unlock --force`: uma chamada só para um agente. Com `--release-on-eof` (ticket 18, 24/10/2026), o fim da entrada padrão vale como a linha `release`: um programa que fica aberto segurando o `hold` em primeiro plano solta a trava no instante em que morre; não combina com `--detach`. |
 | `jlock release [<chave…>] [--owner id] [--group g]` | libera (só o dono). Sem chaves: tudo do dono; com `--group`: tudo do grupo. |
+| `jlock renew [<chave…>] [--owner id] [--group g] [--ttl 2h] [--json]` | **[rev. 6]** adia o prazo das travas do dono para agora + ttl (sem `--ttl`, o ttl da concessão) e renova o heartbeat, sem soltar a trava. Sem chaves: todas do dono (do grupo, com `--group`). Saída: `renewed <chave> until <hora>`; 13 para chave de outro; 14 para trava que já venceu. |
 | `jlock heartbeat <chave> --owner id` | renova; `lost` se a trava não é mais sua. (Para quem não usa `hold`.) |
 | `jlock status <chave>` | dono e fila da chave, inclusive conflitos por hierarquia (pasta acima ou arquivos dentro). |
 | `jlock list [--owner x] [--group g] [--under D:\proj] [--stale] [--json] [--watch]` | tudo que está travado na máquina: chave, dono, grupo, intenção, há quanto tempo, heartbeat, fila. `--watch` redesenha a cada segundo. |
@@ -190,8 +206,8 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | 10 | ocupado (ficou na fila; só com `--no-wait`) |
 | 11 | timeout esperando |
 | 12 | deadlock |
-| 13 | não é o dono (release/heartbeat) |
-| 14 | trava perdida (`hold`/`run` terminam com 14 se o dono descobriu `lost`) |
+| 13 | não é o dono (release/heartbeat/renew) |
+| 14 | trava perdida (`hold`/`run` terminam com 14 se o dono descobriu `lost`); **[rev. 6]** `renew` de uma trava que já passou do prazo |
 | 2 | uso incorreto (argumentos) |
 | 20 | erro de sistema de arquivos (permissão, disco cheio, arquivo preso); a mensagem traz o código do SO e o caminho |
 | 130 | **[rev. 4]** interrompido (CTRL+C/SIGINT/SIGTERM) durante a espera; a senha foi apagada antes de sair |
@@ -267,6 +283,23 @@ liberar as já obtidas e devolver qual faltou.
 
 Ler `holder.json`; `owner` diferente ou arquivo ausente → `lost`; senão renovar mtime (`set_file_times` para agora).
 
+### renew(key, owner, ttl) **[rev. 6]**
+
+Ler `holder.json`; `owner` diferente ou arquivo ausente → `not_owner` (13). Prazo efetivo já vencido → expirar
+como na varredura (`expired`, motivo `ttl`), registrar `lost` e responder 14: o que venceu não ressuscita. Senão,
+com `ttl` (o pedido, ou o `ttl_secs` da concessão), gravar `lease.json` com `until = agora + ttl` por `.tmp` +
+rename; renovar o mtime de `holder.json`; ler `holder.json` de novo e, se a concessão mudou nesse meio-tempo
+(outro `owner` ou outro `since`), responder `not_owner` (o `lease.json` nomeia a concessão antiga, então não
+vale para ninguém). Registrar `renew` com `until`; quem procura no log se a trava foi devolvida (o `hold`) pula
+os `renew`, que não mudam a posse. A pasta sumiu no meio (um `release` ganhou) → `not_owner`, sem erro; sem chaves,
+uma chave com erro de disco não impede as outras (o erro sai no fim, código 20). `holder.json` nunca é reescrito: a trava do SO de quem a
+mantém (`hold`/`run`) e o heartbeat seguem intactos, e a chave não fica livre em instante nenhum. Sem chaves,
+renova todas as travas do dono (só as do grupo, com `--group`).
+
+Prazo efetivo de uma trava, usado por `hold`, `run`, `heartbeat`, expiração, `status`, `list` e `doctor`: o
+`until` de `lease.json` quando ele é desta concessão; senão `since + ttl`; sem nenhum dos dois, não há prazo.
+Um `hold` iniciado por um jlock anterior à 0.2.0 não lê `lease.json` e termina no prazo antigo.
+
 ### release(key, owner)
 
 `owner` diferente → `not_owner`; senão apagar `holder.json`; se `queue/` vazia e `broken/` vazia → apagar `key`,
@@ -314,6 +347,7 @@ manda sozinho, como para travas de `acquire` puro, que nunca têm trava do SO.
 
 | Arquivo | Nasce | Morre | Se o responsável morrer | Pior sobra |
 |---|---|---|---|---|
+| `locks\<hash>\lease.json` **[rev. 6]** | no `renew` | junto com a pasta da chave (só então: enquanto `holder.json` passa por `broken/`, ele ainda vale) | ignorado (vale só para a concessão que nomeia) e sobrescrito no próximo `renew`; a varredura remove `lease.*.tmp` de quem morreu | até a pasta da chave sumir |
 | `locks\<hash>\holder.json` | na concessão | `release`, `force`, expiração | expira em STALE_MS; qualquer participante ou `gc` remove | 30 s + até a próxima chamada |
 | `queue\<senha>.json` | ao entrar na fila | concessão, timeout, desistência (pelo dono) | expira em STALE_MS; removida por quem passar ou `gc` | idem |
 | `broken\…` | só como alvo do rename | milissegundos depois (quem quebrou anota no log e apaga) | o `gc` anota e apaga | até a próxima varredura |
@@ -392,6 +426,10 @@ inexistente, log dentro do limite.
 12. Windows: `release` com `list --watch` lendo ao mesmo tempo; chaves com maiúsculas e barras invertidas
     normalizam igual; caminho relativo e absoluto para o mesmo arquivo dão a mesma chave.
 13. Normalização Linux/macOS: testes unitários puros de `normalize_key` por plataforma (sem processos).
+14. **[rev. 6]** `renew` (`tests/renew.rs`): um `hold --ttl 2s` renovado passa do prazo original sem `lost` e
+    termina no novo; sem `--ttl` vale o ttl da concessão; dono errado → 13 sem `lease.json`; prazo vencido → 14
+    e a chave livre; sem chaves, só as do dono (e do grupo); `lease.json` de outra concessão não segura nada;
+    `locks/` vazia no fim de cada caso.
 
 ---
 
@@ -481,6 +519,10 @@ macOS têm plano próprio em `docs/PLAN-LINUX-MACOS.md`.
    chamador no Windows) e sem herdar os handles padrão do primeiro, mantém a trava até `release`, `--ttl` ou
    `unlock --force`. Junto: o `release` do próprio dono encerra um `hold` com 0, sem registrar `lost` (o
    `hold` confere no fim do log se o último evento da chave é um `release` desse dono).
+11. **`jlock renew`** **[rev. 6]** (pedido do autor, 25/10/2026, ticket 19). O jtasks segura as travas de uma
+   tarefa com `--ttl` e tarefas passam de horas; o prazo vencia com o dono vivo, e pedir de novo não estendia
+   nada. Devolver e pegar de novo deixava a chave livre por um instante e, com `--detach`, um processo antigo
+   vivo a cada vez. `renew` adia o prazo no lugar, sem soltar a trava (seção 7, "renew").
 
 ### O que ficou para o CI ou para o autor
 

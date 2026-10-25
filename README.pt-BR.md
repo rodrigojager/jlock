@@ -141,6 +141,8 @@ Opções que vale conhecer:
   `--detach`; um programa que fica aberto usa `--release-on-eof`.
 - `--ttl 2h`: um limite de segurança. A trava some sozinha depois desse tempo, mesmo que o agente nunca a
   devolva.
+  Para um trabalho que pode demorar mais, `jlock renew --owner agent-7` adia esse prazo sem soltar a trava
+  em momento nenhum.
 
 Por que não o `jlock acquire` puro? Uma trava pega com `acquire` também sobrevive ao comando, mas precisa
 ser renovada (`jlock heartbeat`) pelo menos a cada 30 segundos, senão é tida como morta e expira. Um agente
@@ -273,7 +275,7 @@ deadlock entre si.
 | 11 | tempo esgotado (com `--timeout`) |
 | 12 | deadlock: o pedido fecharia um ciclo |
 | 13 | não é o dono |
-| 14 | trava perdida (`hold`/`run`) |
+| 14 | trava perdida (`hold`/`run`/`renew`) |
 | 20 | erro de sistema de arquivos; a mensagem traz o erro do SO |
 | 130 | interrompido (CTRL+C) durante a espera |
 

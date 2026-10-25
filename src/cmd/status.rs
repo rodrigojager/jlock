@@ -9,7 +9,7 @@ use crate::conflict::{conflicting_dirs, is_ancestor};
 use crate::expire;
 use crate::fsx;
 use crate::heartbeat::stale_after;
-use crate::holder::{now_micros, Holder};
+use crate::holder::{iso, now_micros, Holder};
 use crate::i18n::{t, txt, Text};
 use crate::index;
 use crate::key::{Key, Kind};
@@ -17,7 +17,6 @@ use crate::oslock;
 use crate::store::{KeyDir, Store};
 use serde_json::{json, Value};
 use std::io;
-use std::path::Path;
 
 /// `850ms`, `12s`, `3m05s`, `2h10m`, `3d4h`.
 pub fn human(ms: u64) -> String {
@@ -41,18 +40,26 @@ pub fn heartbeat_ms(path: &std::path::Path) -> Option<u64> {
 }
 
 /// `(dead, late)` for a holder. Dead: heartbeat older than STALE with no OS lock on the file, or
-/// past the ttl; the expiration will break it. Late: heartbeat older than STALE but a `hold`/`run`
+/// past its deadline (ttl or `renew`); the expiration will break it. Late: heartbeat older than STALE but a `hold`/`run`
 /// still has the OS lock, so the owner is alive and the lock stays (see `expire.rs`).
-pub fn liveness(holder_path: &Path, h: &Holder) -> (bool, bool) {
+pub fn liveness(kd: &KeyDir, h: &Holder) -> (bool, bool) {
+    let holder_path = kd.holder_path();
     let stale_ms = stale_after().as_millis() as u64;
-    let hb_stale = heartbeat_ms(holder_path).is_some_and(|ms| ms > stale_ms);
-    let late = hb_stale && oslock::is_held(holder_path);
-    ((hb_stale && !late) || h.ttl_expired(now_micros()), late)
+    let hb_stale = heartbeat_ms(&holder_path).is_some_and(|ms| ms > stale_ms);
+    let late = hb_stale && oslock::is_held(&holder_path);
+    let past = crate::lease::expired(kd, h, now_micros());
+    ((hb_stale && !late) || past, late)
+}
+
+/// When the lock expires (ISO time), `None` without a deadline.
+pub fn expires(kd: &KeyDir, h: &Holder) -> Option<String> {
+    crate::lease::deadline(kd, h).map(iso)
 }
 
 pub fn holder_json(kd: &KeyDir, h: &Holder) -> Value {
-    let (dead, late) = liveness(&kd.holder_path(), h);
+    let (dead, late) = liveness(kd, h);
     let mut v = json!(h);
+    v["expires"] = json!(expires(kd, h));
     v["held_ms"] = json!(ms_since(&h.since));
     v["heartbeat_ms"] = json!(heartbeat_ms(&kd.holder_path()));
     v["stale"] = json!(dead);
@@ -69,11 +76,15 @@ fn describe(kd: &KeyDir, h: &Holder) -> String {
     );
     if let Some(hb) = heartbeat_ms(&kd.holder_path()) {
         line += &t!("status.heartbeat", ago = human(hb));
-        match liveness(&kd.holder_path(), h) {
+        match liveness(kd, h) {
             (true, _) => line += &t!("status.dead"),
             (false, true) => line += &t!("status.late"),
             _ => {}
         }
+    }
+    if let Some(d) = crate::lease::deadline(kd, h) {
+        let left = d.saturating_sub(now_micros()) / 1000;
+        line += &t!("status.expires", left = human(left));
     }
     if let Some(g) = &h.group {
         line += &t!("status.group", group = g);

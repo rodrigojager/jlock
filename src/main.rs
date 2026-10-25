@@ -13,6 +13,7 @@ mod home;
 mod i18n;
 mod index;
 mod key;
+mod lease;
 mod log;
 mod oslock;
 mod queue;
@@ -32,6 +33,7 @@ mod cmd {
     pub mod hold;
     pub mod list;
     pub mod release;
+    pub mod renew;
     pub mod run;
     pub mod status;
     pub mod unlock;

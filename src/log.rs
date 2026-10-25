@@ -89,7 +89,9 @@ pub fn about(key: &str, owner: &str, group: Option<&str>) -> Value {
 }
 
 /// The last event logged about `key`, with the owner it names, read from the end of the log only
-/// (the last 64 KB, plenty for the moment just after something happened to the key).
+/// (the last 64 KB, plenty for the moment just after something happened to the key). `renew` does
+/// not change who holds the key, so it is passed over: a renew logged just after a release must
+/// not hide that release from the `hold` asking.
 pub fn last_about(key: &str) -> Option<(String, String)> {
     use std::io::{Read, Seek, SeekFrom};
     let root = ROOT.get()?;
@@ -102,7 +104,7 @@ pub fn last_about(key: &str) -> Option<(String, String)> {
     let text = String::from_utf8_lossy(&tail);
     text.lines().rev().find_map(|line| {
         let v: Value = serde_json::from_str(line).ok()?;
-        (v["key"].as_str() == Some(key)).then(|| {
+        (v["key"].as_str() == Some(key) && v["event"].as_str() != Some("renew")).then(|| {
             (
                 v["event"].as_str().unwrap_or("").to_string(),
                 v["owner"].as_str().unwrap_or("").to_string(),

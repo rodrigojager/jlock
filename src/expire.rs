@@ -1,5 +1,5 @@
 //! Expiration (plan 7.1 step 5): tickets and holders whose heartbeat is older than `STALE_MS`, or
-//! holders past `since + ttl`, are renamed into `broken/` (only one breaker wins the rename), read,
+//! holders past their deadline (`since + ttl`, or the one `renew` set), are renamed into `broken/` (only one breaker wins the rename), read,
 //! noted, and deleted.
 
 use crate::fsx;
@@ -23,10 +23,10 @@ pub struct Expired {
     pub body: Option<Holder>,
 }
 
-fn judge(body: Option<&Holder>, age_ok: bool) -> Option<&'static str> {
+fn judge(kd: &KeyDir, body: Option<&Holder>, age_ok: bool) -> Option<&'static str> {
     if !age_ok {
         Some("stale")
-    } else if body.is_some_and(|h| h.ttl_expired(now_micros())) {
+    } else if body.is_some_and(|h| crate::lease::expired(kd, h, now_micros())) {
         Some("ttl")
     } else {
         None
@@ -110,7 +110,7 @@ pub fn expire_holder(kd: &KeyDir) -> io::Result<Option<Expired>> {
         Err(e) => return Err(e),
     };
     let body = kd.read_holder()?;
-    let Some(reason) = judge(body.as_ref(), age <= stale_after()) else {
+    let Some(reason) = judge(kd, body.as_ref(), age <= stale_after()) else {
         return Ok(None);
     };
     // A late heartbeat is not death while a `hold`/`run` still has the OS lock: the kernel would
@@ -119,7 +119,7 @@ pub fn expire_holder(kd: &KeyDir) -> io::Result<Option<Expired>> {
         return Ok(None);
     }
     Ok(break_file(kd, &path, "expired.json", |b, age| {
-        judge(b, age <= stale_after()).is_none()
+        judge(kd, b, age <= stale_after()).is_none()
     })?
     .map(|body| Expired {
         what: "holder",

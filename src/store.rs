@@ -1,4 +1,5 @@
-//! The registry on disk (plan section 4): `locks/<sha1>/{key, holder.json, queue/, broken/}`.
+//! The registry on disk (plan section 4): `locks/<sha1>/{key, holder.json, lease.json, queue/,
+//! broken/}`.
 
 use crate::cli::{fs_error, usage, Failure};
 use crate::fsx;
@@ -61,6 +62,10 @@ impl KeyDir {
         self.path.join("holder.json")
     }
 
+    pub fn lease_path(&self) -> PathBuf {
+        self.path.join("lease.json")
+    }
+
     pub fn queue_dir(&self) -> PathBuf {
         self.path.join("queue")
     }
@@ -103,7 +108,10 @@ impl KeyDir {
     }
 
     /// Removes the key folder if nothing is in it any more: no holder, no ticket, nothing in `broken/`.
-    /// Losing a race with a newcomer is fine: `rmdir` fails with "not empty" and the folder stays.
+    /// The lease (and a `.tmp` of a renew that died) goes with it, only then: while the holder sits
+    /// in `broken/` for a moment its lease still counts, and a lease of an earlier grant is ignored
+    /// anyway. Losing a race with a newcomer is fine: `rmdir` fails with "not empty" and the folder
+    /// stays.
     pub fn cleanup(&self) -> io::Result<bool> {
         if self.holder_path().exists()
             || !dir_is_empty(&self.queue_dir())
@@ -111,10 +119,28 @@ impl KeyDir {
         {
             return Ok(false);
         }
+        fsx::remove_with_retry(&self.lease_path())?;
+        self.remove_lease_tmps()?;
         fsx::remove_with_retry(&self.key_file())?;
         fsx::rmdir_if_empty(&self.queue_dir())?;
         fsx::rmdir_if_empty(&self.broken_dir())?;
         fsx::rmdir_if_empty(&self.path)
+    }
+}
+
+impl KeyDir {
+    /// Removes the `.tmp` files left by renews in the folder.
+    fn remove_lease_tmps(&self) -> io::Result<()> {
+        let Ok(entries) = fs::read_dir(&self.path) else {
+            return Ok(());
+        };
+        for entry in entries.filter_map(|e| e.ok()) {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if name.starts_with("lease.") && name.ends_with(".tmp") {
+                fsx::remove_with_retry(&entry.path())?;
+            }
+        }
+        Ok(())
     }
 }
 

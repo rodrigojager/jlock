@@ -139,6 +139,8 @@ Options worth knowing:
   calls use `--detach`; a host that stays open uses `--release-on-eof`.
 - `--ttl 2h`: a safety limit. The lock goes away by itself after this long, even if the agent never
   releases it.
+  For work that may take longer, `jlock renew --owner agent-7` pushes it back without ever letting the
+  lock go.
 
 Why not plain `jlock acquire`? A lock taken with `acquire` also outlives the command, but it has to be
 renewed (`jlock heartbeat`) at least every 30 seconds, or it is taken for dead and expires. An agent spends
@@ -269,7 +271,7 @@ Several keys in one command are taken all or none, in a fixed order, so they nev
 | 11 | timeout (with `--timeout`) |
 | 12 | deadlock: the request would close a cycle |
 | 13 | not the owner |
-| 14 | lock lost (`hold`/`run`) |
+| 14 | lock lost (`hold`/`run`/`renew`) |
 | 20 | file system error; the message carries the OS error |
 | 130 | interrupted (CTRL+C) while waiting |
 

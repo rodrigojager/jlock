@@ -90,11 +90,11 @@ impl Holder {
         parse_iso(&self.since)
     }
 
-    /// `since + ttl` has passed.
-    pub fn ttl_expired(&self, now: u64) -> bool {
+    /// `since + ttl`, the deadline of the grant before any `renew` (see `lease.rs`).
+    pub fn ttl_deadline(&self) -> Option<u64> {
         match (self.ttl_secs, self.since_micros()) {
-            (Some(ttl), Some(since)) => now > since + ttl * 1_000_000,
-            _ => false,
+            (Some(ttl), Some(since)) => Some(since + ttl * 1_000_000),
+            _ => None,
         }
     }
 }
