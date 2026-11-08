@@ -69,8 +69,13 @@ pub fn sweep_key(kd: &KeyDir, report: &mut Report) -> io::Result<()> {
             _ => report.expired_tickets += 1,
         }
     }
+    // A gate older than STALE was left by a process that died while deciding: it goes.
+    let stale = stale_after();
+    if fsx::age(&kd.gate_path()).is_ok_and(|a| a > stale) && kd.break_gate(stale)? {
+        report.broken_consumed += 1;
+    }
     consume_broken(kd, report)?;
-    if kd.holder_path().exists() || !dir_is_empty(&kd.queue_dir()) {
+    if kd.has_holds() || !dir_is_empty(&kd.queue_dir()) {
         kd.ensure_key_file()?;
     }
     if kd.cleanup()? {
@@ -83,7 +88,7 @@ pub fn sweep_key(kd: &KeyDir, report: &mut Report) -> io::Result<()> {
 /// than STALE is debris from a crash and goes.
 fn sweep_unknown(dir: &Path, report: &mut Report) -> io::Result<()> {
     let old = |p: &Path| fsx::age(p).is_ok_and(|a| a > stale_after());
-    for sub in ["queue", "broken"] {
+    for sub in ["holds", "queue", "broken"] {
         if let Ok(entries) = fs::read_dir(dir.join(sub)) {
             for e in entries.filter_map(|e| e.ok()) {
                 if old(&e.path()) && fsx::remove_with_retry(&e.path())? {
@@ -93,15 +98,7 @@ fn sweep_unknown(dir: &Path, report: &mut Report) -> io::Result<()> {
         }
         fsx::rmdir_if_empty(&dir.join(sub))?;
     }
-    if let Ok(entries) = fs::read_dir(dir) {
-        for e in entries.filter_map(|e| e.ok()) {
-            let name = e.file_name().to_string_lossy().into_owned();
-            if name.starts_with("lease.") && name.ends_with(".tmp") && old(&e.path()) {
-                fsx::remove_with_retry(&e.path())?;
-            }
-        }
-    }
-    for file in ["holder.json", "lease.json", "key"] {
+    for file in ["gate", "key"] {
         let path = dir.join(file);
         if path.exists() && old(&path) {
             fsx::remove_with_retry(&path)?;

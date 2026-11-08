@@ -42,8 +42,9 @@ fn on_disk(env: &Env) -> BTreeMap<String, (Value, Vec<Value>)> {
     for dir in env.lock_dirs() {
         let dir = env.locks().join(dir);
         let key = std::fs::read_to_string(dir.join("key")).unwrap();
-        let owner = std::fs::read_to_string(dir.join("holder.json"))
-            .map(|t| serde_json::from_str::<Value>(&t).unwrap()["owner"].clone())
+        let owner = env
+            .holder_owner(&key)
+            .map(Value::from)
             .unwrap_or(Value::Null);
         let mut tickets: Vec<_> = std::fs::read_dir(dir.join("queue"))
             .map(|d| d.map(|e| e.unwrap().path()).collect())

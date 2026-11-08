@@ -1,11 +1,12 @@
-//! Reading the registry: every key folder under `locks/`, with its holder and queue. The folder is
+//! Reading the registry: every key folder under `locks/`, with its holds and queue. The folder is
 //! the truth; `index.json` is only derived from it for quick outside reading.
 
+use crate::conflict::Claim;
 use crate::fsx;
-use crate::holder::{iso, now_micros, Holder};
+use crate::holder::{iso, now_micros};
 use crate::key::{sha1_hex, Key};
 use crate::queue::{self, Ticket};
-use crate::store::{read_body, KeyDir, Store};
+use crate::store::{read_body, Hold, KeyDir, Store};
 use crate::wait::random_u64;
 use serde_json::{json, Value};
 use std::fs;
@@ -16,12 +17,34 @@ use std::time::Duration;
 
 pub struct KeyState {
     pub dir: KeyDir,
-    pub holder: Option<Holder>,
+    pub holds: Vec<Hold>,
     pub tickets: Vec<Ticket>,
 }
 
+impl KeyState {
+    pub fn busy(&self) -> bool {
+        !self.holds.is_empty() || !self.tickets.is_empty()
+    }
+
+    pub fn hold_claims(&self) -> impl Iterator<Item = Claim> + '_ {
+        self.holds.iter().map(|h| Claim {
+            key: self.dir.key.clone(),
+            id: h.grant.clone(),
+            body: h.body.clone(),
+        })
+    }
+
+    pub fn ticket_claims(&self) -> impl Iterator<Item = Claim> + '_ {
+        self.tickets.iter().map(|t| Claim {
+            key: self.dir.key.clone(),
+            id: t.name.clone(),
+            body: t.body.clone(),
+        })
+    }
+}
+
 /// The key a folder stands for: its `key` file, checked against the folder name; if missing (a
-/// cleanup raced with a newcomer), the `key` field of its holder or of any ticket.
+/// cleanup raced with a newcomer), the `key` field of any hold or ticket.
 pub fn key_of_dir(path: &Path) -> Option<Key> {
     let hash = path.file_name()?.to_string_lossy().into_owned();
     let matches = |text: &str| sha1_hex(text) == hash;
@@ -30,9 +53,16 @@ pub fn key_of_dir(path: &Path) -> Option<Key> {
             return Some(Key::from_text(&text));
         }
     }
-    let mut bodies = vec![path.join("holder.json")];
-    if let Ok(entries) = fs::read_dir(path.join("queue")) {
-        bodies.extend(entries.filter_map(|e| e.ok()).map(|e| e.path()));
+    let mut bodies = Vec::new();
+    for sub in ["holds", "queue"] {
+        if let Ok(entries) = fs::read_dir(path.join(sub)) {
+            bodies.extend(
+                entries
+                    .filter_map(|e| e.ok())
+                    .map(|e| e.path())
+                    .filter(|p| p.extension().is_some_and(|x| x == "json")),
+            );
+        }
     }
     bodies
         .iter()
@@ -41,9 +71,9 @@ pub fn key_of_dir(path: &Path) -> Option<Key> {
         .map(|h| Key::from_text(&h.key))
 }
 
-/// Every key folder whose key can be told. Folders that cannot are left to the sweep.
-pub fn dirs(store: &Store) -> io::Result<Vec<KeyDir>> {
-    let entries = match fs::read_dir(&store.locks) {
+/// Every key folder under `locks` whose key can be told. Folders that cannot are left to the sweep.
+pub fn dirs_in(locks: &Path) -> io::Result<Vec<KeyDir>> {
+    let entries = match fs::read_dir(locks) {
         Ok(entries) => entries,
         Err(e) if fsx::is_not_found(&e) => return Ok(Vec::new()),
         Err(e) => return Err(e),
@@ -62,17 +92,21 @@ pub fn dirs(store: &Store) -> io::Result<Vec<KeyDir>> {
     Ok(out)
 }
 
+pub fn dirs(store: &Store) -> io::Result<Vec<KeyDir>> {
+    dirs_in(&store.locks)
+}
+
 pub fn state(dir: KeyDir) -> io::Result<KeyState> {
-    let holder = dir.read_holder()?;
+    let holds = dir.read_holds()?;
     let tickets = queue::list(&dir)?;
     Ok(KeyState {
         dir,
-        holder,
+        holds,
         tickets,
     })
 }
 
-/// Holder and queue of every key, in key order.
+/// Holds and queue of every key, in key order.
 pub fn scan(store: &Store) -> io::Result<Vec<KeyState>> {
     dirs(store)?.into_iter().map(state).collect()
 }
@@ -80,17 +114,18 @@ pub fn scan(store: &Store) -> io::Result<Vec<KeyState>> {
 fn entries(states: &[KeyState]) -> Value {
     let locks: Vec<Value> = states
         .iter()
-        .filter(|st| st.holder.is_some() || !st.tickets.is_empty())
+        .filter(|st| st.busy())
         .map(|st| {
-            let h = st.holder.as_ref();
             json!({
                 "key": st.dir.key.text,
-                "owner": h.map(|h| h.owner.clone()),
-                "group": h.and_then(|h| h.group.clone()),
-                "intent": h.and_then(|h| h.intent.clone()),
-                "since": h.map(|h| h.since.clone()),
+                "holders": st.holds.iter().map(|h| json!({
+                    "owner": h.body.owner, "mode": h.body.mode, "group": h.body.group,
+                    "intent": h.body.intent, "since": h.body.since, "grant": h.grant,
+                    "parent": h.body.parent,
+                })).collect::<Vec<_>>(),
                 "queue": st.tickets.iter()
-                    .map(|t| json!({ "owner": t.body.owner, "since": t.body.since }))
+                    .map(|t| json!({ "owner": t.body.owner, "mode": t.body.mode,
+                                     "since": t.body.since }))
                     .collect::<Vec<_>>(),
             })
         })

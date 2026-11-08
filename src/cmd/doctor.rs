@@ -213,7 +213,7 @@ fn check_primitives(root: &Path, scratch: &mut Scratch) -> Check {
     }
 }
 
-/// (4) the operating system's lock, which `hold` and `run` keep on `holder.json`.
+/// (4) the operating system's lock, which `hold` and `run` keep on their hold files.
 fn check_oslock(root: &Path, scratch: &mut Scratch) -> Check {
     let file = scratch.file(root, "lock");
     if let Err(e) = fsx::create_exclusive(&file, b"lock") {
@@ -485,14 +485,14 @@ fn check_registry(root: &Path) -> Check {
         }
     }
     let states = index::scan(&store).unwrap_or_default();
-    let held = states.iter().filter(|s| s.holder.is_some()).count();
+    let held = states.iter().filter(|s| !s.holds.is_empty()).count();
     let queued = states.iter().filter(|s| !s.tickets.is_empty()).count();
     let dead = states
         .iter()
         .filter(|s| {
-            s.holder
-                .as_ref()
-                .is_some_and(|h| crate::cmd::status::liveness(&s.dir, h).0)
+            s.holds
+                .iter()
+                .any(|h| crate::cmd::status::liveness(&s.dir, h).0)
         })
         .count();
     let sweep = fs::read_to_string(root.join("last-sweep"))

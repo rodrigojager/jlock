@@ -46,9 +46,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
         }
         Beat::Lost(holder) => (holder, "lost"),
         Beat::TtlExpired => {
-            if let Ok(Some(e)) = expire::expire_holder(&kd) {
-                expire::note(&e);
-            }
+            let _ = expire::expire_key(&kd, None);
             let _ = kd.cleanup();
             (None, "ttl")
         }

@@ -223,6 +223,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "renew" => crate::cmd::renew::run(rest),
         "graph" => crate::cmd::graph::run(rest),
         "list" => crate::cmd::list::run(rest),
+        "resources" => crate::cmd::resources::run(rest),
         "unlock" => crate::cmd::unlock::run(rest),
         "gc" => crate::cmd::gc::run(rest),
         other => Err(crate::help::unknown_command(other)),

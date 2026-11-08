@@ -31,7 +31,7 @@ fn live_hold_keeps_the_os_lock_and_death_frees_it_at_once() {
     env.set("JLOCK_STALE_MS", "20000");
     let key = "name:os";
     let mut kid = hold(&env, key, "a");
-    let holder = env.key_dir(key).join("holder.json");
+    let holder = env.hold_files(key)[0].clone();
     assert_eq!(
         state(&holder),
         "busy",
@@ -62,7 +62,7 @@ fn renaming_the_held_file_is_not_blocked() {
     let mut kid = hold(&env, key, "a");
     let dir = env.key_dir(key);
     let moved = dir.join("moved.json");
-    std::fs::rename(dir.join("holder.json"), &moved).expect("rename while held");
+    std::fs::rename(&env.hold_files(key)[0], &moved).expect("rename while held");
     // The hold finds its lock gone at the next heartbeat.
     assert_eq!(kid.wait(SECS5), Some(14));
     std::fs::remove_file(&moved).unwrap();

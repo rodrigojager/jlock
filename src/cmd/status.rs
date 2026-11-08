@@ -1,20 +1,20 @@
-//! `jlock status <key>`: holder and queue of one key, and the keys that block it through the
-//! hierarchy (a folder above it, files inside it) or `*`.
+//! `jlock status <key>`: the holds (owner, mode, nesting) and queue of one key, and the keys that
+//! block it through the hierarchy (a folder above it, files inside it) or `*`.
 
 use crate::cli::{
     fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
 };
-use crate::cmd::acquire::normalize_keys;
+use crate::cmd::acquire::{check_resources, normalize_keys};
 use crate::conflict::{conflicting_dirs, is_ancestor};
 use crate::expire;
 use crate::fsx;
 use crate::heartbeat::stale_after;
-use crate::holder::{iso, now_micros, Holder};
+use crate::holder::{iso, now_micros};
 use crate::i18n::{t, txt, Text};
 use crate::index;
 use crate::key::{Key, Kind};
 use crate::oslock;
-use crate::store::{KeyDir, Store};
+use crate::store::{Hold, KeyDir, Store};
 use serde_json::{json, Value};
 use std::io;
 
@@ -39,50 +39,61 @@ pub fn heartbeat_ms(path: &std::path::Path) -> Option<u64> {
     fsx::age(path).ok().map(|d| d.as_millis() as u64)
 }
 
-/// `(dead, late)` for a holder. Dead: heartbeat older than STALE with no OS lock on the file, or
-/// past its deadline (ttl or `renew`); the expiration will break it. Late: heartbeat older than STALE but a `hold`/`run`
-/// still has the OS lock, so the owner is alive and the lock stays (see `expire.rs`).
-pub fn liveness(kd: &KeyDir, h: &Holder) -> (bool, bool) {
-    let holder_path = kd.holder_path();
+/// `(dead, late)` for a hold. Dead: heartbeat older than STALE with no OS lock on the file, past
+/// its deadline (ttl or `renew`), or nested in a hold that has ended; the expiration will break it.
+/// Late: heartbeat older than STALE but a `hold`/`run` still has the OS lock, so the owner is alive
+/// and the lock stays (see `expire.rs`).
+pub fn liveness(kd: &KeyDir, h: &Hold) -> (bool, bool) {
     let stale_ms = stale_after().as_millis() as u64;
-    let hb_stale = heartbeat_ms(&holder_path).is_some_and(|ms| ms > stale_ms);
-    let late = hb_stale && oslock::is_held(&holder_path);
+    let hb_stale = heartbeat_ms(&h.path).is_some_and(|ms| ms > stale_ms);
+    let late = hb_stale && oslock::is_held(&h.path);
     let past = crate::lease::expired(kd, h, now_micros());
-    ((hb_stale && !late) || past, late)
+    let orphan = crate::expire::parent_gone(kd, &h.body);
+    ((hb_stale && !late) || past || orphan, late)
 }
 
-/// When the lock expires (ISO time), `None` without a deadline.
-pub fn expires(kd: &KeyDir, h: &Holder) -> Option<String> {
+/// When the hold expires (ISO time), `None` without a deadline.
+pub fn expires(kd: &KeyDir, h: &Hold) -> Option<String> {
     crate::lease::deadline(kd, h).map(iso)
 }
 
-pub fn holder_json(kd: &KeyDir, h: &Holder) -> Value {
+/// A hold as `status --json` and `list --json` show it: the body (`owner`, `mode`, `parent`,
+/// `group`, ...) plus `grant`, `nested`, `expires`, `held_ms`, `heartbeat_ms`, `stale`, `late`.
+pub fn holder_json(kd: &KeyDir, h: &Hold) -> Value {
     let (dead, late) = liveness(kd, h);
-    let mut v = json!(h);
+    let mut v = json!(h.body);
+    v["grant"] = json!(h.grant);
+    v["nested"] = json!(h.body.parent.is_some());
+    v["parent"] = json!(h.body.parent);
     v["expires"] = json!(expires(kd, h));
-    v["held_ms"] = json!(ms_since(&h.since));
-    v["heartbeat_ms"] = json!(heartbeat_ms(&kd.holder_path()));
+    v["held_ms"] = json!(ms_since(&h.body.since));
+    v["heartbeat_ms"] = json!(heartbeat_ms(&h.path));
     v["stale"] = json!(dead);
     v["late"] = json!(late);
     v
 }
 
-fn describe(kd: &KeyDir, h: &Holder) -> String {
+fn describe(kd: &KeyDir, hold: &Hold) -> String {
+    let h = &hold.body;
     let mut line = t!(
         "status.by",
         owner = h.owner,
+        mode = h.mode,
         since = h.since,
         ago = human(ms_since(&h.since))
     );
-    if let Some(hb) = heartbeat_ms(&kd.holder_path()) {
+    if let Some(p) = &h.parent {
+        line += &t!("status.nested", owner = p.owner, key = p.key);
+    }
+    if let Some(hb) = heartbeat_ms(&hold.path) {
         line += &t!("status.heartbeat", ago = human(hb));
-        match liveness(kd, h) {
+        match liveness(kd, hold) {
             (true, _) => line += &t!("status.dead"),
             (false, true) => line += &t!("status.late"),
             _ => {}
         }
     }
-    if let Some(d) = crate::lease::deadline(kd, h) {
+    if let Some(d) = crate::lease::deadline(kd, hold) {
         let left = d.saturating_sub(now_micros()) / 1000;
         line += &t!("status.expires", left = human(left));
     }
@@ -95,6 +106,15 @@ fn describe(kd: &KeyDir, h: &Holder) -> String {
     line
 }
 
+/// `owner (mode)` of each hold, for the conflict lines.
+fn owners(holds: &[Hold]) -> String {
+    holds
+        .iter()
+        .map(|h| format!("{} ({})", h.body.owner, h.body.mode))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
     let kd = store.key_dir(&key);
     if kd.exists() {
@@ -103,12 +123,13 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
     }
     let st = index::state(store.key_dir(&key))?;
     let mut text = String::new();
-    match &st.holder {
-        Some(h) => {
-            text += &t!("status.held", key = key.text);
-            text += &format!("\n  {}\n", describe(&kd, h));
+    if st.holds.is_empty() {
+        text += &format!("{}\n", t!("status.free", key = key.text));
+    } else {
+        text += &format!("{}\n", t!("status.held", key = key.text));
+        for h in &st.holds {
+            text += &format!("  {}\n", describe(&kd, h));
         }
-        None => text += &format!("{}\n", t!("status.free", key = key.text)),
     }
     let mut queue = Vec::new();
     if !st.tickets.is_empty() {
@@ -122,12 +143,13 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
                 "status.queue_item",
                 position = i + 1,
                 owner = t.body.owner,
+                mode = t.body.mode,
                 time = human(waiting)
             )
         );
         queue.push(
-            json!({ "position": i + 1, "owner": t.body.owner, "since": t.body.since,
-                           "waiting_ms": waiting, "ticket": t.name }),
+            json!({ "position": i + 1, "owner": t.body.owner, "mode": t.body.mode,
+                           "since": t.body.since, "waiting_ms": waiting, "ticket": t.name }),
         );
     }
     let mut conflicts = Vec::new();
@@ -135,22 +157,21 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
     for cd in conflicting_dirs(store, &key)? {
         expire::expire_key(&cd, None)?;
         let cs = index::state(cd)?;
-        if cs.holder.is_none() && cs.tickets.is_empty() {
+        if !cs.busy() {
             continue;
         }
         if conflicts.is_empty() {
             text += &format!("{}\n", t!("status.conflicts"));
         }
         text += "  ";
-        match &cs.holder {
-            Some(h) => {
-                text += &t!(
-                    "status.conflict_held",
-                    key = cs.dir.key.text,
-                    owner = h.owner
-                )
-            }
-            None => text += &t!("status.conflict_free", key = cs.dir.key.text),
+        if cs.holds.is_empty() {
+            text += &t!("status.conflict_free", key = cs.dir.key.text);
+        } else {
+            text += &t!(
+                "status.conflict_held",
+                key = cs.dir.key.text,
+                owner = owners(&cs.holds)
+            );
         }
         if !cs.tickets.is_empty() {
             text += &crate::i18n::trn("status.conflict_waiting", cs.tickets.len() as u64, &[]);
@@ -166,9 +187,11 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
         if !reasons.contains(&why) {
             reasons.push(why);
         }
+        let holders: Vec<Value> = cs.holds.iter().map(|h| holder_json(&cs.dir, h)).collect();
         conflicts.push(json!({
             "key": cs.dir.key.text,
-            "holder": cs.holder.as_ref().map(|h| holder_json(&cs.dir, h)),
+            "holder": holders.first(),
+            "holders": holders,
             "queue": cs.tickets.len(),
         }));
     }
@@ -176,11 +199,13 @@ fn status(store: &Store, key: Key) -> io::Result<(String, Value)> {
     for why in reasons {
         text += &crate::help::wrap(&t!(why), "  ", "    ", crate::help::COLUMNS);
     }
+    let holders: Vec<Value> = st.holds.iter().map(|h| holder_json(&kd, h)).collect();
     let value = json!({
         "result": "ok",
         "key": key.text,
-        "state": if st.holder.is_some() { "held" } else { "free" },
-        "holder": st.holder.as_ref().map(|h| holder_json(&kd, h)),
+        "state": if holders.is_empty() { "free" } else { "held" },
+        "holder": holders.first(),
+        "holders": holders,
         "queue": queue,
         "conflicts": conflicts,
     });
@@ -201,7 +226,10 @@ pub fn run(args: Vec<String>) -> CmdResult {
         }
     }
     let input = input.ok_or_else(|| usage(txt!("error.status_needs")))?;
-    let key = normalize_keys(std::slice::from_ref(&input))?.remove(0);
+    // A resource is checked like when it is taken: a typo is refused, not reported as free.
+    let key = check_resources(normalize_keys(std::slice::from_ref(&input))?)?
+        .remove(0)
+        .0;
     let store = Store::open()?;
     let (text, value) = status(&store, key).map_err(|e| fs_error(Text::plain(&input), &e))?;
     if json {

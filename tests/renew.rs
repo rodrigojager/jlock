@@ -1,6 +1,6 @@
 //! `jlock renew` (ticket 19): the deadline of a live lock moves to now + ttl without the key ever
 //! being free; the wrong owner is refused, a lock already past its deadline expires, and a
-//! `lease.json` of another grant counts for nothing.
+//! lease (`holds/<grant>.lease`) that does not name the grant counts for nothing.
 mod common;
 
 use common::Env;
@@ -88,7 +88,7 @@ fn a_lock_without_a_deadline_only_gets_its_heartbeat() {
     let done = env.run(&["renew", key, "--owner", "a", "--json"]);
     assert_eq!(done.code, 0);
     assert!(done.json()["until"].is_null());
-    assert!(!env.key_dir(key).join("lease.json").exists());
+    assert!(env.lease_files(key).is_empty());
     assert_eq!(env.run(&["release", key, "--owner", "a"]).code, 0);
     assert!(env.lock_dirs().is_empty(), "{:?}", env.lock_dirs());
 }
@@ -106,7 +106,7 @@ fn wrong_owner_is_refused_and_an_expired_lock_is_lost() {
     assert_eq!(done.code, 13);
     assert_eq!(done.json()["result"], "not_owner");
     assert_eq!(done.json()["not_owner"][0]["holder"], "a");
-    assert!(!env.key_dir(key).join("lease.json").exists());
+    assert!(env.lease_files(key).is_empty());
     let free = env.run(&["renew", "name:nobody", "--owner", "a"]);
     assert_eq!(free.code, 13);
 
@@ -153,7 +153,7 @@ fn without_keys_every_lock_of_the_owner_and_only_of_the_group() {
         .collect();
     keys.sort();
     assert_eq!(keys, ["name:a1", "name:a2"]);
-    assert!(!env.key_dir("name:b1").join("lease.json").exists());
+    assert!(env.lease_files("name:b1").is_empty());
     let none = env.run(&["renew", "--owner", "nobody"]);
     assert_eq!((none.code, none.stdout.trim()), (0, "nothing to renew"));
     assert_eq!(env.run(&["renew"]).code, 2);
@@ -173,18 +173,20 @@ fn a_lease_of_another_grant_counts_for_nothing() {
         0
     );
     assert_eq!(env.run(&["renew", key, "--owner", "a"]).code, 0);
-    let lease = env.key_dir(key).join("lease.json");
-    let old = std::fs::read(&lease).unwrap();
+    let leases = env.lease_files(key);
+    assert_eq!(leases.len(), 1);
+    let old = std::fs::read(&leases[0]).unwrap();
     assert_eq!(env.run(&["release", key, "--owner", "a"]).code, 0);
     assert!(env.lock_dirs().is_empty(), "the lease went with the folder");
 
-    // The same owner takes it again with a short ttl; a lease left from the first grant (far in
-    // the future) must not keep the new one alive.
+    // The same owner takes it again with a short ttl; the lease of the first grant (far in the
+    // future), even put under the new grant's name, must not keep the new one alive.
     assert_eq!(
         env.run(&["acquire", key, "--no-wait", "--owner", "a", "--ttl", "1s"])
             .code,
         0
     );
+    let lease = env.hold_files(key)[0].with_extension("lease");
     std::fs::write(&lease, old).unwrap();
     sleep(Duration::from_millis(1300));
     let next = env.run(&["acquire", key, "--no-wait", "--owner", "b", "--json"]);

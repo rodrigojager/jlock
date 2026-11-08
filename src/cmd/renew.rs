@@ -1,6 +1,6 @@
 //! `jlock renew`: moves the deadline of a live lock to now + ttl and renews its heartbeat. The
-//! deadline goes to `lease.json` (see `lease.rs`); `holder.json` is only touched, so the key never
-//! becomes free and a `hold` keeping it goes on as before.
+//! deadline goes to `holds/<grant>.lease` (see `lease.rs`); the hold file is only touched, so the
+//! key never becomes free and a `hold` keeping it goes on as before.
 
 use crate::cli::{
     fs_error, parse_duration, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult,
@@ -14,7 +14,7 @@ use crate::holder::{iso, now_micros, Ident};
 use crate::i18n::{t, txt};
 use crate::index;
 use crate::lease::{self, Lease};
-use crate::store::{KeyDir, Store};
+use crate::store::{Hold, KeyDir, Store};
 use serde_json::json;
 use std::io;
 
@@ -26,66 +26,66 @@ pub enum Renewal {
     Lost,
 }
 
-/// Renews one key if `owner` holds it. `ttl` (seconds) overrides the ttl of the grant.
+/// Renews every hold `owner` has on one key. `ttl` (seconds) overrides the ttl of each grant.
 pub fn renew_key(kd: &KeyDir, owner: &str, ttl: Option<u64>) -> io::Result<Renewal> {
-    let h = match kd.read_holder()? {
-        Some(h) if h.owner == owner => h,
-        Some(h) => return Ok(Renewal::NotOwner(Some(h.owner))),
-        None => return Ok(Renewal::NotOwner(None)),
-    };
+    let holds = kd.read_holds()?;
+    let (mine, others): (Vec<Hold>, Vec<Hold>) =
+        holds.into_iter().partition(|h| h.body.owner == owner);
+    if mine.is_empty() {
+        return Ok(Renewal::NotOwner(
+            others.first().map(|h| h.body.owner.clone()),
+        ));
+    }
     let now = now_micros();
-    if lease::expired(kd, &h, now) {
-        if let Some(e) = expire::expire_holder(kd)? {
-            expire::note(&e);
-        }
+    if mine.iter().any(|h| lease::expired(kd, h, now)) {
+        let _ = expire::expire_key(kd, None);
         let _ = kd.cleanup();
-        let mut fields = crate::log::about(&kd.key.text, owner, h.group.as_deref());
+        let mut fields = crate::log::about(&kd.key.text, owner, mine[0].body.group.as_deref());
         fields["reason"] = json!("ttl");
         crate::log::event("lost", fields);
         return Ok(Renewal::Lost);
     }
-    let until = match ttl.or(h.ttl_secs) {
-        Some(secs) => {
-            let until = iso(now + secs * 1_000_000);
-            let body = Lease {
-                owner: owner.to_string(),
-                since: h.since.clone(),
-                until: until.clone(),
-            };
-            match lease::write(kd, &body) {
-                Ok(()) => {}
-                // Released and the folder removed meanwhile.
-                Err(e) if fsx::is_not_found(&e) => return Ok(gone(kd)),
-                Err(e) => return Err(e),
+    let mut last_until = None;
+    let mut renewed = 0;
+    for h in &mine {
+        let until = match ttl.or(h.body.ttl_secs) {
+            Some(secs) => {
+                let until = iso(now + secs * 1_000_000);
+                let body = Lease {
+                    owner: owner.to_string(),
+                    since: h.body.since.clone(),
+                    until: until.clone(),
+                };
+                match lease::write(kd, &h.grant, &body) {
+                    Ok(()) => {}
+                    // Released and the folder removed meanwhile.
+                    Err(e) if fsx::is_not_found(&e) => continue,
+                    Err(e) => return Err(e),
+                }
+                Some(until)
             }
-            Some(until)
+            None => None,
+        };
+        match fsx::touch(&h.path) {
+            Ok(()) => {}
+            Err(e) if fsx::is_not_found(&e) => {
+                // The grant ended between the read and the write: its lease counts for nobody.
+                let _ = kd.remove_lease(&h.grant);
+                continue;
+            }
+            Err(e) => return Err(e),
         }
-        None => None,
-    };
-    match fsx::touch(&kd.holder_path()) {
-        Ok(()) => {}
-        Err(e) if fsx::is_not_found(&e) => return Ok(gone(kd)),
-        Err(e) => return Err(e),
+        renewed += 1;
+        last_until = until.or(last_until);
     }
-    // The grant may have ended between the read and the write: the lease names it, so it counts for
-    // nobody else, and the folder's cleanup removes it.
-    match kd.read_holder()? {
-        Some(now) if now.owner == owner && now.since == h.since => {}
-        other => {
-            let _ = kd.cleanup();
-            return Ok(Renewal::NotOwner(other.map(|h| h.owner)));
-        }
+    if renewed == 0 {
+        let _ = kd.cleanup();
+        return Ok(Renewal::NotOwner(None));
     }
-    let mut fields = crate::log::about(&kd.key.text, owner, h.group.as_deref());
-    fields["until"] = json!(until);
+    let mut fields = crate::log::about(&kd.key.text, owner, mine[0].body.group.as_deref());
+    fields["until"] = json!(last_until);
     crate::log::event("renew", fields);
-    Ok(Renewal::Done(until))
-}
-
-/// The holder went away under us: a lease just written must not keep the folder alive.
-fn gone(kd: &KeyDir) -> Renewal {
-    let _ = kd.cleanup();
-    Renewal::NotOwner(None)
+    Ok(Renewal::Done(last_until))
 }
 
 pub fn run(args: Vec<String>) -> CmdResult {
@@ -123,8 +123,11 @@ pub fn run(args: Vec<String>) -> CmdResult {
             .map_err(failed)?
             .into_iter()
             .filter(|st| {
-                st.holder.as_ref().is_some_and(|h| {
-                    h.owner == owner && group.as_ref().is_none_or(|g| h.group.as_ref() == Some(g))
+                st.holds.iter().any(|h| {
+                    h.body.owner == owner
+                        && group
+                            .as_ref()
+                            .is_none_or(|g| h.body.group.as_ref() == Some(g))
                 })
             })
             .map(|st| st.dir)

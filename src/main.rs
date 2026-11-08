@@ -17,6 +17,7 @@ mod lease;
 mod log;
 mod oslock;
 mod queue;
+mod resources;
 mod selfreplace;
 mod sha256;
 mod store;
@@ -34,6 +35,7 @@ mod cmd {
     pub mod list;
     pub mod release;
     pub mod renew;
+    pub mod resources;
     pub mod run;
     pub mod status;
     pub mod unlock;

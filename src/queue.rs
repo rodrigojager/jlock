@@ -1,5 +1,6 @@
 //! Tickets: `queue/<micros-UTC-16-digits>-<4 hex>.json`, created with `create_new`. The file name
-//! orders the queue; the body is the same as `holder.json`; the mtime is the waiter's heartbeat.
+//! orders the queue; the body is the same as a hold's (with the mode asked for); the mtime is the
+//! waiter's heartbeat.
 
 use crate::fsx;
 use crate::holder::{now_micros, Holder};

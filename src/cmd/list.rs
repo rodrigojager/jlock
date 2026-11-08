@@ -1,10 +1,11 @@
-//! `jlock list`: everything locked on this machine, read from the folder (never the index).
+//! `jlock list`: everything locked on this machine, one line per hold (owner, mode, nesting), read
+//! from the folder (never the index).
 
 use crate::cli::{
     fs_error, print_json, unexpected_rest, unknown_option, usage, Arg, CmdResult, Parser, EXIT_OK,
 };
 use crate::cmd::acquire::normalize_keys;
-use crate::cmd::status::{expires, heartbeat_ms, human, liveness, ms_since};
+use crate::cmd::status::{heartbeat_ms, holder_json, human, ms_since};
 use crate::conflict::is_ancestor;
 use crate::heartbeat::stale_after;
 use crate::holder::now_micros;
@@ -28,16 +29,7 @@ struct Filters {
 
 fn row(st: &KeyState) -> Value {
     let stale_ms = stale_after().as_millis() as u64;
-    let holder = st.holder.as_ref().map(|h| {
-        let hb = heartbeat_ms(&st.dir.holder_path());
-        let (dead, late) = liveness(&st.dir, h);
-        json!({
-            "owner": h.owner, "group": h.group, "intent": h.intent, "meta": h.meta,
-            "pid": h.pid, "host": h.host, "cwd": h.cwd, "since": h.since, "ttl_secs": h.ttl_secs,
-            "expires": expires(&st.dir, h),
-            "held_ms": ms_since(&h.since), "heartbeat_ms": hb, "stale": dead, "late": late,
-        })
-    });
+    let holders: Vec<Value> = st.holds.iter().map(|h| holder_json(&st.dir, h)).collect();
     let queue: Vec<Value> = st
         .tickets
         .iter()
@@ -45,21 +37,23 @@ fn row(st: &KeyState) -> Value {
         .map(|(i, t)| {
             let hb = heartbeat_ms(&t.path);
             json!({
-                "position": i + 1, "owner": t.body.owner, "group": t.body.group,
-                "since": t.body.since, "waiting_ms": ms_since(&t.body.since),
+                "position": i + 1, "owner": t.body.owner, "mode": t.body.mode,
+                "group": t.body.group, "since": t.body.since,
+                "waiting_ms": ms_since(&t.body.since),
                 "heartbeat_ms": hb, "stale": hb.is_some_and(|ms| ms > stale_ms),
                 "ticket": t.name,
             })
         })
         .collect();
-    json!({ "key": st.dir.key.text, "holder": holder, "queue": queue })
+    json!({ "key": st.dir.key.text, "holder": holders.first(), "holders": holders,
+            "queue": queue })
 }
 
 fn keep(row: &Value, f: &Filters) -> bool {
-    let holder = &row["holder"];
+    let holders = row["holders"].as_array().map(Vec::as_slice).unwrap_or(&[]);
     let queue = row["queue"].as_array().map(Vec::as_slice).unwrap_or(&[]);
     let field_matches = |field: &str, want: &str| {
-        holder[field].as_str() == Some(want)
+        holders.iter().any(|h| h[field].as_str() == Some(want))
             || queue.iter().any(|t| t[field].as_str() == Some(want))
     };
     if f.owner.as_ref().is_some_and(|o| !field_matches("owner", o)) {
@@ -75,8 +69,8 @@ fn keep(row: &Value, f: &Filters) -> bool {
         }
     }
     if f.stale {
-        let dead =
-            holder["stale"] == json!(true) || queue.iter().any(|t| t["stale"] == json!(true));
+        let dead = holders.iter().any(|h| h["stale"] == json!(true))
+            || queue.iter().any(|t| t["stale"] == json!(true));
         if !dead {
             return false;
         }
@@ -87,7 +81,7 @@ fn keep(row: &Value, f: &Filters) -> bool {
 fn rows(store: &Store, f: &Filters) -> std::io::Result<Vec<Value>> {
     Ok(index::scan(store)?
         .iter()
-        .filter(|st| st.holder.is_some() || !st.tickets.is_empty())
+        .filter(|st| st.busy())
         .map(row)
         .filter(|r| keep(r, f))
         .collect())
@@ -101,6 +95,7 @@ fn table(rows: &[Value]) -> String {
     let text = |v: &Value| v.as_str().unwrap_or("-").to_string();
     let mut lines = vec![[
         "list.col_key",
+        "list.col_mode",
         "list.col_owner",
         "list.col_group",
         "list.col_intent",
@@ -109,26 +104,41 @@ fn table(rows: &[Value]) -> String {
         "list.col_queue",
     ]
     .map(|k| t!(k))];
+    let none = Value::Null;
     for r in rows {
-        let h = &r["holder"];
-        let mut beat = ms(&h["heartbeat_ms"]);
-        if h["stale"] == json!(true) {
-            beat += &t!("list.dead");
-        } else if h["late"] == json!(true) {
-            beat += &t!("list.late");
+        let holders = r["holders"].as_array().map(Vec::as_slice).unwrap_or(&[]);
+        let queue = r["queue"].as_array().map_or(0, Vec::len).to_string();
+        // One line per hold; a key with only a queue gets one line of dashes.
+        let each: Vec<&Value> = if holders.is_empty() {
+            vec![&none]
+        } else {
+            holders.iter().collect()
+        };
+        for (i, h) in each.into_iter().enumerate() {
+            let mut beat = ms(&h["heartbeat_ms"]);
+            if h["stale"] == json!(true) {
+                beat += &t!("list.dead");
+            } else if h["late"] == json!(true) {
+                beat += &t!("list.late");
+            }
+            let mut owner = text(&h["owner"]);
+            if h["nested"] == json!(true) {
+                owner += &t!("list.nested");
+            }
+            lines.push([
+                text(&r["key"]),
+                text(&h["mode"]),
+                owner,
+                text(&h["group"]),
+                text(&h["intent"]),
+                ms(&h["held_ms"]),
+                beat,
+                if i == 0 { queue.clone() } else { String::new() },
+            ]);
         }
-        lines.push([
-            text(&r["key"]),
-            text(&h["owner"]),
-            text(&h["group"]),
-            text(&h["intent"]),
-            ms(&h["held_ms"]),
-            beat,
-            r["queue"].as_array().map_or(0, Vec::len).to_string(),
-        ]);
     }
     // Columns are counted as the terminal shows them: CJK text takes two columns a character.
-    let widths: Vec<usize> = (0..7)
+    let widths: Vec<usize> = (0..8)
         .map(|c| lines.iter().map(|l| width(&l[c])).max().unwrap_or(0))
         .collect();
     let mut out = String::new();
@@ -142,7 +152,10 @@ fn table(rows: &[Value]) -> String {
         out += "\n";
     }
     // Footer: how many locks and waiters, then the legend of the marks that appear above.
-    let held = rows.iter().filter(|r| !r["holder"].is_null()).count() as u64;
+    let held: u64 = rows
+        .iter()
+        .map(|r| r["holders"].as_array().map_or(0, Vec::len) as u64)
+        .sum();
     let waiting: u64 = rows
         .iter()
         .map(|r| r["queue"].as_array().map_or(0, Vec::len) as u64)
@@ -152,12 +165,21 @@ fn table(rows: &[Value]) -> String {
         trn("list.footer_locks", held, &[]),
         trn("list.footer_waiting", waiting, &[])
     );
-    let marked = |field: &str| rows.iter().any(|r| r["holder"][field] == json!(true));
+    let marked = |field: &str| {
+        rows.iter().any(|r| {
+            r["holders"]
+                .as_array()
+                .is_some_and(|hs| hs.iter().any(|h| h[field] == json!(true)))
+        })
+    };
     if marked("stale") {
         out += &format!("{}\n", t!("list.legend_dead"));
     }
     if marked("late") {
         out += &format!("{}\n", t!("list.legend_late"));
+    }
+    if marked("nested") {
+        out += &format!("{}\n", t!("list.legend_nested"));
     }
     out
 }

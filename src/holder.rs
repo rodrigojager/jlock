@@ -1,4 +1,5 @@
-//! Body of `holder.json` and of the queue tickets (plan section 4), and the UTC clock helpers.
+//! Body of a hold (`holds/<grant>.json`) and of the queue tickets (plan section 4), the hold modes,
+//! and the UTC clock helpers.
 
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -20,10 +21,62 @@ impl Ident {
     }
 }
 
+/// How a key is held: `shared` holds of the same key coexist; `exclusive` conflicts with any other
+/// hold of a conflicting key (except the owner's own family, see `conflict.rs`). `Shared < Exclusive`:
+/// an exclusive hold covers a shared request of the same owner.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
+pub enum Mode {
+    Shared,
+    #[default]
+    Exclusive,
+}
+
+impl Mode {
+    pub fn parse(text: &str) -> Option<Mode> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "shared" => Some(Mode::Shared),
+            "exclusive" => Some(Mode::Exclusive),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Mode::Shared => "shared",
+            Mode::Exclusive => "exclusive",
+        }
+    }
+
+    /// Two holds of conflicting keys coexist only when both are shared.
+    pub fn compatible(self, other: Mode) -> bool {
+        self == Mode::Shared && other == Mode::Shared
+    }
+}
+
+impl std::fmt::Display for Mode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// The hold a nested hold lives inside: the hold of an ancestor owner that covered the key when it
+/// was granted. When that hold ends (release, expiry, force), the nested hold ends with it.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Parent {
+    pub owner: String,
+    pub key: String,
+    pub grant: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Holder {
     pub key: String,
     pub owner: String,
+    #[serde(default)]
+    pub mode: Mode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<Parent>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -43,10 +96,12 @@ pub struct Holder {
 }
 
 impl Holder {
-    pub fn new(key: &str, ident: &Ident) -> Holder {
+    pub fn new(key: &str, ident: &Ident, mode: Mode) -> Holder {
         Holder {
             key: key.to_string(),
             owner: ident.owner.clone(),
+            mode,
+            parent: None,
             group: ident.group.clone(),
             intent: ident.intent.clone(),
             meta: if ident.meta.is_empty() {
@@ -67,6 +122,9 @@ impl Holder {
         Holder {
             key: key.to_string(),
             owner: "?".into(),
+            // An unreadable body is taken for the strongest hold: it blocks until it is expired.
+            mode: Mode::Exclusive,
+            parent: None,
             group: None,
             intent: None,
             meta: None,

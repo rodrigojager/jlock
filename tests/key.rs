@@ -76,6 +76,49 @@ fn names_and_all() {
 }
 
 #[test]
+fn resources_are_their_own_kind() {
+    let k = normalize_for(" resource: Desktop ", "/", "/", Platform::Linux).unwrap();
+    assert_eq!(k.text, "resource:desktop");
+    assert_eq!(k.kind, Kind::Resource);
+    let k = normalize_for("resource:PORT: 8080 ", "d:/", "c:/", Platform::Windows).unwrap();
+    assert_eq!(k.text, "resource:port:8080", "the name folds, never a path");
+    // The argument keeps its case: it may be a name.
+    let k = normalize_for("resource:vm:Web-1", "/", "/", Platform::Linux).unwrap();
+    assert_eq!(k.text, "resource:vm:Web-1");
+    assert!(normalize_for("resource:", "/", "/", Platform::Linux).is_err());
+    assert!(normalize_for("resource:port:", "/", "/", Platform::Linux).is_err());
+}
+
+#[test]
+fn mode_suffix() {
+    use key::split_mode_suffix;
+    assert_eq!(
+        split_mode_suffix("src/a.ts@shared"),
+        ("src/a.ts", Some("shared"))
+    );
+    assert_eq!(
+        split_mode_suffix("resource:desktop@exclusive"),
+        ("resource:desktop", Some("exclusive"))
+    );
+    assert_eq!(
+        split_mode_suffix("node_modules/@types"),
+        ("node_modules/@types", None)
+    );
+    assert_eq!(split_mode_suffix("a@sharedx"), ("a@sharedx", None));
+    assert_eq!(split_mode_suffix("shared"), ("shared", None));
+}
+
+#[test]
+fn owners_are_paths() {
+    use key::check_owner;
+    assert!(check_owner("gt:run/T18/exec-1").is_ok());
+    assert!(check_owner("pid:123").is_ok());
+    for bad in ["a//b", "/a", "a/", " / "] {
+        assert!(check_owner(bad).is_err(), "{bad}");
+    }
+}
+
+#[test]
 fn hash_is_sha1_hex_of_text() {
     let k = normalize_for(r"D:\X\A.TS", "d:/", "c:/", Platform::Windows).unwrap();
     assert_eq!(k.hash, sha1_hex("d:/x/a.ts"));

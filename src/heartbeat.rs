@@ -1,4 +1,4 @@
-//! Heartbeat (plan decision 6): the mtime of `holder.json` or of a ticket, renewed every
+//! Heartbeat (plan decision 6): the mtime of a hold file or of a ticket, renewed every
 //! `JLOCK_HEARTBEAT_MS`; without renewal for `JLOCK_STALE_MS` the owner is taken for dead.
 
 use crate::fsx;
@@ -49,16 +49,29 @@ pub enum Beat {
     TtlExpired,
 }
 
-/// Renews `owner`'s lock on a key: reads the holder first; a different owner or no holder is `Lost`.
+/// Renews every hold of `owner` on a key. No hold of the owner is `Lost` (with the owner of the
+/// oldest other hold, if any).
 pub fn beat(kd: &KeyDir, owner: &str) -> io::Result<Beat> {
-    match kd.read_holder()? {
-        None => Ok(Beat::Lost(None)),
-        Some(h) if h.owner != owner => Ok(Beat::Lost(Some(h.owner))),
-        Some(h) if crate::lease::expired(kd, &h, now_micros()) => Ok(Beat::TtlExpired),
-        Some(_) => match fsx::touch(&kd.holder_path()) {
-            Ok(()) => Ok(Beat::Renewed),
-            Err(e) if fsx::is_not_found(&e) => Ok(Beat::Lost(None)),
-            Err(e) => Err(e),
-        },
+    let holds = kd.read_holds()?;
+    let mine: Vec<_> = holds.iter().filter(|h| h.body.owner == owner).collect();
+    if mine.is_empty() {
+        return Ok(Beat::Lost(holds.first().map(|h| h.body.owner.clone())));
     }
+    let now = now_micros();
+    if mine.iter().any(|h| crate::lease::expired(kd, h, now)) {
+        return Ok(Beat::TtlExpired);
+    }
+    let mut renewed = false;
+    for h in mine {
+        match fsx::touch(&h.path) {
+            Ok(()) => renewed = true,
+            Err(e) if fsx::is_not_found(&e) => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(if renewed {
+        Beat::Renewed
+    } else {
+        Beat::Lost(None)
+    })
 }

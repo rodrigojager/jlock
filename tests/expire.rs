@@ -83,7 +83,7 @@ fn hold_whose_lock_was_deleted_exits_14() {
     let key = "name:lost";
     let mut hold = env.spawn(&["hold", key, "--owner", "a"]);
     assert_eq!(hold.read_line(), format!("granted {key}"));
-    std::fs::remove_file(env.key_dir(key).join("holder.json")).unwrap();
+    std::fs::remove_file(&env.hold_files(key)[0]).unwrap();
     assert_eq!(hold.wait(SECS5), Some(14));
     assert_eq!(hold.read_line(), format!("lost {key}"));
 }

@@ -37,7 +37,15 @@ pub fn run(args: Vec<String>) -> CmdResult {
         };
         println!(
             "{}",
-            t!(how, from = e.from, to = e.to, key = e.key, holder = e.to)
+            t!(
+                how,
+                from = e.from,
+                to = e.to,
+                key = e.key,
+                holder = e.to,
+                mode = e.mode,
+                to_mode = e.to_mode
+            )
         );
     }
     if found.is_empty() {

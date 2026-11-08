@@ -3,7 +3,7 @@
 //! CTRL+C/SIGTERM, or the end of the process. A lost lock ends it with 14.
 
 use crate::cli::{fs_error, print_json, usage, CmdResult, EXIT_LOST, EXIT_OK};
-use crate::cmd::acquire::{acquire_all, normalize_keys, parse, report, SetOutcome};
+use crate::cmd::acquire::{acquire_all, parse, report, wants, SetOutcome};
 use crate::cmd::release::release_key;
 use crate::expire;
 use crate::heartbeat::{beat, heartbeat_interval, Beat};
@@ -33,32 +33,49 @@ pub struct Keeper<'a> {
     pub owner: String,
     pub json: bool,
     next: Instant,
-    /// The OS lock on each key's `holder.json`, freed by the kernel if this process dies.
+    /// The OS lock on the owner's hold files of each key, freed by the kernel if this process dies.
     os: Vec<(String, OsLock)>,
 }
 
-/// Takes the OS lock on a freshly granted `holder.json`. An expirer checking the lock may hold it
+/// Takes the OS lock on one freshly granted hold file. An expirer checking the lock may hold it
 /// for an instant, so a busy answer is retried briefly.
-fn os_lock(kd: &KeyDir, owner: &str) -> Option<OsLock> {
+fn os_lock_file(path: &std::path::Path) -> Option<OsLock> {
     for _ in 0..50 {
-        match oslock::try_lock(&kd.holder_path()) {
+        match oslock::try_lock(path) {
             Ok(Try::Locked(lock)) => return Some(lock),
             Ok(Try::Busy) => sleep(Duration::from_millis(10)),
             Ok(Try::Unsupported) | Err(_) => break,
         }
     }
-    let mut fields = crate::log::about(&kd.key.text, owner, None);
-    fields["reason"] = json!("oslock: unsupported");
-    crate::log::event("acquire", fields);
-    wait::debug(format!("oslock: unsupported on {}", kd.key.text));
     None
+}
+
+/// The OS locks on the owner's holds of one key.
+fn os_locks(kd: &KeyDir, owner: &str) -> Vec<OsLock> {
+    let locks: Vec<OsLock> = kd
+        .holds_of(owner)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|h| os_lock_file(&h.path))
+        .collect();
+    if locks.is_empty() {
+        let mut fields = crate::log::about(&kd.key.text, owner, None);
+        fields["reason"] = json!("oslock: unsupported");
+        crate::log::event("acquire", fields);
+        wait::debug(format!("oslock: unsupported on {}", kd.key.text));
+    }
+    locks
 }
 
 impl<'a> Keeper<'a> {
     pub fn new(store: &'a Store, keys: Vec<Key>, owner: &str, json: bool) -> Keeper<'a> {
         let os = keys
             .iter()
-            .filter_map(|k| os_lock(&store.key_dir(k), owner).map(|l| (k.text.clone(), l)))
+            .flat_map(|k| {
+                os_locks(&store.key_dir(k), owner)
+                    .into_iter()
+                    .map(|l| (k.text.clone(), l))
+            })
             .collect();
         Keeper {
             store,
@@ -79,7 +96,9 @@ impl<'a> Keeper<'a> {
         for key in &self.keys {
             match beat(&self.store.key_dir(key), &self.owner) {
                 Ok(Beat::Renewed) => {}
-                Ok(Beat::Lost(None)) if released_by(&key.text, &self.owner) => {
+                // Other holders may remain (shared holds, the owner's family): only the log says
+                // whether the owner itself gave it back.
+                Ok(Beat::Lost(_)) if released_by(&key.text, &self.owner) => {
                     return Some(Trouble::Released { key: key.clone() })
                 }
                 Ok(Beat::Lost(holder)) => {
@@ -119,9 +138,7 @@ impl<'a> Keeper<'a> {
             Trouble::Released { key } => (key, None, "released"),
             Trouble::Ttl { key } => {
                 let kd = self.store.key_dir(key);
-                if let Ok(Some(e)) = expire::expire_holder(&kd) {
-                    expire::note(&e);
-                }
+                let _ = expire::expire_key(&kd, None);
                 let _ = kd.cleanup();
                 (key, None, "ttl")
             }
@@ -158,9 +175,9 @@ impl<'a> Keeper<'a> {
 /// expired? The log tells; it is written right after the file goes, so it is read a few times.
 fn released_by(key: &str, owner: &str) -> bool {
     for _ in 0..10 {
-        match crate::log::last_about(key) {
-            Some((event, who)) if event == "release" && who == owner => return true,
-            Some((event, _)) if event == "forced" || event == "expired" => return false,
+        match crate::log::last_about(key, owner).as_deref() {
+            Some("release") => return true,
+            Some("forced") | Some("expired") => return false,
             _ => sleep(Duration::from_millis(20)),
         }
     }
@@ -198,22 +215,22 @@ pub fn run(args: Vec<String>) -> CmdResult {
     }
     let child = crate::detach::is_child();
     if opts.detach && !child {
-        normalize_keys(&opts.keys)?; // bad keys are refused here, not in the second process
+        wants(&opts)?; // bad keys are refused here, not in the second process
         return crate::detach::start(original);
     }
     wait::install_interrupt_handler();
     watch_stdin(opts.release_on_eof);
-    let keys = normalize_keys(&opts.keys)?;
+    let wants = wants(&opts)?;
     let store = Store::open()?;
     let deadline = opts.timeout.map(|t| Instant::now() + t);
-    let outcome = acquire_all(&store, &keys, &opts.ident, opts.wait, deadline)
+    let outcome = acquire_all(&store, &wants, &opts.ident, opts.wait, deadline)
         .map_err(|e| fs_error(txt!("error.cannot_lock"), &e))?;
-    let SetOutcome::Granted { keys, .. } = &outcome else {
-        return Ok(report(&opts, &outcome));
-    };
+    if !matches!(outcome, SetOutcome::Granted { .. }) {
+        return Ok(report(&opts, &wants, &outcome));
+    }
     // The OS locks are in place before anyone is told the keys are held.
-    let mut keeper = Keeper::new(&store, keys.clone(), &opts.ident.owner, opts.json);
-    report(&opts, &outcome);
+    let mut keeper = Keeper::new(&store, outcome.keys(), &opts.ident.owner, opts.json);
+    report(&opts, &wants, &outcome);
     let _ = crate::index::rewrite(&store);
     if child {
         crate::detach::ready();

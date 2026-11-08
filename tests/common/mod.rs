@@ -116,11 +116,54 @@ impl Env {
         self.locks().join(sha1_hex(text))
     }
 
-    /// Owner written in the key's `holder.json`, if any.
+    /// The hold files of a key (`holds/<grant>.json`), in grant order.
+    pub fn hold_files(&self, text: &str) -> Vec<PathBuf> {
+        let mut files: Vec<PathBuf> = std::fs::read_dir(self.key_dir(text).join("holds"))
+            .map(|d| {
+                d.filter_map(|e| e.ok())
+                    .map(|e| e.path())
+                    .filter(|p| p.extension().is_some_and(|x| x == "json"))
+                    .collect()
+            })
+            .unwrap_or_default();
+        files.sort();
+        files
+    }
+
+    /// The bodies of the key's holds, in grant order (files that vanish while read are skipped).
+    pub fn holds(&self, text: &str) -> Vec<serde_json::Value> {
+        self.hold_files(text)
+            .iter()
+            .filter_map(|p| std::fs::read_to_string(p).ok())
+            .filter_map(|b| serde_json::from_str(&b).ok())
+            .collect()
+    }
+
+    /// The lease files of a key (`holds/<grant>.lease`).
+    pub fn lease_files(&self, text: &str) -> Vec<PathBuf> {
+        std::fs::read_dir(self.key_dir(text).join("holds"))
+            .map(|d| {
+                d.filter_map(|e| e.ok())
+                    .map(|e| e.path())
+                    .filter(|p| p.extension().is_some_and(|x| x == "lease"))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Owner of the key's oldest hold, if any.
     pub fn holder_owner(&self, text: &str) -> Option<String> {
-        let body = std::fs::read_to_string(self.key_dir(text).join("holder.json")).ok()?;
-        let v: serde_json::Value = serde_json::from_str(&body).ok()?;
-        v["owner"].as_str().map(str::to_string)
+        self.holds(text)
+            .first()
+            .and_then(|v| v["owner"].as_str().map(str::to_string))
+    }
+
+    /// Owners of every hold of the key, in grant order.
+    pub fn holder_owners(&self, text: &str) -> Vec<String> {
+        self.holds(text)
+            .iter()
+            .filter_map(|v| v["owner"].as_str().map(str::to_string))
+            .collect()
     }
 
     /// Number of tickets in the key's queue.

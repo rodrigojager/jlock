@@ -2,7 +2,7 @@
 //! while renewing the heartbeat, releases at the end and passes the command's exit code through.
 
 use crate::cli::{fs_error, usage, CmdResult, Failure, EXIT_LOST, EXIT_USAGE};
-use crate::cmd::acquire::{acquire_all, normalize_keys, parse, report, SetOutcome};
+use crate::cmd::acquire::{acquire_all, parse, report, wants, SetOutcome};
 use crate::cmd::hold::Keeper;
 use crate::i18n::txt;
 use crate::store::Store;
@@ -29,16 +29,16 @@ pub fn run(args: Vec<String>) -> CmdResult {
     }
     // CTRL+C reaches the command too; jlock keeps the lock until the command is gone.
     wait::install_interrupt_handler();
-    let keys = normalize_keys(&opts.keys)?;
+    let wants = wants(&opts)?;
     let store = Store::open()?;
     let deadline = opts.timeout.map(|t| Instant::now() + t);
-    let outcome = acquire_all(&store, &keys, &opts.ident, opts.wait, deadline)
+    let outcome = acquire_all(&store, &wants, &opts.ident, opts.wait, deadline)
         .map_err(|e| fs_error(txt!("error.cannot_lock"), &e))?;
-    let SetOutcome::Granted { keys, .. } = outcome else {
-        return Ok(report(&opts, &outcome));
-    };
+    if !matches!(outcome, SetOutcome::Granted { .. }) {
+        return Ok(report(&opts, &wants, &outcome));
+    }
     let _ = crate::index::rewrite(&store);
-    let mut keeper = Keeper::new(&store, keys, &opts.ident.owner, opts.json);
+    let mut keeper = Keeper::new(&store, outcome.keys(), &opts.ident.owner, opts.json);
     let mut child = match Command::new(&command[0]).args(&command[1..]).spawn() {
         Ok(child) => child,
         Err(e) => {

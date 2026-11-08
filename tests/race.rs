@@ -41,10 +41,9 @@ fn twelve_racers_exactly_one_winner_per_round() {
         assert_eq!(losers, RACERS - 1, "round {round}");
         let winner = winners[0].clone();
 
-        let dir = env.key_dir(key);
-        let holder: serde_json::Value =
-            serde_json::from_str(&std::fs::read_to_string(dir.join("holder.json")).unwrap())
-                .unwrap();
+        let holds = env.holds(key);
+        assert_eq!(holds.len(), 1, "round {round}: {holds:?}");
+        let holder = holds[0].clone();
         assert_eq!(holder["owner"], winner.as_str());
         assert_eq!(holder["key"], key);
         for (owner, out) in &results {

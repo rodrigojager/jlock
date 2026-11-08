@@ -1,4 +1,5 @@
-//! Key normalization (plan section 5). Pure string work: nothing here touches the disk.
+//! Key normalization (plan section 5), the per-key mode suffix and the owner path check. Pure
+//! string work: nothing here touches the disk.
 
 use sha1::{Digest, Sha1};
 
@@ -6,7 +7,50 @@ use sha1::{Digest, Sha1};
 pub enum Kind {
     Path,
     Name,
+    /// `resource:<name>[:<arg>]`, a resource of the catalogue (`resources.rs`).
+    Resource,
     All,
+}
+
+/// The per-key mode suffix: `src/a.ts@shared`, `resource:desktop@exclusive`. Returns the key without
+/// it and the mode word. Only these two exact words count, so any other `@` stays in the key.
+pub fn split_mode_suffix(input: &str) -> (&str, Option<&'static str>) {
+    let trimmed = input.trim_end();
+    for word in ["shared", "exclusive"] {
+        if let Some(rest) = trimmed.strip_suffix(word) {
+            if let Some(key) = rest.strip_suffix('@') {
+                return (key, Some(word));
+            }
+        }
+    }
+    (input, None)
+}
+
+/// An owner is a path of segments separated by `/` (`gt:run/T18/exec-1`): no empty segment, no
+/// leading or trailing `/`. An error is a catalog key.
+pub fn check_owner(owner: &str) -> Result<(), String> {
+    if owner.split('/').any(|seg| seg.trim().is_empty()) {
+        return Err("error.owner_path".into());
+    }
+    Ok(())
+}
+
+/// Normalizes `resource:<name>[:<arg>]` (the part after `resource:`): the name in lower case, both
+/// parts trimmed. Whether the name exists and takes an argument is checked against the catalogue
+/// by the caller.
+fn normalize_resource(rest: &str) -> Result<String, String> {
+    let (name, arg) = match rest.split_once(':') {
+        Some((n, a)) => (n.trim().to_ascii_lowercase(), Some(a.trim())),
+        None => (rest.trim().to_ascii_lowercase(), None),
+    };
+    if name.is_empty() {
+        return Err("error.empty_resource".into());
+    }
+    match arg {
+        Some("") => Err("error.empty_resource_arg".into()),
+        Some(a) => Ok(format!("resource:{name}:{a}")),
+        None => Ok(format!("resource:{name}")),
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,6 +90,8 @@ impl Key {
             Kind::All
         } else if text.starts_with("name:") {
             Kind::Name
+        } else if text.starts_with("resource:") {
+            Kind::Resource
         } else {
             Kind::Path
         };
@@ -63,7 +109,8 @@ pub fn sha1_hex(text: &str) -> String {
 }
 
 /// Normalizes a key given on the command line, relative to `cwd`, for the running system. An error
-/// is a catalog key (`error.empty_key`, `error.empty_name`), turned into text by the caller.
+/// is a catalog key (`error.empty_key`, `error.empty_name`, `error.empty_resource`...), turned into
+/// text by the caller.
 pub fn normalize(input: &str, cwd: &std::path::Path) -> Result<Key, String> {
     let home =
         std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).unwrap_or_default();
@@ -90,6 +137,9 @@ pub fn normalize_for(
             return Err("error.empty_name".into());
         }
         return Ok(Key::from_text(&format!("name:{name}")));
+    }
+    if let Some(rest) = input.strip_prefix("resource:") {
+        return normalize_resource(rest).map(|text| Key::from_text(&text));
     }
     let path = normalize_path(input, cwd, home, platform);
     Ok(Key::from_text(&path))
