@@ -43,7 +43,10 @@ for example by putting the number after a noun ("waiting: {n}").
 
 ### What is never translated
 
-- Command and option names (`acquire`, `--no-wait`), `name:`, `*`, and the `JLOCK_*` variables.
+- Command and option names (`acquire`, `--no-wait`), `name:`, `resource:`, `*`, and the `JLOCK_*`
+  variables.
+- The mode values `shared` and `exclusive` where they are typed or filled in (`--mode shared`,
+  `@shared`, the `{mode}` marker), and resource names (`resource:desktop`).
 - Everything printed with `--json`, the lines of `log.jsonl`, `index.json` and the exit codes: they are
   the interface for scripts and stay the same in every language.
 - File names (`holder.json`, `log.jsonl`) and the result words of the JSON (`granted`, `queued`) when a

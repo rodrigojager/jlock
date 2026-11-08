@@ -116,3 +116,24 @@ implementation and why.
 - **Done instead:** `--version` prints `JLOCK_FAKE_VERSION` when it is set **and** the binary is a debug
   build (the one `cargo test` runs). Release builds ignore it, so the version a user sees is always the
   real one.
+
+## 14. 0.3: one file per hold, decided under a gate (owners, modes, resources)
+
+- **What:** plan decision 4 rested on one `holder.json` per key, created with `create_new`: consult and
+  register in one atomic step. Shared holds and nested holds of one family need several holds per key.
+- **Done instead:** `holds/<grant>.json`, one file per hold. Decisions about one key are serialized by a
+  `gate` file (`create_new`, deleted at once; one older than `JLOCK_STALE_MS` was left by a dead process
+  and is broken), so two simultaneous requests for one key still have exactly one winner. Across keys the
+  0.1 protocol stays: create, then re-read the conflicting keys and withdraw on a clash. The lease moved
+  to `holds/<grant>.lease`. Not compatible with the 0.2 layout (the author waived compatibility).
+- **Decisions where the request left a choice:** an ancestor asking for a key held only by its
+  descendants is granted (not nested); a request covered by its own family skips the queue (otherwise a
+  sibling waiting for the parent would deadlock it); the nearest covering ancestor is the parent; a
+  descendant's wait counts as its ancestors' wait in the waits-for graph (may refuse a request whose
+  ancestor would not actually have waited for its child; accepted, since a task waits for its commands);
+  same-owner shared then exclusive is an upgrade that adds a second hold; the per-key mode suffix is
+  `@shared`/`@exclusive` (only these exact words, so `node_modules/@types` stays a path); built-in
+  resources `audio`, `browser`, `clipboard`, `desktop`, `gpu`, `machine`, `network`, `port:<n>`, all
+  exclusive by default (`machine` too: a benchmark that forgets the mode must not silently share); the
+  user catalogue is `<JLOCK_HOME>/resources.json`; `*` stays, for emergencies. Details: `docs/USAGE.md`,
+  `docs/API-0.3.md`.

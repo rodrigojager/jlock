@@ -50,6 +50,20 @@ first tagged release (the one-line installers and `jlock update` need a publishe
    enough, install, five-minute tour, agent/script/human paths, how it works, guarantees and limits. Examples
    in the READMEs are re-executed by a test so they never lie.
 
+## Done (unreleased): 0.3, "families, readers and resources"
+
+Asked for by the first user (jtasks), whose tasks deadlocked with the commands they started, could only
+ask for a quiet machine with `*`, and had free-text names collide:
+
+1. **Hierarchical owners.** Owners are `/` paths; an owner's family never blocks it; a key covered by an
+   ancestor's hold is granted at once as a nested hold that ends with it.
+2. **Shared and exclusive modes**, with a fair queue (no writer starvation).
+3. **Registered resources**: `resource:` keys checked against a built-in catalogue and a user file;
+   `jlock resources`.
+
+The on-disk layout changed (one file per hold) and is not compatible with 0.2. Details: `CHANGELOG.md`,
+`docs/USAGE.md`, `docs/API-0.3.md`.
+
 ## Then: Linux and macOS hardening
 
 The code compiles for Unix and the design is portable, but it has only ever run on Windows. Plan:

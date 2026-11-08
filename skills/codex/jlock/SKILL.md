@@ -5,8 +5,9 @@ description: Take turns with other agents, scripts and people on this machine by
 
 # jlock: locks for files, folders and names
 
-`jlock` gives one owner at a time a lock on a key: a file, a folder (which covers everything inside it)
-or a name such as `name:port-3000`. Others who ask wait in line, in order of arrival. Locks of processes
+`jlock` gives one owner at a time a lock on a key: a file, a folder (which covers everything inside it),
+a registered resource such as `resource:port:3000` or `resource:desktop`, or a free name such as
+`name:deploy`. Locks can also be shared, for readers. Others who ask wait in line, in order of arrival. Locks of processes
 that died are recovered by themselves. The locks are advisory: they only protect against programs that
 also use jlock, so take them every time, even when you think you are alone.
 
@@ -100,20 +101,37 @@ exits with the command's own exit code:
 
 ```
 jlock run name:build --owner codex:k7f2 --timeout 10m -- cargo build --release
-jlock run name:port-3000 --owner codex:k7f2 --no-wait -- npm run dev
+jlock run resource:port:3000 --owner codex:k7f2 --no-wait -- npm run dev
 jlock run name:db-migrations --owner codex:k7f2 -- ./migrate.sh
 ```
 
-Everything after `--` belongs to the command. Use a `name:` key for anything that is not a file: ports,
-databases, deploy targets, a shared test environment. Everyone has to use the same name.
+Everything after `--` belongs to the command. For things that are not files, use a registered resource
+when there is one (`jlock resources` lists them: `resource:port:<n>`, `resource:desktop` for the real
+mouse and keyboard, `resource:clipboard`, `resource:browser`, `resource:machine`...); a misspelled
+resource is refused with a suggestion. Otherwise use a `name:` key (databases, deploy targets, a shared
+test environment); everyone has to use the same name. Never take `*` to get a quiet machine: take
+`resource:machine` (exclusive) instead, and take it `@shared` for heavy jobs such as full test suites.
+
+## Reading only, and commands you start for your task
+
+- If you only read a file or run something that must not see it change, take it shared:
+  `--mode shared`, or `src/auth.rs@shared` for one key. Shared locks coexist; an exclusive one waits for
+  them.
+- Owners are paths. A command you start for your task can take the task's files again under a child
+  owner and is granted at once, nested in your lock, while other agents still wait:
+  `jlock run src/auth.rs --owner codex:k7f2/test -- cargo test`. When you release your task's
+  locks, the nested ones end too. Do not use `/` in your own owner for anything else.
 
 ## Keys
 
 | Key | Means | Conflicts with |
 |---|---|---|
 | a path: `src/auth.rs`, `D:\proj\dist`, `.` | that file or folder; relative to the current folder; it does not have to exist | the same path, everything inside it, every folder above it, and `*` |
-| `name:<text>` | anything that is not a file | the same name and `*` |
-| `*` | everything | every key |
+| `resource:<name>[:<arg>]` | a registered resource (`jlock resources`): `resource:desktop`, `resource:port:3000` | the same resource and argument, and `*` |
+| `name:<text>` | anything else, by a name everyone agrees on | the same name and `*` |
+| `*` | everything (emergencies only) | every key |
+
+Add `@shared` to a key (or `--mode shared` to the command) to share it with other readers.
 
 ## Reading the answers
 

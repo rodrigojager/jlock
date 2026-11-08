@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 — unreleased
+
+- **Owners are paths** (`gt:run/T18/exec-1`). An owner, its ancestors and its descendants never block
+  each other. A key covered by an ancestor's hold (the key itself, a folder above it, or `*`) is granted
+  at once as a *nested* hold, without queueing, and ends when that hold ends (release, ttl, death,
+  `unlock --force`); an ancestor is granted a key whose only other holders are its descendants. A
+  descendant's wait counts as its ancestors' wait in deadlock detection. Fixes a task deadlocking with
+  the commands it starts. Owners with an empty part or a `/` at either end are refused.
+- **Shared and exclusive modes**: `--mode shared|exclusive` on `acquire`, `hold`, `run`, or per key with
+  `@shared`/`@exclusive`. Shared holds coexist; path hierarchy conflicts apply across modes; an
+  exclusive waiter is never starved by later shared requests.
+- **`resource:<name>[:<arg>]` keys** checked against a catalogue: built-in `audio`, `browser`,
+  `clipboard`, `desktop`, `gpu`, `machine`, `network`, `port:<n>`, plus your own in
+  `<JLOCK_HOME>/resources.json`. Unknown names are refused with a "did you mean". New command
+  `jlock resources`. `resource:machine` exclusive is the way to ask for a quiet machine; `*` stays for
+  emergencies.
+- `status`, `list`, `graph`, `index.json`, the log and `--json` show modes, every hold of a key
+  (`holders`) and nesting (`nested`, `parent`); `acquire --json` adds `locks`; busy/timeout add
+  `holders` and `mode`. `list` has a MODE column and one line per hold. See `docs/API-0.3.md`.
+- **New on-disk layout, not compatible with 0.2**: one file per hold (`holds/<grant>.json`, its lease in
+  `holds/<grant>.lease`), decided under a short-lived `gate` file. Let every 0.2 lock go before
+  upgrading. Ticket and grant names end in five digits.
+
 ## 0.2.0 — 2026-10-25
 
 - New command `jlock renew [<key...>] [--owner id] [--group g] [--ttl 2h]`: pushes the deadline (`--ttl`) of

@@ -19,6 +19,14 @@ Revisão 5, 24/10/2026: a fase 2 da seção 14 (idiomas, help didático, `about`
 entram nas tabelas da seção 6. Os pontos estão marcados com **[rev. 5]**.
 Revisão 6, 25/10/2026: `jlock renew` (ticket 19) estende o prazo (`ttl`) de uma trava viva sem soltá-la; o prazo
 novo fica em `lease.json`, ao lado de `holder.json`. Os pontos estão marcados com **[rev. 6]**.
+Revisão 7, 08/11/2026 (0.3): donos hierárquicos (caminhos com `/`; a família de um dono nunca o bloqueia;
+chave coberta por posse de um ancestral é concedida na hora como posse aninhada, que acaba com a do pai),
+modos `shared`/`exclusive` (`--mode`, sufixo `@shared`) com fila justa sem fome de escritor, e chaves
+`resource:` verificadas contra um catálogo (embutido + `<JLOCK_HOME>/resources.json`; `jlock resources`).
+O layout em disco muda: `holds/<grant>.json` (uma por posse) e `holds/<grant>.lease`, decididos sob um
+arquivo `gate` de vida curta, no lugar de `holder.json`/`lease.json`; sem compatibilidade com a 0.2.
+Onde as seções abaixo falam de `holder.json`, leia-se "o arquivo da posse". A referência atualizada está
+em `docs/USAGE.md` e `docs/API-0.3.md`; o porquê em `docs/DEVIATIONS.md` §14.
 
 ---
 
