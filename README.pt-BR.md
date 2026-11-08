@@ -35,6 +35,12 @@ Revezar parece simples. Fazer isso direito numa máquina só, sem servidor, exig
   enxerga o ciclo e recusa o pedido que o fecharia.
 - **Saber quem tem o quê.** Quando algo empaca, você precisa ver quem tem a trava, desde quando, e quem está
   esperando. O jlock lista tudo isso, e deixa você quebrar uma trava numa emergência.
+- **Leitores e escritores.** Muitos podem ler uma coisa ao mesmo tempo, desde que ninguém a escreva. O jlock
+  tem travas compartilhadas e exclusivas, e um escritor esperando a sua vez nunca fica de fora por causa de
+  uma sequência de leitores.
+- **Uma tarefa e os comandos que ela inicia.** Uma tarefa que segura os seus arquivos precisa poder rodar um
+  comando que os pega de novo, sem esperar por si mesma. No jlock os donos são caminhos (`run-1/T04/exec-2`),
+  e a própria família de uma tarefa nunca a bloqueia.
 
 ## Por que não algo que já existe
 
@@ -143,6 +149,10 @@ Opções que vale conhecer:
   devolva.
   Para um trabalho que pode demorar mais, `jlock renew --owner agent-7` adia esse prazo sem soltar a trava
   em momento nenhum.
+- `--mode shared`: só para leitura. Travas compartilhadas de uma chave convivem; uma exclusiva (o padrão)
+  espera por elas. Uma única chave também pode dizer isso: `src/a.ts@shared`.
+- Donos são caminhos: um comando que o agente inicia para a tarefa 42 pode pegar de novo os arquivos da tarefa
+  como `--owner agent-7/task-42/build` e é concedido na hora, aninhado na trava da tarefa.
 
 Por que não o `jlock acquire` puro? Uma trava pega com `acquire` também sobrevive ao comando, mas precisa
 ser renovada (`jlock heartbeat`) pelo menos a cada 30 segundos, senão é tida como morta e expira. Um agente
@@ -166,7 +176,7 @@ Com `--json`, todo comando imprime um objeto JSON, igual em todos os idiomas:
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
+{"key":"name:port-3000","keys":["name:port-3000"],"locks":[{"grant":"1794179768887254-63969","key":"name:port-3000","mode":"exclusive","nested":false,"parent":null}],"mode":"exclusive","owner":"agent-7","result":"granted","waited_ms":7}
 ```
 
 ## Usando a partir de um script
@@ -184,8 +194,8 @@ Aqui o comando é o próprio jlock, então dá para ver a trava segura enquanto 
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-CHAVE         DONO        GRUPO  INTENÇÃO  HÁ    HEARTBEAT  FILA
-name:nightly  pid:181176  -      -         21ms  21ms       0
+CHAVE         MODO       DONO       GRUPO  INTENÇÃO  HÁ    HEARTBEAT  FILA
+name:nightly  exclusive  pid:29516  -      -         17ms  17ms       0
 
 1 trava, 0 na fila
 $ jlock list
@@ -210,6 +220,43 @@ $ jlock graph
 ninguém esperando
 ```
 
+## Compartilhamento, famílias e recursos
+
+Três coisas vão além de "um dono por vez":
+
+- **Travas compartilhadas.** `--mode shared` (ou `@shared` depois de uma chave) para leitores: travas
+  compartilhadas de uma chave convivem, uma exclusiva espera até que elas saiam, e um leitor que chega depois
+  de um escritor em espera entra na fila atrás dele. Uma trava compartilhada numa pasta e uma exclusiva num
+  arquivo dentro dela continuam em conflito.
+- **Famílias de donos.** Um dono é um caminho: `task-7/exec-1` é filho de `task-7`. Um dono, seus ancestrais e
+  seus descendentes nunca bloqueiam uns aos outros. Uma chave que um ancestral segura (a própria chave, uma
+  pasta acima dela, ou `*`) é concedida ao filho na hora, como uma trava *aninhada* que pula a fila e termina
+  quando a trava do ancestral termina. Irmãos e estranhos esperam como sempre.
+- **Recursos.** `resource:<nome>` nomeia algo que não é um arquivo: `resource:desktop` (o mouse, o teclado e
+  as janelas de verdade), `resource:clipboard`, `resource:port:8080`, `resource:machine`, e outros (`jlock
+  resources` lista todos; acrescente os seus em `resources.json`, na pasta do registro). Um recurso escrito
+  errado é recusado com uma sugestão, em vez de virar em silêncio outra trava. Para pedir uma máquina quieta
+  (um benchmark, um teste de tempo), pegue `resource:machine` exclusivo; os trabalhos que pesam na máquina o
+  pegam compartilhado. O `*` continua existindo, mas para todas as travas de todos os projetos: guarde-o para
+  emergências.
+
+<!-- jlock-example -->
+```text
+$ jlock acquire name:db --mode shared --owner reader-1
+concedida name:db (shared)
+$ jlock acquire name:db --mode shared --owner reader-2
+concedida name:db (shared)
+$ jlock acquire name:db --owner writer --no-wait
+ocupada name:db, com reader-1 (shared) e mais 1 (posição 1)
+dica: jlock status name:db mostra quem a tem e a fila; tire o --no-wait para esperar a sua vez
+$ jlock acquire name:build --owner task-7
+concedida name:build
+$ jlock acquire name:build --owner task-7/exec-1
+concedida name:build (aninhada em task-7)
+$ jlock acquire resource:desktp --owner agent-7
+jlock: recurso desconhecido 'desktp'; você quis dizer resource:desktop? (jlock resources lista todos)
+```
+
 ## Como funciona
 
 O estado é uma pasta no disco (`%LOCALAPPDATA%\jlock` no Windows, `~/.local/state/jlock` no Linux,
@@ -219,24 +266,25 @@ quebrar.
 ```mermaid
 flowchart TD
     A["jlock acquire chave"] --> B["tira uma senha em locks/&lt;hash&gt;/queue/<br/>(o nome dela é a hora de chegada)"]
-    B --> C{"senha viva mais antiga,<br/>sem holder.json,<br/>nenhuma chave em conflito pega?"}
+    B --> C{"nenhuma posse em conflito,<br/>nenhuma senha mais antiga em conflito<br/>(modos e donos considerados)?"}
     C -- não --> W["espera, renovando o heartbeat da senha"] --> C
-    C -- sim --> D["cria holder.json em modo exclusivo<br/>(um passo atômico: exatamente um vencedor)"]
+    C -- sim --> D["sob o gate da chave, criar<br/>holds/&lt;grant&gt;.json (exatamente um vencedor)"]
     D --> E["concedida"]
-    E --> H["hold / run renovam o heartbeat (mtime)<br/>e mantêm uma trava do SO no holder.json"]
-    H --> R["release: apaga holder.json;<br/>a pasta some quando não sobra ninguém"]
+    E --> H["hold / run renovam o heartbeat (mtime)<br/>e mantêm uma trava do SO no arquivo de posse"]
+    H --> R["release: apaga o arquivo de posse (e as posses aninhadas nele);<br/>a pasta some quando não sobra ninguém"]
     H -. "dono morreu: sem heartbeat<br/>e sem trava do SO" .-> X["quem passar por ali a renomeia<br/>para broken/ e registra 'expired'"]
     X --> C
 ```
 
-- **Uma pasta por chave**, com o nome do SHA-1 da chave normalizada. O `holder.json` existe exatamente enquanto
-  a chave está pega, e diz quem a tem.
-- **Uma senha por esperador** em `queue/`, com o nome da sua hora de chegada: só a senha viva mais antiga pode
-  pegar a trava, então a ordem é a ordem de chegada.
+- **Uma pasta por chave**, com o nome do SHA-1 da chave normalizada. Cada trava nela é um arquivo em `holds/`
+  que diz quem a tem, em que modo, e em qual trava ela está aninhada. Dois pedidos para a mesma chave são
+  decididos um depois do outro, sob o arquivo `gate` da chave, criado e apagado num instante.
+- **Uma senha por esperador** em `queue/`, com o nome da sua hora de chegada: um esperador só passa quando
+  nenhuma senha mais antiga em conflito está à sua frente, então a ordem é a ordem de chegada.
 - **Heartbeat**: donos e esperadores tocam o seu arquivo a cada 5 s. Um arquivo que não é tocado há 30 s
   pertence a um processo morto e é removido por quem o encontrar. `hold` e `run` também mantêm uma trava do
-  sistema operacional no `holder.json`, que o kernel solta no instante em que o processo morre; assim, um dono
-  lento mas vivo nunca é tido como morto.
+  sistema operacional nos seus arquivos de posse, que o kernel solta no instante em que o processo morre;
+  assim, um dono lento mas vivo nunca é tido como morto.
 - **Deadlocks**: os próprios arquivos descrevem quem espera por quem; um pedido que fecharia um ciclo é
   recusado, com a cadeia.
 - **Zero sobras**: sem nada travado, a pasta `locks` fica vazia.
@@ -246,7 +294,7 @@ flowchart TD
 | O jlock garante | O jlock não faz (e por que tudo bem) |
 |---|---|
 | um dono por chave a cada instante | impedir programas que não usam o jlock: as travas são consultivas, como as do `flock` |
-| ordem estrita de chegada entre os esperadores vivos | passagem instantânea: o próximo percebe em até um quarto de segundo |
+| um dono exclusivo por chave a cada instante (ou qualquer número de donos compartilhados; a família de um dono divide as suas travas) | passagem instantânea: o próximo percebe em até um quarto de segundo |
 | a trava de um dono morto é recuperada em até 30 s, e registrada no log | distinguir morto de congelado num `acquire` simples (um dono congelado encontra `lost` e para); com `hold`/`run`, a trava do SO distingue os dois |
 | deadlocks detectados e resolvidos sempre do mesmo jeito | coordenação entre máquinas diferentes |
 | a lista é sempre a verdade: ela é a própria pasta | — |
@@ -258,12 +306,16 @@ flowchart TD
 | Chave | Significado | Conflita com |
 |---|---|---|
 | um caminho: `D:\proj\src\a.ts`, `src/a.ts`, `~/notes`, `.` | aquele arquivo ou pasta; caminhos relativos partem da pasta atual; o caminho não precisa existir | o mesmo caminho, tudo o que está dentro dele, toda pasta acima dele, e `*` |
-| `name:<text>` | qualquer coisa que não seja um caminho: `name:port-3000`, `name:deploy-prod` | o mesmo nome, e `*` |
-| `*` | tudo | todas as chaves |
+| `name:<text>` | qualquer outra coisa que você mesmo nomeia: `name:deploy-prod`, `name:nightly` | o mesmo nome, e `*` |
+| `resource:<name>[:<arg>]` | um recurso registrado: `resource:desktop`, `resource:port:8080` (`jlock resources`) | o mesmo recurso e argumento, e `*` |
+| `*` | tudo (emergências; para uma máquina quieta, pegue `resource:machine`) | todas as chaves |
 
 No Windows e no macOS, maiúsculas e minúsculas são ignoradas (`D:\Proj\SRC` e `d:/proj/src` são a mesma
 chave). Várias chaves num mesmo comando são pegas todas ou nenhuma, numa ordem fixa, então nunca causam
 deadlock entre si.
+Uma chave é pega no modo exclusivo, a menos que `--mode shared` ou o seu próprio sufixo `@shared` diga outra
+coisa; duas travas só entram em conflito quando as suas chaves conflitam, ao menos uma é exclusiva e os donos
+delas não são da mesma família.
 
 ## Códigos de saída
 

@@ -37,6 +37,12 @@ résoudre tout ceci:
   toujours. jlock voit le cycle et refuse la demande qui le fermerait.
 - **Savoir qui détient quoi.** Quand quelque chose est bloqué, il faut voir qui le détient, depuis quand,
   et qui attend. jlock affiche tout cela, et permet de casser un verrou en cas d'urgence.
+- **Lecteurs et rédacteurs.** Plusieurs peuvent lire une chose en même temps tant que personne ne l'écrit.
+  jlock a des verrous partagés et exclusifs, et un rédacteur qui attend son tour n'est jamais privé du verrou
+  par un flot de lecteurs.
+- **Une tâche et les commandes qu'elle lance.** Une tâche qui détient ses fichiers doit pouvoir lancer une
+  commande qui les reprend, sans s'attendre elle-même. Dans jlock, les propriétaires sont des chemins
+  (`run-1/T04/exec-2`), et la propre famille d'une tâche ne la bloque jamais.
 
 ## Pourquoi pas une solution qui existe déjà
 
@@ -146,6 +152,11 @@ Les options à connaître:
   le rend jamais.
   Pour un travail qui peut durer plus longtemps, `jlock renew --owner agent-7` repousse ce délai sans jamais
   lâcher le verrou.
+- `--mode shared`: pour lire seulement. Les verrous partagés sur une clé coexistent; un verrou exclusif (le
+  défaut) les attend. Une seule clé peut aussi le dire: `src/a.ts@shared`.
+- Les propriétaires sont des chemins: une commande que l'agent lance pour la tâche 42 peut reprendre les
+  fichiers de la tâche avec `--owner agent-7/task-42/build` et l'obtient aussitôt, imbriquée dans le verrou de
+  la tâche.
 
 Pourquoi pas simplement `jlock acquire`? Un verrou pris avec `acquire` survit lui aussi à la commande, mais
 il doit être renouvelé (`jlock heartbeat`) au moins toutes les 30 secondes, sinon il est considéré comme
@@ -170,7 +181,7 @@ Avec `--json`, chaque commande affiche un seul objet JSON, identique dans toutes
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
+{"key":"name:port-3000","keys":["name:port-3000"],"locks":[{"grant":"1794179771051540-93053","key":"name:port-3000","mode":"exclusive","nested":false,"parent":null}],"mode":"exclusive","owner":"agent-7","result":"granted","waited_ms":5}
 ```
 
 ## L'utiliser depuis un script
@@ -188,8 +199,8 @@ Ici, la commande est jlock lui-même, ce qui permet de voir le verrou tenu penda
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-CLÉ           PROPRIÉTAIRE  GROUPE  INTENTION  DEPUIS  HEARTBEAT  FILE
-name:nightly  pid:181076    -       -          34ms    33ms       0
+CLÉ           MODE       PROPRIÉTAIRE  GROUPE  INTENTION  DEPUIS  HEARTBEAT  FILE
+name:nightly  exclusive  pid:28184     -       -          18ms    18ms       0
 
 1 verrou, 0 en attente
 $ jlock list
@@ -214,6 +225,44 @@ $ jlock graph
 personne en attente
 ```
 
+## Partage, familles et ressources
+
+Trois choses vont au-delà de « un propriétaire à la fois »:
+
+- **Verrous partagés.** `--mode shared` (ou `@shared` après une clé) pour les lecteurs: les verrous partagés
+  d'une clé coexistent, un verrou exclusif attend qu'ils aient disparu, et un lecteur qui arrive après un
+  rédacteur en attente se met en file derrière lui. Un verrou partagé sur un dossier et un verrou exclusif sur
+  un fichier qu'il contient restent en conflit.
+- **Familles de propriétaires.** Un propriétaire est un chemin: `task-7/exec-1` est un enfant de `task-7`. Un
+  propriétaire, ses ancêtres et ses descendants ne se bloquent jamais entre eux. Une clé qu'un ancêtre détient
+  (la clé elle-même, un dossier au-dessus, ou `*`) est accordée à l'enfant aussitôt, comme un verrou
+  *imbriqué* qui saute la file et prend fin quand le verrou de l'ancêtre prend fin. Les frères et les
+  étrangers attendent comme d'habitude.
+- **Ressources.** `resource:<nom>` désigne quelque chose qui n'est pas un fichier: `resource:desktop` (la
+  vraie souris, le clavier et les fenêtres), `resource:clipboard`, `resource:port:8080`, `resource:machine`,
+  et d'autres (`jlock resources` les liste; ajoutez les vôtres dans `resources.json`, dans le dossier du
+  registre). Une ressource mal orthographiée est refusée avec une suggestion, au lieu de devenir en silence un
+  autre verrou. Pour demander une machine au calme (un benchmark, un test de temps), prenez `resource:machine`
+  en exclusif; les tâches qui chargent la machine le prennent en partagé. `*` existe toujours, mais il arrête
+  tous les verrous de tous les projets: gardez-le pour les urgences.
+
+<!-- jlock-example -->
+```text
+$ jlock acquire name:db --mode shared --owner reader-1
+accordé name:db (shared)
+$ jlock acquire name:db --mode shared --owner reader-2
+accordé name:db (shared)
+$ jlock acquire name:db --owner writer --no-wait
+occupé name:db détenu par reader-1 (shared) et 1 autre (position 1)
+astuce: jlock status name:db montre qui la détient et la file d'attente; retirez --no-wait pour attendre votre tour
+$ jlock acquire name:build --owner task-7
+accordé name:build
+$ jlock acquire name:build --owner task-7/exec-1
+accordé name:build (imbriqué dans task-7)
+$ jlock acquire resource:desktp --owner agent-7
+jlock: ressource inconnue 'desktp'; vouliez-vous dire resource:desktop? (jlock resources les liste)
+```
+
 ## Comment ça marche
 
 L'état est un dossier sur le disque (`%LOCALAPPDATA%\jlock` sous Windows, `~/.local/state/jlock` sous
@@ -223,25 +272,27 @@ perdu si un processus plante.
 ```mermaid
 flowchart TD
     A["jlock acquire clé"] --> B["prendre un ticket dans locks/&lt;hash&gt;/queue/<br/>(son nom est l'heure d'arrivée)"]
-    B --> C{"plus ancien ticket vivant,<br/>pas de holder.json,<br/>aucune clé en conflit prise?"}
+    B --> C{"aucune détention en conflit,<br/>aucun ticket plus ancien en conflit<br/>(modes et propriétaires pris en compte)?"}
     C -- non --> W["attendre, en renouvelant le heartbeat du ticket"] --> C
-    C -- oui --> D["créer holder.json en exclusif<br/>(une seule étape atomique: exactement un gagnant)"]
+    C -- oui --> D["sous le gate de la clé, créer<br/>holds/&lt;grant&gt;.json (exactement un gagnant)"]
     D --> E["accordé"]
-    E --> H["hold / run renouvellent le heartbeat (mtime)<br/>et gardent un verrou du SE sur holder.json"]
-    H --> R["release: supprimer holder.json;<br/>le dossier disparaît quand il ne reste personne"]
+    E --> H["hold / run renouvellent le heartbeat (mtime)<br/>et gardent un verrou du SE sur le fichier de détention"]
+    H --> R["release: supprimer le fichier de détention (et les détentions imbriquées en lui);<br/>le dossier disparaît quand il ne reste personne"]
     H -. "propriétaire mort: pas de heartbeat<br/>ni de verrou du SE" .-> X["le premier qui passe le renomme<br/>vers broken/ et journalise 'expired'"]
     X --> C
 ```
 
-- **Un dossier par clé**, nommé d'après le SHA-1 de la clé normalisée. `holder.json` existe exactement
-  tant que la clé est prise, et dit qui la détient.
-- **Un ticket par demandeur en attente** dans `queue/`, nommé d'après son heure d'arrivée: seul le plus
-  ancien ticket vivant peut prendre le verrou, donc l'ordre est l'ordre d'arrivée.
-- **Heartbeat (signal de vie)**: les propriétaires et ceux qui attendent touchent leur fichier toutes les
-  5 s. Un fichier qui n'a pas été touché depuis 30 s appartient à un processus mort et est supprimé par
-  quiconque le remarque. `hold` et `run` gardent aussi un verrou du système d'exploitation sur
-  `holder.json`, que le noyau relâche à l'instant où le processus meurt: un propriétaire lent mais vivant
-  n'est donc jamais pris pour mort.
+- **Un dossier par clé**, nommé d'après le SHA-1 de la clé normalisée. Chaque verrou posé dessus est un
+  fichier dans `holds/` qui dit qui le détient, dans quel mode, et dans quel verrou il est imbriqué. Deux
+  demandes pour la même clé sont tranchées l'une après l'autre sous le fichier `gate` de la clé, créé et
+  supprimé en un instant.
+- **Un ticket par demandeur en attente** dans `queue/`, nommé d'après son heure d'arrivée: un demandeur ne
+  passe que si aucun ticket plus ancien en conflit n'est devant lui, donc l'ordre est l'ordre d'arrivée.
+- **Heartbeat (signal de vie)**: les propriétaires et ceux qui attendent touchent leur fichier toutes les 5 s.
+  Un fichier qui n'a pas été touché depuis 30 s appartient à un processus mort et est supprimé par quiconque
+  le remarque. `hold` et `run` gardent aussi un verrou du système d'exploitation sur leurs fichiers de
+  détention, que le noyau relâche à l'instant où le processus meurt: un propriétaire lent mais vivant n'est
+  donc jamais pris pour mort.
 - **Interblocages**: les fichiers eux-mêmes décrivent qui attend qui; une demande qui fermerait un cycle
   est refusée, avec la chaîne.
 - **Zéro reste**: quand rien n'est verrouillé, le dossier `locks` est vide.
@@ -251,7 +302,7 @@ flowchart TD
 | jlock garantit | jlock ne fait pas (et pourquoi ce n'est pas grave) |
 |---|---|
 | un seul propriétaire par clé à tout instant | arrêter les programmes qui n'utilisent pas jlock: les verrous sont consultatifs, comme ceux de `flock` |
-| un ordre d'arrivée strict entre les demandeurs vivants | le passage de relais instantané: le suivant s'en aperçoit en moins d'un quart de seconde |
+| un seul propriétaire exclusif par clé à tout instant (ou autant de propriétaires partagés qu'on veut; la famille d'un propriétaire partage ses verrous) | le passage de relais instantané: le suivant s'en aperçoit en moins d'un quart de seconde |
 | le verrou d'un propriétaire mort est récupéré en 30 s au plus, et journalisé | distinguer un mort d'un figé pour un simple `acquire` (un propriétaire figé trouve `lost` et s'arrête); avec `hold`/`run`, le verrou du SE fait la différence |
 | des interblocages détectés et résolus de la même façon à chaque fois | la coordination entre plusieurs machines |
 | la liste dit toujours la vérité: c'est le dossier lui-même | — |
@@ -263,12 +314,16 @@ flowchart TD
 | Clé | Signification | En conflit avec |
 |---|---|---|
 | un chemin: `D:\proj\src\a.ts`, `src/a.ts`, `~/notes`, `.` | ce fichier ou ce dossier; les chemins relatifs partent du dossier courant; le chemin n'a pas besoin d'exister | le même chemin, tout ce qu'il contient, chaque dossier au-dessus de lui, et `*` |
-| `name:<text>` | tout ce qui n'est pas un chemin: `name:port-3000`, `name:deploy-prod` | le même nom, et `*` |
-| `*` | tout | toutes les clés |
+| `name:<text>` | tout le reste, que vous nommez vous-même: `name:deploy-prod`, `name:nightly` | le même nom, et `*` |
+| `resource:<name>[:<arg>]` | une ressource enregistrée: `resource:desktop`, `resource:port:8080` (`jlock resources`) | la même ressource et le même argument, et `*` |
+| `*` | tout (urgences; pour une machine au calme, prenez `resource:machine`) | toutes les clés |
 
 Sous Windows et macOS, la casse des lettres est ignorée (`D:\Proj\SRC` et `d:/proj/src` sont la même clé).
 Plusieurs clés dans une même commande sont prises toutes ou aucune, dans un ordre fixe, si bien qu'elles ne
 se bloquent jamais entre elles.
+Une clé est prise en exclusif sauf si `--mode shared` ou son propre suffixe `@shared` dit le contraire; deux
+verrous ne sont en conflit que si leurs clés le sont, qu'au moins l'un est exclusif et que leurs propriétaires
+ne sont pas d'une même famille.
 
 ## Codes de sortie
 

@@ -36,6 +36,12 @@ Abwechseln klingt einfach. Es auf einem Rechner ohne Server richtig zu machen, h
   erkennt den Zyklus und lehnt die Anfrage ab, die ihn schließen würde.
 - **Wissen, wer was hat.** Wenn etwas hängt, musst du sehen, wer es hält, seit wann und wer wartet. jlock
   listet all das auf und lässt dich im Notfall eine Sperre aufbrechen.
+- **Leser und Schreiber.** Viele dürfen etwas gleichzeitig lesen, solange niemand es schreibt. jlock kennt
+  geteilte und exklusive Sperren, und ein Schreiber, der auf seine Reihe wartet, wird nie von einem Strom von
+  Lesern ausgehungert.
+- **Eine Aufgabe und die Befehle, die sie startet.** Eine Aufgabe, die ihre Dateien hält, muss einen Befehl
+  ausführen können, der sie erneut nimmt, ohne auf sich selbst zu warten. In jlock sind Besitzer Pfade
+  (`run-1/T04/exec-2`), und die eigene Familie einer Aufgabe blockiert sie nie.
 
 ## Warum nicht etwas, das es schon gibt
 
@@ -144,6 +150,11 @@ Optionen, die du kennen solltest:
   Agent sie nie freigibt.
   Für Arbeit, die länger dauern kann, verschiebt `jlock renew --owner agent-7` diese Grenze, ohne die Sperre
   je loszulassen.
+- `--mode shared`: nur zum Lesen. Geteilte Sperren auf einen Schlüssel bestehen nebeneinander; eine exklusive
+  (der Standard) wartet auf sie. Auch ein einzelner Schlüssel kann es sagen: `src/a.ts@shared`.
+- Besitzer sind Pfade: Ein Befehl, den der Agent für Aufgabe 42 startet, kann die Dateien der Aufgabe als
+  `--owner agent-7/task-42/build` erneut nehmen und bekommt sie sofort, verschachtelt in der Sperre der
+  Aufgabe.
 
 Warum nicht einfach `jlock acquire`? Eine mit `acquire` genommene Sperre überdauert den Befehl ebenfalls, muss
 aber mindestens alle 30 Sekunden erneuert werden (`jlock heartbeat`), sonst gilt sie als tot und läuft ab. Ein
@@ -167,7 +178,7 @@ Mit `--json` gibt jeder Befehl ein einziges JSON-Objekt aus, in jeder Sprache gl
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":0}
+{"key":"name:port-3000","keys":["name:port-3000"],"locks":[{"grant":"1794179773657368-73598","key":"name:port-3000","mode":"exclusive","nested":false,"parent":null}],"mode":"exclusive","owner":"agent-7","result":"granted","waited_ms":6}
 ```
 
 ## Aus einem Skript heraus
@@ -185,8 +196,8 @@ Hier ist der Befehl jlock selbst, so siehst du die Sperre, die gehalten wird, so
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-SCHLÜSSEL     BESITZER    GRUPPE  ABSICHT  DAUER  HEARTBEAT  WARTEND
-name:nightly  pid:182568  -       -        26ms   25ms       0
+SCHLÜSSEL     MODUS      BESITZER   GRUPPE  ABSICHT  DAUER  HEARTBEAT  WARTEND
+name:nightly  exclusive  pid:29224  -       -        55ms   56ms       0
 
 1 Sperre, 0 warten
 $ jlock list
@@ -211,6 +222,44 @@ $ jlock graph
 niemand wartet
 ```
 
+## Teilen, Familien und Ressourcen
+
+Drei Dinge gehen über „ein Besitzer zur Zeit“ hinaus:
+
+- **Geteilte Sperren.** `--mode shared` (oder `@shared` hinter einem Schlüssel) für Leser: Geteilte Sperren
+  eines Schlüssels bestehen nebeneinander, eine exklusive wartet, bis sie weg sind, und ein Leser, der nach
+  einem wartenden Schreiber eintrifft, reiht sich hinter ihm ein. Eine geteilte Sperre auf einen Ordner und
+  eine exklusive auf eine Datei darin kollidieren weiterhin.
+- **Familien von Besitzern.** Ein Besitzer ist ein Pfad: `task-7/exec-1` ist ein Kind von `task-7`. Ein
+  Besitzer, seine Vorfahren und seine Nachkommen blockieren einander nie. Ein Schlüssel, den ein Vorfahre hält
+  (der Schlüssel selbst, ein Ordner darüber oder `*`), wird dem Kind sofort erteilt, als *verschachtelte*
+  Sperre, die die Warteschlange überspringt und endet, wenn die Sperre des Vorfahren endet. Geschwister und
+  Fremde warten wie gewohnt.
+- **Ressourcen.** `resource:<Name>` benennt etwas, das keine Datei ist: `resource:desktop` (die echte Maus,
+  Tastatur und Fenster), `resource:clipboard`, `resource:port:8080`, `resource:machine` und mehr (`jlock
+  resources` listet sie auf; eigene fügen Sie in `resources.json` im Registry-Ordner hinzu). Eine falsch
+  geschriebene Ressource wird mit einem Vorschlag abgelehnt, statt stillschweigend zu einer anderen Sperre zu
+  werden. Um eine ruhige Maschine anzufordern (ein Benchmark, ein Zeitmesstest), nehmen Sie `resource:machine`
+  exklusiv; Jobs, die die Maschine belasten, nehmen sie geteilt. `*` gibt es weiterhin, aber es hält jede
+  Sperre jedes Projekts an: Heben Sie es für Notfälle auf.
+
+<!-- jlock-example -->
+```text
+$ jlock acquire name:db --mode shared --owner reader-1
+erteilt name:db (shared)
+$ jlock acquire name:db --mode shared --owner reader-2
+erteilt name:db (shared)
+$ jlock acquire name:db --owner writer --no-wait
+belegt name:db, gehalten von reader-1 (shared) und 1 weiterer (Position 1)
+Tipp: jlock status name:db zeigt, wer ihn hält, und die Warteschlange; lass --no-wait weg, um zu warten, bis du dran bist
+$ jlock acquire name:build --owner task-7
+erteilt name:build
+$ jlock acquire name:build --owner task-7/exec-1
+erteilt name:build (verschachtelt in task-7)
+$ jlock acquire resource:desktp --owner agent-7
+jlock: unbekannte Ressource 'desktp'; meinten Sie resource:desktop? (jlock resources listet sie auf)
+```
+
 ## Wie es funktioniert
 
 Der Zustand ist ein Ordner auf der Festplatte (`%LOCALAPPDATA%\jlock` unter Windows, `~/.local/state/jlock`
@@ -220,24 +269,26 @@ geht verloren, wenn irgendein Prozess abstürzt.
 ```mermaid
 flowchart TD
     A["jlock acquire Schlüssel"] --> B["ein Ticket in locks/&lt;hash&gt;/queue/ ziehen<br/>(sein Name ist die Ankunftszeit)"]
-    B --> C{"ältestes lebendes Ticket,<br/>kein holder.json,<br/>kein kollidierender Schlüssel belegt?"}
+    B --> C{"keine kollidierende Haltung,<br/>kein älteres kollidierendes Ticket<br/>(Modi und Besitzer berücksichtigt)?"}
     C -- nein --> W["warten, dabei den Heartbeat des Tickets erneuern"] --> C
-    C -- ja --> D["holder.json exklusiv anlegen<br/>(ein atomarer Schritt: genau ein Gewinner)"]
+    C -- ja --> D["unter dem gate des Schlüssels<br/>holds/&lt;grant&gt;.json anlegen (genau ein Gewinner)"]
     D --> E["erteilt"]
-    E --> H["hold / run erneuern den Heartbeat (mtime)<br/>und halten eine OS-Sperre auf holder.json"]
-    H --> R["release: holder.json löschen;<br/>der Ordner verschwindet, wenn niemand mehr da ist"]
+    E --> H["hold / run erneuern den Heartbeat (mtime)<br/>und halten eine OS-Sperre auf der Halte-Datei"]
+    H --> R["release: die Halte-Datei löschen (und die darin verschachtelten Halten);<br/>der Ordner verschwindet, wenn niemand mehr da ist"]
     H -. "Besitzer gestorben: kein Heartbeat<br/>und keine OS-Sperre" .-> X["wer vorbeikommt, benennt sie<br/>in broken/ um und loggt 'expired'"]
     X --> C
 ```
 
-- **Ein Ordner pro Schlüssel**, benannt nach dem SHA-1 des normalisierten Schlüssels. `holder.json` existiert
-  genau so lange, wie der Schlüssel belegt ist, und sagt, wer ihn hat.
-- **Ein Ticket pro Wartendem** in `queue/`, benannt nach seiner Ankunftszeit: Nur das älteste lebende Ticket
-  darf die Sperre nehmen, also ist die Reihenfolge die Reihenfolge der Ankunft.
-- **Heartbeat** (Lebenszeichen): Besitzer und Wartende berühren ihre Datei alle 5 s. Eine Datei, die 30 s
-  lang nicht berührt wurde, gehört einem toten Prozess und wird von dem entfernt, der sie bemerkt. `hold`
-  und `run` halten außerdem eine Betriebssystemsperre auf `holder.json`, die der Kernel in dem Augenblick
-  aufhebt, in dem der Prozess stirbt; so wird ein langsamer, aber lebender Besitzer nie für tot gehalten.
+- **Ein Ordner pro Schlüssel**, benannt nach dem SHA-1 des normalisierten Schlüssels. Jede Sperre darauf ist
+  eine Datei in `holds/`, die sagt, wer sie hat, in welchem Modus und in welcher Sperre sie verschachtelt ist.
+  Zwei Anfragen für denselben Schlüssel werden nacheinander unter der `gate`-Datei des Schlüssels entschieden,
+  die im Nu angelegt und wieder gelöscht wird.
+- **Ein Ticket pro Wartendem** in `queue/`, benannt nach seiner Ankunftszeit: Ein Wartender kommt nur dran,
+  wenn kein älteres kollidierendes Ticket vor ihm liegt, also ist die Reihenfolge die Reihenfolge der Ankunft.
+- **Heartbeat** (Lebenszeichen): Besitzer und Wartende berühren ihre Datei alle 5 s. Eine Datei, die 30 s lang
+  nicht berührt wurde, gehört einem toten Prozess und wird von dem entfernt, der sie bemerkt. `hold` und `run`
+  halten außerdem eine Betriebssystemsperre auf ihren Halte-Dateien, die der Kernel in dem Augenblick aufhebt,
+  in dem der Prozess stirbt; so wird ein langsamer, aber lebender Besitzer nie für tot gehalten.
 - **Deadlocks**: Die Dateien selbst beschreiben, wer auf wen wartet; eine Anfrage, die einen Zyklus
   schließen würde, wird abgelehnt, samt der Kette.
 - **Keine Überreste**: Ist nichts gesperrt, ist der Ordner `locks` leer.
@@ -247,7 +298,7 @@ flowchart TD
 | jlock garantiert | jlock garantiert nicht (und warum das in Ordnung ist) |
 |---|---|
 | ein Besitzer pro Schlüssel zu jedem Zeitpunkt | Programme aufzuhalten, die jlock nicht nutzen: Die Sperren sind beratend, wie bei `flock` |
-| strikte Reihenfolge der Ankunft unter lebenden Wartenden | sofortige Übergabe: Der Nächste bemerkt es innerhalb einer Viertelsekunde |
+| ein exklusiver Besitzer pro Schlüssel zu jedem Zeitpunkt (oder beliebig viele geteilte; die Familie eines Besitzers teilt ihre Sperren) | sofortige Übergabe: Der Nächste bemerkt es innerhalb einer Viertelsekunde |
 | die Sperre eines toten Besitzers wird innerhalb von 30 s zurückgewonnen und protokolliert | bei einem einfachen `acquire` tot von eingefroren zu unterscheiden (ein eingefrorener Besitzer findet `lost` vor und hört auf); mit `hold`/`run` unterscheidet die OS-Sperre die beiden |
 | Deadlocks werden erkannt und jedes Mal gleich aufgelöst | Koordination zwischen verschiedenen Rechnern |
 | die Liste ist immer die Wahrheit: Sie ist der Ordner selbst | — |
@@ -259,12 +310,16 @@ flowchart TD
 | Schlüssel | Bedeutung | Kollidiert mit |
 |---|---|---|
 | ein Pfad: `D:\proj\src\a.ts`, `src/a.ts`, `~/notes`, `.` | diese Datei oder dieser Ordner; relative Pfade gehen vom aktuellen Ordner aus; der Pfad muss nicht existieren | demselben Pfad, allem darin, jedem Ordner darüber und `*` |
-| `name:<text>` | alles, was kein Pfad ist: `name:port-3000`, `name:deploy-prod` | demselben Namen und `*` |
-| `*` | alles | jedem Schlüssel |
+| `name:<text>` | alles andere, was Sie selbst benennen: `name:deploy-prod`, `name:nightly` | demselben Namen und `*` |
+| `resource:<name>[:<arg>]` | eine registrierte Ressource: `resource:desktop`, `resource:port:8080` (`jlock resources`) | derselben Ressource mit demselben Argument und `*` |
+| `*` | alles (Notfälle; für eine ruhige Maschine `resource:machine` nehmen) | jedem Schlüssel |
 
 Unter Windows und macOS wird Groß- und Kleinschreibung ignoriert (`D:\Proj\SRC` und `d:/proj/src` sind
 derselbe Schlüssel). Mehrere Schlüssel in einem Befehl werden alle oder keiner genommen, in einer festen
 Reihenfolge, sodass sie sich nie gegenseitig blockieren.
+Ein Schlüssel wird exklusiv genommen, sofern `--mode shared` oder sein eigenes Suffix `@shared` nichts anderes
+sagt; zwei Sperren kollidieren nur, wenn ihre Schlüssel kollidieren, mindestens eine exklusiv ist und ihre
+Besitzer nicht zu einer Familie gehören.
 
 ## Exit-Codes
 

@@ -33,6 +33,11 @@ Taking turns sounds simple. Doing it right on one machine, with no server, means
   the cycle and refuses the request that would close it.
 - **Knowing who has what.** When something is stuck, you need to see who holds it, since when, and who is
   waiting. jlock lists it all, and lets you break a lock in an emergency.
+- **Readers and writers.** Many may read a thing at once while nobody writes it. jlock has shared and
+  exclusive locks, and a writer waiting its turn is never starved by a stream of readers.
+- **A task and the commands it starts.** A task that holds its files must be able to run a command that
+  takes them again, without waiting for itself. In jlock owners are paths (`run-1/T04/exec-2`), and a
+  task's own family never blocks it.
 
 ## Why not something that already exists
 
@@ -141,6 +146,10 @@ Options worth knowing:
   releases it.
   For work that may take longer, `jlock renew --owner agent-7` pushes it back without ever letting the
   lock go.
+- `--mode shared`: for reading only. Shared locks on a key coexist; an exclusive one (the default) waits
+  for them. A single key can say it too: `src/a.ts@shared`.
+- Owners are paths: a command the agent starts for task 42 can take the task's files again as
+  `--owner agent-7/task-42/build` and is granted at once, nested in the task's lock.
 
 Why not plain `jlock acquire`? A lock taken with `acquire` also outlives the command, but it has to be
 renewed (`jlock heartbeat`) at least every 30 seconds, or it is taken for dead and expires. An agent spends
@@ -163,7 +172,7 @@ With `--json`, every command prints one JSON object, the same in every language:
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
+{"key":"name:port-3000","keys":["name:port-3000"],"locks":[{"grant":"1794179300217744-06814","key":"name:port-3000","mode":"exclusive","nested":false,"parent":null}],"mode":"exclusive","owner":"agent-7","result":"granted","waited_ms":5}
 ```
 
 ## Using it from a script
@@ -181,8 +190,8 @@ Here the command is jlock itself, so you can see the lock held while it runs:
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-KEY           OWNER       GROUP  INTENT  HELD  HEARTBEAT  QUEUE
-name:nightly  pid:170600  -      -       26ms  24ms       0
+KEY           MODE       OWNER      GROUP  INTENT  HELD  HEARTBEAT  QUEUE
+name:nightly  exclusive  pid:22640  -      -       11ms  11ms       0
 
 1 lock, 0 waiting
 $ jlock list
@@ -207,6 +216,41 @@ $ jlock graph
 no waiters
 ```
 
+## Sharing, families and resources
+
+Three things go beyond "one owner at a time":
+
+- **Shared locks.** `--mode shared` (or `@shared` after a key) for readers: shared locks of a key coexist,
+  an exclusive one waits until they are gone, and a reader that arrives after a waiting writer queues
+  behind it. A shared lock on a folder and an exclusive one on a file inside it still conflict.
+- **Families of owners.** An owner is a path: `task-7/exec-1` is a child of `task-7`. An owner, its
+  ancestors and its descendants never block each other. A key that an ancestor holds (the key itself, a
+  folder above it, or `*`) is granted to the child at once, as a *nested* lock that skips the queue and
+  ends when the ancestor's lock ends. Siblings and strangers wait as usual.
+- **Resources.** `resource:<name>` names something that is not a file: `resource:desktop` (the real mouse,
+  keyboard and windows), `resource:clipboard`, `resource:port:8080`, `resource:machine`, and more
+  (`jlock resources` lists them; add your own in `resources.json` in the registry folder). A misspelled
+  resource is refused with a suggestion instead of silently becoming another lock. To ask for a quiet
+  machine (a benchmark, a timing test), take `resource:machine` exclusive; jobs that load the machine
+  take it shared. `*` still exists, but it stops every lock of every project: keep it for emergencies.
+
+<!-- jlock-example -->
+```text
+$ jlock acquire name:db --mode shared --owner reader-1
+granted name:db (shared)
+$ jlock acquire name:db --mode shared --owner reader-2
+granted name:db (shared)
+$ jlock acquire name:db --owner writer --no-wait
+busy name:db held by reader-1 (shared) and 1 other (position 1)
+tip: jlock status name:db shows who holds it and the queue; drop --no-wait to wait your turn
+$ jlock acquire name:build --owner task-7
+granted name:build
+$ jlock acquire name:build --owner task-7/exec-1
+granted name:build (nested in task-7)
+$ jlock acquire resource:desktp --owner agent-7
+jlock: unknown resource 'desktp'; did you mean resource:desktop? (jlock resources lists them)
+```
+
 ## How it works
 
 The state is a folder on disk (`%LOCALAPPDATA%\jlock` on Windows, `~/.local/state/jlock` on Linux,
@@ -216,24 +260,25 @@ process crashes.
 ```mermaid
 flowchart TD
     A["jlock acquire key"] --> B["take a ticket in locks/&lt;hash&gt;/queue/<br/>(its name is the arrival time)"]
-    B --> C{"oldest live ticket,<br/>no holder.json,<br/>no conflicting key taken?"}
+    B --> C{"no conflicting hold,<br/>no older conflicting ticket<br/>(modes and owners considered)?"}
     C -- no --> W["wait, renewing the ticket's heartbeat"] --> C
-    C -- yes --> D["create holder.json exclusively<br/>(one atomic step: exactly one winner)"]
+    C -- yes --> D["under the key's gate, create<br/>holds/&lt;grant&gt;.json (exactly one winner)"]
     D --> E["granted"]
-    E --> H["hold / run renew the heartbeat (mtime)<br/>and keep an OS lock on holder.json"]
-    H --> R["release: delete holder.json;<br/>the folder goes when nobody is left"]
+    E --> H["hold / run renew the heartbeat (mtime)<br/>and keep an OS lock on the hold file"]
+    H --> R["release: delete the hold file (and the holds nested in it);<br/>the folder goes when nobody is left"]
     H -. "owner died: no heartbeat<br/>and no OS lock" .-> X["anyone passing by renames it<br/>to broken/ and logs 'expired'"]
     X --> C
 ```
 
-- **One folder per key**, named by the SHA-1 of the normalized key. `holder.json` exists exactly while the
-  key is taken, and says who has it.
-- **A ticket per waiter** in `queue/`, named by its arrival time: only the oldest live ticket may take the
-  lock, so the order is the order of arrival.
+- **One folder per key**, named by the SHA-1 of the normalized key. Each lock on it is one file in
+  `holds/` saying who has it, in which mode, and which lock it is nested in. Two requests for the same key
+  are decided one after the other under the key's `gate` file, created and deleted in an instant.
+- **A ticket per waiter** in `queue/`, named by its arrival time: a waiter goes only when no older
+  conflicting ticket is ahead of it, so the order is the order of arrival.
 - **Heartbeat**: owners and waiters touch their file every 5 s. A file not touched for 30 s belongs to a
   dead process and is removed by whoever sees it. `hold` and `run` also keep an operating-system lock on
-  `holder.json`, which the kernel drops the instant the process dies, so a slow but living owner is never
-  taken for dead.
+  their hold files, which the kernel drops the instant the process dies, so a slow but living owner is
+  never taken for dead.
 - **Deadlocks**: the files themselves describe who waits for whom; a request that would close a cycle is
   refused, with the chain.
 - **Zero leftovers**: with nothing locked, the `locks` folder is empty.
@@ -242,7 +287,7 @@ flowchart TD
 
 | jlock guarantees | jlock does not (and why that is fine) |
 |---|---|
-| one owner per key at any instant | stopping programs that do not use jlock: the locks are advisory, like `flock` |
+| one exclusive owner per key at any instant (or any number of shared ones; an owner's family shares its locks) | stopping programs that do not use jlock: the locks are advisory, like `flock` |
 | strict order of arrival among living waiters | instant hand-over: the next one notices within a quarter of a second |
 | a dead owner's lock is recovered within 30 s, and logged | telling dead from frozen for a plain `acquire` (a frozen owner finds `lost` and stops); with `hold`/`run` the OS lock tells them apart |
 | deadlocks detected and resolved the same way every time | coordination between different machines |
@@ -255,11 +300,14 @@ flowchart TD
 | Key | Meaning | Conflicts with |
 |---|---|---|
 | a path: `D:\proj\src\a.ts`, `src/a.ts`, `~/notes`, `.` | that file or folder; relative paths start from the current folder; the path does not have to exist | the same path, everything inside it, every folder above it, and `*` |
-| `name:<text>` | anything that is not a path: `name:port-3000`, `name:deploy-prod` | the same name, and `*` |
-| `*` | everything | every key |
+| `name:<text>` | anything else you name yourself: `name:deploy-prod`, `name:nightly` | the same name, and `*` |
+| `resource:<name>[:<arg>]` | a registered resource: `resource:desktop`, `resource:port:8080` (`jlock resources`) | the same resource and argument, and `*` |
+| `*` | everything (emergencies; for a quiet machine take `resource:machine`) | every key |
 
 On Windows and macOS the case of letters is ignored (`D:\Proj\SRC` and `d:/proj/src` are the same key).
 Several keys in one command are taken all or none, in a fixed order, so they never deadlock each other.
+A key is taken exclusive unless `--mode shared` or its own `@shared` suffix says otherwise; two locks
+conflict only when their keys conflict, at least one is exclusive, and their owners are not of one family.
 
 ## Exit codes
 

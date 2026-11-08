@@ -20,6 +20,8 @@ jlock 起源于 AI 编程智能体。多个智能体同时在同一个仓库里�
 - **到达顺序。** 应该是先请求的人先得到，而不是碰巧在合适时刻重试的人。jlock 维护一个真正的队列。
 - **死锁。** A 持有 `x` 并等待 `y`；B 持有 `y` 并等待 `x`；两者永远等下去。jlock 能看出这个环，并拒绝会使环闭合的那个请求。
 - **知道谁持有什么。** 当某样东西卡住时，你需要看到谁持有它、从何时起、谁在等待。jlock 会把这些全部列出来，并允许你在紧急情况下解除一个锁。
+- **读者与写者。** 在没有人写入时，许多人可以同时读取同一样东西。jlock 有共享锁和独占锁，排队等待的写者也不会被源源不断的读者饿死。
+- **一个任务和它启动的命令。** 持有文件的任务必须能运行一条再次获取这些文件的命令，而不必等待自己。在 jlock 中，所有者是路径（`run-1/T04/exec-2`），任务自己的家族永远不会阻塞它。
 
 ## 为什么不用现成的方案
 
@@ -114,6 +116,8 @@ $ jlock status name:demo
   管道关闭，锁立刻释放。短调用用 `--detach`；保持运行的宿主用 `--release-on-eof`。
 - `--ttl 2h`：安全上限。经过这段时间后锁会自行消失，即使智能体从未释放它。
   对可能更久的工作，`jlock renew --owner agent-7` 可以推迟这个上限，期间锁从不松开。
+- `--mode shared`：仅用于读取。同一个键上的共享锁可以并存；独占锁（默认）要等它们都结束。单个键也可以这样写：`src/a.ts@shared`。
+- 所有者是路径：智能体为任务 42 启动的命令，可以用 `--owner agent-7/task-42/build` 再次获取该任务的文件，并立刻获得授予，嵌套在该任务的锁中。
 
 为什么不直接用 `jlock acquire`？用 `acquire` 获取的锁同样会在命令结束后保留，但必须至少每 30 秒续期一次（`jlock heartbeat`），否则会被视为失效并过期。智能体在两条命令之间往往要花上几分钟，所以 `hold --detach` 才是适合它的工具；`acquire` 适用于能自行续期的程序。如果有人解除了锁（`jlock unlock --force`），后台进程会结束，`jlock heartbeat <file> --owner agent-7` 会回答 `lost`（退出码 13）：长时间停顿后值得检查一下。
 
@@ -132,7 +136,7 @@ $ jlock release --group task-42 --owner agent-7
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
+{"key":"name:port-3000","keys":["name:port-3000"],"locks":[{"grant":"1794179775108866-67649","key":"name:port-3000","mode":"exclusive","nested":false,"parent":null}],"mode":"exclusive","owner":"agent-7","result":"granted","waited_ms":6}
 ```
 
 ## 在脚本中使用
@@ -149,8 +153,8 @@ jlock run name:deploy-prod --timeout 2m -- ./deploy.sh
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-键            所有者      组  用途  时长  心跳  队列
-name:nightly  pid:188636  -   -     25ms  24ms  0
+键            模式       所有者     组  用途  时长   心跳   队列
+name:nightly  exclusive  pid:28912  -   -     105ms  104ms  0
 
 1 个锁, 0 个在等待
 $ jlock list
@@ -174,6 +178,31 @@ $ jlock graph
 没有等待者
 ```
 
+## 共享、家族与资源
+
+有三件事超出了“一次只有一个所有者”：
+
+- **共享锁。** 读者使用 `--mode shared`（或在键后加 `@shared`）：同一个键上的共享锁可以并存，独占锁要等它们全部消失，而在等待中的写者之后到达的读者会排在它后面。文件夹上的共享锁与其内部文件上的独占锁仍然冲突。
+- **所有者家族。** 所有者是一个路径：`task-7/exec-1` 是 `task-7` 的子级。一个所有者、它的祖先和它的后代之间永远不会互相阻塞。祖先持有的键（键本身、其上层文件夹或 `*`）会立刻授予子级，作为一个*嵌套*锁，它跳过队列，并在祖先的锁结束时结束。兄弟和无关者照常等待。
+- **资源。** `resource:<名称>` 表示不是文件的东西：`resource:desktop`（真实的鼠标、键盘和窗口）、`resource:clipboard`、`resource:port:8080`、`resource:machine` 等等（`jlock resources` 会列出；可在注册表文件夹的 `resources.json` 中添加自己的）。拼错的资源会被拒绝并给出建议，而不会悄悄变成另一个锁。若要请求一台安静的机器（基准测试、计时测试），请以独占方式获取 `resource:machine`；给机器加负载的任务则以共享方式获取。`*` 仍然存在，但它会拦住所有项目的所有锁：请只在紧急情况下使用。
+
+<!-- jlock-example -->
+```text
+$ jlock acquire name:db --mode shared --owner reader-1
+已授予 name:db (shared)
+$ jlock acquire name:db --mode shared --owner reader-2
+已授予 name:db (shared)
+$ jlock acquire name:db --owner writer --no-wait
+忙 name:db：持有者 reader-1 (shared) 及另外 1 个（位次 1）
+提示：jlock status name:db 显示谁持有它以及队列；去掉 --no-wait 即可排队等候
+$ jlock acquire name:build --owner task-7
+已授予 name:build
+$ jlock acquire name:build --owner task-7/exec-1
+已授予 name:build (嵌套于 task-7)
+$ jlock acquire resource:desktp --owner agent-7
+jlock: 未知资源 'desktp'；你是想用 resource:desktop 吗？（jlock resources 会列出它们）
+```
+
 ## 工作原理
 
 状态就是磁盘上的一个文件夹（Windows 上是 `%LOCALAPPDATA%\jlock`，Linux 上是 `~/.local/state/jlock`，macOS 上是 `~/Library/Application Support/jlock`）。不需要任何常驻进程，任何进程崩溃也不会丢失任何东西。
@@ -181,19 +210,19 @@ $ jlock graph
 ```mermaid
 flowchart TD
     A["jlock acquire 键"] --> B["在 locks/&lt;hash&gt;/queue/ 中取一张排队票<br/>（它的名字就是到达时间）"]
-    B --> C{"是最早的有效排队票、<br/>没有 holder.json、<br/>没有冲突的键被占用？"}
+    B --> C{"没有冲突的持有，<br/>没有更早的冲突排队票<br/>（已考虑模式和所有者）？"}
     C -- 否 --> W["等待，同时续期排队票的心跳"] --> C
-    C -- 是 --> D["以独占方式创建 holder.json<br/>（一个原子步骤：恰好一个赢家）"]
+    C -- 是 --> D["在该键的 gate 之下，创建<br/>holds/&lt;grant&gt;.json（恰好一个赢家）"]
     D --> E["已授予"]
-    E --> H["hold / run 续期心跳（mtime）<br/>并在 holder.json 上保持操作系统锁"]
-    H --> R["release：删除 holder.json；<br/>没有人留下时文件夹随之消失"]
+    E --> H["hold / run 续期心跳（mtime）<br/>并在持有文件上保持操作系统锁"]
+    H --> R["release：删除持有文件（以及嵌套在其中的持有）；<br/>没有人留下时文件夹随之消失"]
     H -. "所有者已死亡：没有心跳<br/>也没有操作系统锁" .-> X["任何路过的命令把它重命名<br/>到 broken/ 并记录 'expired'"]
     X --> C
 ```
 
-- **每个键一个文件夹**，以规范化后的键的 SHA-1 命名。`holder.json` 恰好在键被占用期间存在，并写明由谁持有。
-- **每个等待者一张排队票**，放在 `queue/` 中，以其到达时间命名：只有最早的有效排队票才能获取锁，所以顺序就是到达顺序。
-- **心跳**：所有者和等待者每 5 s 触碰一次自己的文件。超过 30 s 未被触碰的文件属于已死亡的进程，会被看到它的任何人删除。`hold` 和 `run` 还会在 `holder.json` 上保持一个操作系统锁，进程一死，内核会立即解除它，因此一个缓慢但仍存活的所有者永远不会被误认为已死亡。
+- **每个键一个文件夹**，以规范化后的键的 SHA-1 命名。其上的每个锁是 `holds/` 中的一个文件，写明由谁持有、处于什么模式、嵌套在哪个锁中。对同一个键的两个请求，在该键的 `gate` 文件之下依次裁决，该文件瞬间创建、瞬间删除。
+- **每个等待者一张排队票**，放在 `queue/` 中，以其到达时间命名：只有前面没有更早的冲突排队票时，等待者才能轮到，所以顺序就是到达顺序。
+- **心跳**：所有者和等待者每 5 s 触碰一次自己的文件。超过 30 s 未被触碰的文件属于已死亡的进程，会被看到它的任何人删除。`hold` 和 `run` 还会在各自的持有文件上保持一个操作系统锁，进程一死，内核会立即解除它，因此一个缓慢但仍存活的所有者永远不会被误认为已死亡。
 - **死锁**：文件本身就描述了谁在等待谁；会使环闭合的请求会被拒绝，并附上那条链。
 - **零残留**：没有任何锁时，`locks` 文件夹是空的。
 
@@ -202,7 +231,7 @@ flowchart TD
 | jlock 保证 | jlock 不做的事（以及为什么这没问题） |
 |---|---|
 | 任一时刻每个键只有一个所有者 | 阻止不使用 jlock 的程序：这些锁是建议性的，就像 `flock` 一样 |
-| 在存活的等待者之间严格按到达顺序 | 瞬间交接：下一个会在四分之一秒内察觉 |
+| 任一时刻每个键只有一个独占所有者（或任意数量的共享所有者；一个所有者的家族共享它的锁） | 瞬间交接：下一个会在四分之一秒内察觉 |
 | 已死亡所有者的锁会在 30 s 内被回收，并记入日志 | 对普通的 `acquire` 区分已死亡和卡住（卡住的所有者会发现 `lost` 并停止）；使用 `hold`/`run` 时，操作系统锁能区分二者 |
 | 每次都以相同方式检测并解决死锁 | 不同机器之间的协调 |
 | 列表永远是真实状态：它就是文件夹本身 | — |
@@ -214,10 +243,12 @@ flowchart TD
 | 键 | 含义 | 与谁冲突 |
 |---|---|---|
 | 一个路径：`D:\proj\src\a.ts`、`src/a.ts`、`~/notes`、`.` | 那个文件或文件夹；相对路径从当前文件夹开始；路径不必存在 | 相同的路径、其中的所有内容、其上层的每个文件夹，以及 `*` |
-| `name:<text>` | 任何不是路径的东西：`name:port-3000`、`name:deploy-prod` | 相同的名称，以及 `*` |
-| `*` | 全部 | 所有键 |
+| `name:<text>` | 你自己命名的其他任何东西：`name:deploy-prod`、`name:nightly` | 相同的名称，以及 `*` |
+| `resource:<name>[:<arg>]` | 一个已注册的资源：`resource:desktop`、`resource:port:8080`（`jlock resources`） | 相同的资源和参数，以及 `*` |
+| `*` | 全部（紧急情况；要一台安静的机器，请获取 `resource:machine`） | 所有键 |
 
 在 Windows 和 macOS 上忽略字母大小写（`D:\Proj\SRC` 和 `d:/proj/src` 是同一个键）。一个命令中的多个键要么全部获取、要么一个都不获取，并按固定顺序进行，因此它们之间永远不会互相死锁。
+键默认以独占方式获取，除非 `--mode shared` 或它自己的 `@shared` 后缀另有说明；只有当两个锁的键冲突、至少有一个是独占的、并且它们的所有者不属于同一个家族时，这两个锁才会冲突。
 
 ## 退出码
 

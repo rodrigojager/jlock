@@ -35,6 +35,12 @@ questo:
   vede il ciclo e rifiuta la richiesta che lo chiuderebbe.
 - **Sapere chi tiene cosa.** Quando qualcosa è bloccato, devi vedere chi lo tiene, da quando e chi sta
   attendendo. jlock elenca tutto, e ti permette di rompere un blocco in caso di emergenza.
+- **Lettori e scrittori.** Molti possono leggere una cosa insieme, finché nessuno la scrive. jlock ha blocchi
+  condivisi ed esclusivi, e uno scrittore che attende il suo turno non viene mai tagliato fuori da un flusso
+  di lettori.
+- **Un'attività e i comandi che avvia.** Un'attività che tiene i suoi file deve poter eseguire un comando che
+  li riprende, senza aspettare se stessa. In jlock i proprietari sono percorsi (`run-1/T04/exec-2`), e la
+  famiglia di un'attività non la blocca mai.
 
 ## Perché non qualcosa che esiste già
 
@@ -143,6 +149,11 @@ Opzioni da conoscere:
   lo rilascia mai.
   Per un lavoro che può durare di più, `jlock renew --owner agent-7` sposta in avanti questo limite senza mai
   lasciare il blocco.
+- `--mode shared`: solo per leggere. I blocchi condivisi su una chiave convivono; uno esclusivo (il
+  predefinito) li aspetta. Anche una singola chiave può dirlo: `src/a.ts@shared`.
+- I proprietari sono percorsi: un comando che l'agente avvia per l'attività 42 può riprendere i file
+  dell'attività come `--owner agent-7/task-42/build` e gli viene concesso subito, annidato nel blocco
+  dell'attività.
 
 Perché non semplicemente `jlock acquire`? Anche un blocco preso con `acquire` sopravvive al comando, ma va
 rinnovato (`jlock heartbeat`) almeno ogni 30 secondi, altrimenti viene considerato morto e scade. Un agente
@@ -166,7 +177,7 @@ Con `--json`, ogni comando stampa un oggetto JSON, uguale in ogni lingua:
 <!-- jlock-example -->
 ```text
 $ jlock acquire name:port-3000 --owner agent-7 --json
-{"key":"name:port-3000","keys":["name:port-3000"],"owner":"agent-7","result":"granted","waited_ms":1}
+{"key":"name:port-3000","keys":["name:port-3000"],"locks":[{"grant":"1794179774593687-05968","key":"name:port-3000","mode":"exclusive","nested":false,"parent":null}],"mode":"exclusive","owner":"agent-7","result":"granted","waited_ms":5}
 ```
 
 ## Usarlo da uno script
@@ -184,8 +195,8 @@ Qui il comando è jlock stesso, così puoi vedere il blocco tenuto mentre è in 
 <!-- jlock-example -->
 ```text
 $ jlock run name:nightly -- jlock list
-CHIAVE        PROPRIETARIO  GRUPPO  SCOPO  DURATA  HEARTBEAT  CODA
-name:nightly  pid:179856    -       -      21ms    21ms       0
+CHIAVE        MODALITÀ   PROPRIETARIO  GRUPPO  SCOPO  DURATA  HEARTBEAT  CODA
+name:nightly  exclusive  pid:25280     -       -      14ms    15ms       0
 
 1 blocco, 0 in attesa
 $ jlock list
@@ -210,6 +221,44 @@ $ jlock graph
 nessuno in attesa
 ```
 
+## Condivisione, famiglie e risorse
+
+Tre cose vanno oltre «un proprietario alla volta»:
+
+- **Blocchi condivisi.** `--mode shared` (o `@shared` dopo una chiave) per i lettori: i blocchi condivisi di
+  una chiave convivono, uno esclusivo attende finché non sono spariti, e un lettore che arriva dopo uno
+  scrittore in attesa si mette in coda dietro di lui. Un blocco condiviso su una cartella e uno esclusivo su
+  un file al suo interno restano in conflitto.
+- **Famiglie di proprietari.** Un proprietario è un percorso: `task-7/exec-1` è figlio di `task-7`. Un
+  proprietario, i suoi antenati e i suoi discendenti non si bloccano mai tra loro. Una chiave che un antenato
+  tiene (la chiave stessa, una cartella sopra di essa, o `*`) viene concessa subito al figlio, come blocco
+  *annidato* che salta la coda e termina quando termina il blocco dell'antenato. Fratelli ed estranei
+  attendono come al solito.
+- **Risorse.** `resource:<nome>` indica qualcosa che non è un file: `resource:desktop` (il vero mouse, la
+  tastiera e le finestre), `resource:clipboard`, `resource:port:8080`, `resource:machine`, e altro (`jlock
+  resources` le elenca; aggiungi le tue in `resources.json`, nella cartella del registro). Una risorsa scritta
+  male viene rifiutata con un suggerimento, invece di diventare in silenzio un altro blocco. Per chiedere una
+  macchina tranquilla (un benchmark, un test di tempi), prendi `resource:machine` in esclusiva; i lavori che
+  caricano la macchina la prendono condivisa. `*` esiste ancora, ma ferma ogni blocco di ogni progetto:
+  tienilo per le emergenze.
+
+<!-- jlock-example -->
+```text
+$ jlock acquire name:db --mode shared --owner reader-1
+concessa name:db (shared)
+$ jlock acquire name:db --mode shared --owner reader-2
+concessa name:db (shared)
+$ jlock acquire name:db --owner writer --no-wait
+occupata name:db, tenuta da reader-1 (shared) e 1 altro (posizione 1)
+suggerimento: jlock status name:db mostra chi la tiene e la coda; togli --no-wait per attendere il tuo turno
+$ jlock acquire name:build --owner task-7
+concessa name:build
+$ jlock acquire name:build --owner task-7/exec-1
+concessa name:build (annidato in task-7)
+$ jlock acquire resource:desktp --owner agent-7
+jlock: risorsa sconosciuta 'desktp'; intendevi resource:desktop? (jlock resources le elenca)
+```
+
 ## Come funziona
 
 Lo stato è una cartella sul disco (`%LOCALAPPDATA%\jlock` su Windows, `~/.local/state/jlock` su Linux,
@@ -219,23 +268,25 @@ processo va in crash.
 ```mermaid
 flowchart TD
     A["jlock acquire chiave"] --> B["prende un biglietto in locks/&lt;hash&gt;/queue/<br/>(il suo nome è l'ora di arrivo)"]
-    B --> C{"biglietto vivo più vecchio,<br/>nessun holder.json,<br/>nessuna chiave in conflitto presa?"}
+    B --> C{"nessun possesso in conflitto,<br/>nessun biglietto più vecchio in conflitto<br/>(considerando modalità e proprietari)?"}
     C -- no --> W["attende, rinnovando l'heartbeat del biglietto"] --> C
-    C -- yes --> D["crea holder.json in esclusiva<br/>(un solo passo atomico: esattamente un vincitore)"]
+    C -- yes --> D["sotto il gate della chiave, crea<br/>holds/&lt;grant&gt;.json (esattamente un vincitore)"]
     D --> E["concessa"]
-    E --> H["hold / run rinnovano l'heartbeat (mtime)<br/>e tengono un blocco del SO su holder.json"]
-    H --> R["release: elimina holder.json;<br/>la cartella sparisce quando non resta nessuno"]
+    E --> H["hold / run rinnovano l'heartbeat (mtime)<br/>e tengono un blocco del SO sul file di possesso"]
+    H --> R["release: elimina il file di possesso (e i possessi annidati in esso);<br/>la cartella sparisce quando non resta nessuno"]
     H -. "proprietario morto: nessun heartbeat<br/>e nessun blocco del SO" .-> X["chiunque passi la rinomina<br/>in broken/ e registra 'expired'"]
     X --> C
 ```
 
-- **Una cartella per chiave**, chiamata con lo SHA-1 della chiave normalizzata. `holder.json` esiste
-  esattamente finché la chiave è presa, e dice chi ce l'ha.
-- **Un biglietto per ogni attesa** in `queue/`, chiamato con l'ora di arrivo: solo il biglietto vivo più
-  vecchio può prendere il blocco, quindi l'ordine è l'ordine di arrivo.
+- **Una cartella per chiave**, chiamata con lo SHA-1 della chiave normalizzata. Ogni blocco su di essa è un
+  file in `holds/` che dice chi ce l'ha, in quale modalità e in quale blocco è annidato. Due richieste per la
+  stessa chiave vengono decise una dopo l'altra sotto il file `gate` della chiave, creato ed eliminato in un
+  istante.
+- **Un biglietto per ogni attesa** in `queue/`, chiamato con l'ora di arrivo: chi attende passa solo quando
+  davanti a lui non c'è nessun biglietto più vecchio in conflitto, quindi l'ordine è l'ordine di arrivo.
 - **Heartbeat** (segnale di vita): proprietari e chi attende toccano il proprio file ogni 5 s. Un file non
-  toccato da 30 s appartiene a un processo morto e viene rimosso da chiunque lo veda. `hold` e `run`
-  tengono anche un blocco del sistema operativo su `holder.json`, che il kernel rilascia nell'istante in
+  toccato da 30 s appartiene a un processo morto e viene rimosso da chiunque lo veda. `hold` e `run` tengono
+  anche un blocco del sistema operativo sui propri file di possesso, che il kernel rilascia nell'istante in
   cui il processo muore, così un proprietario lento ma vivo non viene mai preso per morto.
 - **Deadlock**: i file stessi descrivono chi attende chi; una richiesta che chiuderebbe un ciclo viene
   rifiutata, mostrando la catena.
@@ -246,7 +297,7 @@ flowchart TD
 | jlock garantisce | jlock non garantisce (e perché va bene così) |
 |---|---|
 | un solo proprietario per chiave in ogni istante | fermare i programmi che non usano jlock: i blocchi sono consultivi, come `flock` |
-| ordine di arrivo rigoroso tra chi attende ed è vivo | il passaggio istantaneo: il prossimo se ne accorge entro un quarto di secondo |
+| un solo proprietario esclusivo per chiave in ogni istante (o un numero qualsiasi di condivisi; la famiglia di un proprietario condivide i propri blocchi) | il passaggio istantaneo: il prossimo se ne accorge entro un quarto di secondo |
 | il blocco di un proprietario morto viene recuperato entro 30 s, e registrato nel log | distinguere un morto da un congelato con un semplice `acquire` (un proprietario congelato trova `lost` e si ferma); con `hold`/`run` il blocco del SO li distingue |
 | deadlock rilevati e risolti sempre allo stesso modo | il coordinamento tra macchine diverse |
 | l'elenco è sempre la verità: è la cartella stessa | — |
@@ -258,12 +309,16 @@ flowchart TD
 | Chiave | Significato | In conflitto con |
 |---|---|---|
 | un percorso: `D:\proj\src\a.ts`, `src/a.ts`, `~/notes`, `.` | quel file o quella cartella; i percorsi relativi partono dalla cartella corrente; il percorso non deve per forza esistere | lo stesso percorso, tutto ciò che contiene, ogni cartella sopra di esso, e `*` |
-| `name:<text>` | qualsiasi cosa che non sia un percorso: `name:port-3000`, `name:deploy-prod` | lo stesso nome, e `*` |
-| `*` | tutto | ogni chiave |
+| `name:<text>` | qualsiasi altra cosa a cui dai un nome tu: `name:deploy-prod`, `name:nightly` | lo stesso nome, e `*` |
+| `resource:<name>[:<arg>]` | una risorsa registrata: `resource:desktop`, `resource:port:8080` (`jlock resources`) | la stessa risorsa e lo stesso argomento, e `*` |
+| `*` | tutto (emergenze; per una macchina tranquilla prendi `resource:machine`) | ogni chiave |
 
 Su Windows e macOS maiuscole e minuscole non contano (`D:\Proj\SRC` e `d:/proj/src` sono la stessa
 chiave). Più chiavi in un solo comando vengono prese tutte o nessuna, in un ordine fisso, così non vanno
 mai in deadlock tra loro.
+Una chiave viene presa in esclusiva a meno che `--mode shared` o il suo suffisso `@shared` non dicano altro;
+due blocchi sono in conflitto solo quando lo sono le loro chiavi, almeno uno è esclusivo e i loro proprietari
+non sono di una stessa famiglia.
 
 ## Codici di uscita
 
