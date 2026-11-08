@@ -2,7 +2,7 @@
 //! `locks/<sha1>/{key, gate, holds/<grant>.json, holds/<grant>.lease, queue/, broken/}`.
 //!
 //! A key may have several holds at once (shared holds, nested holds of one family), one file each,
-//! named by its grant (`<micros-UTC-16-digits>-<4 hex>`, in grant order). Decisions about one key are
+//! named by its grant (`<micros-UTC-16-digits>-<5 digits>`, in grant order). Decisions about one key are
 //! made under its `gate`, a file created with `create_new` and deleted a moment later: two callers
 //! asking for the same key at the same instant are decided one after the other.
 

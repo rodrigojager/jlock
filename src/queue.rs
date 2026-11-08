@@ -1,4 +1,4 @@
-//! Tickets: `queue/<micros-UTC-16-digits>-<4 hex>.json`, created with `create_new`. The file name
+//! Tickets: `queue/<micros-UTC-16-digits>-<5 digits>.json`, created with `create_new`. The file name
 //! orders the queue; the body is the same as a hold's (with the mode asked for); the mtime is the
 //! waiter's heartbeat.
 
@@ -18,8 +18,10 @@ pub struct Ticket {
     pub body: Holder,
 }
 
+/// A ticket or grant name: the time in microseconds, then a random number against ties. Digits only,
+/// so that it reads the same in every output.
 pub fn new_name() -> String {
-    format!("{:016}-{:04x}", now_micros(), random_u64() & 0xffff)
+    format!("{:016}-{:05}", now_micros(), random_u64() % 100_000)
 }
 
 /// Creates a ticket for `body` in the key's queue. If the folder disappears meanwhile (a release
