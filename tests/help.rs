@@ -46,7 +46,18 @@ fn every_command_has_a_help_page() {
 
 #[test]
 fn every_option_has_a_line_of_help_and_is_taken_by_the_parser() {
-    let env = Env::new("help-options");
+    let mut env = Env::new("help-options");
+    // `update --version <example>` must never reach the real releases: it would replace the binary
+    // under test with a published one. An empty folder as the release origin makes it fail at once.
+    let releases = env.home.join("no-releases");
+    std::fs::create_dir_all(&releases).unwrap();
+    let text = releases.to_string_lossy().replace('\\', "/");
+    let base = if text.starts_with('/') {
+        format!("file://{text}")
+    } else {
+        format!("file:///{text}")
+    };
+    env.set("JLOCK_UPDATE_BASE", &base);
     for c in commands::COMMANDS {
         let page = env.run(&["help", c.name]).stdout;
         for o in c.opts {
