@@ -138,6 +138,74 @@ mod platform {
     use std::os::unix::process::CommandExt;
     use std::process::{Child, Command};
 
+    // Darwin killpg excludes zombies and returns EPERM for a zombie-only group.
+    // EPERM can also mean a live, unsignalable member: never ignore it on its own.
+    #[cfg(target_os = "macos")]
+    fn zombie_group(group: i32) -> io::Result<bool> {
+        use std::mem::{size_of, zeroed};
+        const PROC_PGRP_ONLY: u32 = 2;
+        fn members(group: i32) -> io::Result<Vec<i32>> {
+            unsafe {
+                let bytes =
+                    libc::proc_listpids(PROC_PGRP_ONLY, group as u32, std::ptr::null_mut(), 0);
+                if bytes <= 0 || bytes as usize > 16 * 1024 * 1024 {
+                    return Err(io::Error::other("cannot size command process group"));
+                }
+                let mut pids = vec![0i32; bytes as usize / size_of::<i32>() + 64];
+                let capacity = (pids.len() * size_of::<i32>()) as i32;
+                let used = libc::proc_listpids(
+                    PROC_PGRP_ONLY,
+                    group as u32,
+                    pids.as_mut_ptr().cast(),
+                    capacity,
+                );
+                // Zero also represents an API error. A pinned leader must be present.
+                // A full buffer may be truncated; retry cleanup instead of guessing.
+                if used <= 0
+                    || used >= capacity
+                    || !(used as usize).is_multiple_of(size_of::<i32>())
+                {
+                    return Err(io::Error::other(
+                        "incomplete command process group snapshot",
+                    ));
+                }
+                pids.truncate(used as usize / size_of::<i32>());
+                Ok(pids)
+            }
+        }
+        let snapshot = members(group)?;
+        if !snapshot.contains(&group) {
+            return Ok(false);
+        }
+        for &pid in &snapshot {
+            if pid <= 0 {
+                return Ok(false);
+            }
+            let mut info: libc::proc_bsdinfo = unsafe { zeroed() };
+            // arg=1 includes zombies; arg=0 would report the pinned leader as ESRCH.
+            let used = unsafe {
+                libc::proc_pidinfo(
+                    pid,
+                    libc::PROC_PIDTBSDINFO,
+                    1,
+                    &mut info as *mut _ as _,
+                    size_of::<libc::proc_bsdinfo>() as i32,
+                )
+            };
+            if used != size_of::<libc::proc_bsdinfo>() as i32
+                || info.pbi_pid != pid as u32
+                || info.pbi_pgid != group as u32
+                || info.pbi_status != libc::SZOMB as u32
+            {
+                return Ok(false);
+            }
+        }
+        // A member could fork between the first snapshot and its transition to zombie.
+        // Re-snapshot after every observed member is dead: any new PID refuses cleanup.
+        // WNOWAIT still pins the leader, so this group cannot be recycled meanwhile.
+        Ok(members(group)?.iter().all(|pid| snapshot.contains(pid)))
+    }
+
     pub struct Tree {
         child: Child,
         group: i32,
@@ -197,7 +265,11 @@ mod platform {
             // The group belongs only to this command, never to the invoking agent or shell.
             if unsafe { libc::kill(-self.group, libc::SIGKILL) } == -1 {
                 let e = io::Error::last_os_error();
-                if e.raw_os_error() != Some(libc::ESRCH) {
+                let gone = e.raw_os_error() == Some(libc::ESRCH);
+                #[cfg(target_os = "macos")]
+                let gone =
+                    gone || (e.raw_os_error() == Some(libc::EPERM) && zombie_group(self.group)?);
+                if !gone {
                     return Err(e);
                 }
             }
@@ -209,6 +281,30 @@ mod platform {
     impl Drop for Tree {
         fn drop(&mut self) {
             let _ = self.stop();
+        }
+    }
+
+    #[cfg(all(test, target_os = "macos"))]
+    mod tests {
+        use super::*;
+        use std::time::{Duration, Instant};
+
+        #[test]
+        fn zombie_proof_refuses_a_live_member_even_after_leader_exit() {
+            // Both children are bounded; this test never inspects or signals another group.
+            let mut tree =
+                Tree::spawn(&["/bin/sh".into(), "-c".into(), "sleep 2 & exit 0".into()]).unwrap();
+            let deadline = Instant::now() + Duration::from_secs(1);
+            while tree.try_wait().unwrap().is_none() {
+                assert!(Instant::now() < deadline);
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            assert!(
+                !zombie_group(tree.group).unwrap(),
+                "live child must retain custody"
+            );
+            tree.stop().unwrap();
+            tree.stop().unwrap(); // No signal after the leader was reaped.
         }
     }
 }

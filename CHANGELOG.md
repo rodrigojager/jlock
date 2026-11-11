@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.3
+
+- Finish normal commands on macOS when the private group contains only zombies: Darwin returns EPERM for that group. Verify complete group snapshots and zombie states before accepting it; live or uninspectable members still retain ownership.
+- Keep the unreaped leader pinned until cleanup, and recheck group membership after state inspection to reject a concurrent fork.
+- Add a bounded normal-exit regression alongside descendant, timeout, lock-loss and unrelated-process coverage.
+- Publish immutable tags and use supported macOS 15 runners for every native check.
+
 ## 0.4.2
 
 - Add `run --total-timeout` to bound queue plus payload with one custodian and a single budget.

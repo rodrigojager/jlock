@@ -11,8 +11,8 @@ for every target, packs the archives, writes `SHA256SUMS` and publishes the GitH
 | `x86_64-pc-windows-msvc` | `windows-latest` | `jlock-X.Y.Z-x86_64-pc-windows-msvc.zip` |
 | `x86_64-unknown-linux-musl` (static) | `ubuntu-latest` | `jlock-X.Y.Z-x86_64-unknown-linux-musl.tar.gz` |
 | `aarch64-unknown-linux-musl` (static) | `ubuntu-24.04-arm` | `jlock-X.Y.Z-aarch64-unknown-linux-musl.tar.gz` |
-| `x86_64-apple-darwin` | `macos-14` (cross-built from arm64) | `jlock-X.Y.Z-x86_64-apple-darwin.tar.gz` |
-| `aarch64-apple-darwin` | `macos-14` | `jlock-X.Y.Z-aarch64-apple-darwin.tar.gz` |
+| `x86_64-apple-darwin` | `macos-15` (cross-built from arm64) | `jlock-X.Y.Z-x86_64-apple-darwin.tar.gz` |
+| `aarch64-apple-darwin` | `macos-15` | `jlock-X.Y.Z-aarch64-apple-darwin.tar.gz` |
 
 Each archive holds the binary (`jlock` or `jlock.exe`), `LICENSE` and `README.md` at its root.
 `SHA256SUMS` lists every archive in the `sha256sum` format (`<hash>  <file>`).
@@ -39,10 +39,10 @@ Each archive holds the binary (`jlock` or `jlock.exe`), `LICENSE` and `README.md
 ## When a target fails
 
 - The `publish` job only runs when every build succeeded, so a failed target publishes nothing. Fix the
-  problem on `main`, then move the tag: `git tag -d v0.2.0`, `git push --delete origin v0.2.0`, tag the
-  fixed commit and push the tag again.
-- If a Release was already created (for example by a manual run) and is wrong, delete it on GitHub
-  before pushing the tag again; `gh release create` refuses an existing tag.
+  problem on `main`, bump the patch version and push a new tag. Never move or delete a published tag:
+  users may already have fetched its source even if archive publication failed.
+- If a Release was already created and is wrong, retain its tag, mark it as superseded in the release
+  notes and publish the correction under a new version.
 - A runner image that GitHub retired (as happened to `macos-13`) shows as a job that waits forever: move
   that target to a current runner in the matrix.
 

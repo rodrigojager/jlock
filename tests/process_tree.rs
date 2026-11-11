@@ -95,6 +95,21 @@ fn assert_stopped(env: &Env) {
 }
 
 #[test]
+fn successful_command_without_descendants_finishes_and_unlocks() {
+    let env = Env::new("tree-normal-empty");
+    // Darwin returns EPERM when SIGKILL targets only the unreaped, exited leader.
+    // No command timeout: cleanup itself must finish, not retry forever with locks held.
+    let done = Kid::start(env.cmd(&["run", "name:tree", "--", common::JLOCK, "list"]))
+        .finish(Duration::from_secs(5));
+    assert_eq!(done.code, 0, "{}", done.stderr);
+    assert!(done.stdout.contains("name:tree"));
+    assert!(env.run(&["status", "name:tree"]).stdout.starts_with("free"));
+    let done = Kid::start(env.cmd(&["exec", "--timeout", "2s", "--", common::JLOCK, "--version"]))
+        .finish(Duration::from_secs(5));
+    assert_eq!(done.code, 0, "{}", done.stderr);
+}
+
+#[test]
 fn timeout_closes_inherited_pipes_and_does_not_touch_another_process() {
     let env = Env::new("tree-timeout");
     let mut unrelated = Command::new(std::env::current_exe().unwrap())

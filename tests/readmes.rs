@@ -153,9 +153,6 @@ fn run_block(tag: &str, n: usize, block: &Block) -> Vec<String> {
         .steps
         .iter()
         .map(|(cmd, _)| {
-            // Bypass libtest capture so a blocked fixture remains diagnosable in CI.
-            use std::io::Write;
-            let _ = writeln!(std::io::stderr(), "README {tag} block {n}: {cmd}");
             let args: Vec<String> = split(cmd)
                 .into_iter()
                 .map(|a| {

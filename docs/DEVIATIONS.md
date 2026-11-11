@@ -88,7 +88,7 @@ implementation and why.
 - **What:** ticket 14 builds `x86_64-apple-darwin` on `macos-13`, the Intel runner.
 - **Why not:** GitHub retired the `macos-13` runners; a workflow that names them waits for a runner that
   never comes.
-- **Done instead:** the Intel binary is cross-built on `macos-14` (Apple's toolchain targets both
+- **Done instead:** the Intel binary is cross-built on `macos-15` (Apple's toolchain targets both
   architectures). The test suite still runs on that runner, for arm64; the Intel binary is not tested
   natively before it is published.
 
@@ -153,3 +153,12 @@ explicit limitations. Cleanup failure retains ownership and reports the conditio
 `run --total-timeout` bounds queue plus payload with one deadline. It returns 124 even when the budget
 expires in the queue and never starts a payload after expiry. Use this instead of nesting supervisors:
 on Unix each supervisor creates its own process group, so an outer hard timeout cannot clean an inner group.
+
+
+On macOS, `killpg` excludes zombies and returns EPERM for a zombie-only group (Apple XNU
+[`killpg1`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_sig.c)).
+Version 0.4.3 accepts this only after two complete libproc group snapshots and individual zombie-state
+checks, with the leader still unreaped. A live member, inspection failure, truncated snapshot or new PID
+continues to refuse cleanup. This prevents both an endless wait after ordinary success and an unsafe
+unlock when EPERM really means an unsignalable live command. Snapshot/state API semantics are in Apple's
+[`proc_info.c`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/proc_info.c).
