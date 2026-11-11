@@ -195,7 +195,7 @@ mod platform {
             if used != size_of::<libc::proc_bsdinfo>() as i32
                 || info.pbi_pid != pid as u32
                 || info.pbi_pgid != group as u32
-                || info.pbi_status != libc::SZOMB as u32
+                || info.pbi_status != libc::SZOMB
             {
                 return Ok(false);
             }

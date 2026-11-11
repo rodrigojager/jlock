@@ -2,6 +2,7 @@
 
 ## 0.4.3
 
+- Includes the foreground supervision from 0.4.0–0.4.2: `exec --timeout`, `run --command-timeout` and `run --total-timeout`, private Windows Job Objects and Unix process groups, cleanup before lock release, and no changes to the 0.3 registry/owner-family protocol.
 - Finish normal commands on macOS when the private group contains only zombies: Darwin returns EPERM for that group. Verify complete group snapshots and zombie states before accepting it; live or uninspectable members still retain ownership.
 - Keep the unreaped leader pinned until cleanup, and recheck group membership after state inspection to reject a concurrent fork.
 - Add a bounded normal-exit regression alongside descendant, timeout, lock-loss and unrelated-process coverage.
