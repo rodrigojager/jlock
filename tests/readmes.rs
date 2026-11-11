@@ -153,6 +153,7 @@ fn run_block(tag: &str, n: usize, block: &Block) -> Vec<String> {
         .steps
         .iter()
         .map(|(cmd, _)| {
+            eprintln!("README {tag} block {n}: {cmd}");
             let args: Vec<String> = split(cmd)
                 .into_iter()
                 .map(|a| {
