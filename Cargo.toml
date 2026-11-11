@@ -1,6 +1,6 @@
 [package]
 name = "jlock"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 description = "Machine-wide locks for files, folders and names: fair queue, heartbeat recovery, deadlock detection, no server"
 license = "MIT"
@@ -27,6 +27,10 @@ windows-sys = { version = "0.59", features = [
     "Win32_Storage_FileSystem",
     "Win32_System_Console",
     "Win32_System_IO",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
 ] }
 
 [target.'cfg(unix)'.dependencies]

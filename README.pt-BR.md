@@ -374,3 +374,21 @@ Rodrigo Jäger — GitHub <https://github.com/rodrigojager> · LinkedIn <https:/
 ## Licença
 
 MIT, veja [`LICENSE`](LICENSE).
+
+## Foreground process safety (0.4)
+
+`jlock exec --timeout 10m -- <command...>` supervises a foreground command without taking a lock.
+`jlock run <keys...> --command-timeout 10m -- <command...>` keeps its locks through descendant cleanup.
+`run --timeout` still limits only the lock queue. A command deadline returns **124**; loss of a lock returns **14**.
+Neither outcome automatically retries the command.
+
+On Windows the child starts suspended, enters a private Job Object and only then runs. Descendants are
+terminated before returning or releasing locks, even when the wrapper exits first. Closing the supervisor
+also closes its kill-on-close job. Containment failure refuses to launch; cleanup failure keeps the locks
+and reports `cleanup pending`. Other agents, keepers and unrelated Node/Python processes are never searched
+for or signalled. On Unix a private process group covers ordinary descendants; deliberate detachment and
+hard supervisor death are outside this guarantee. Docker daemon workloads and remote services are outside
+OS process custody: manage those explicitly. Do not launch persistent background services with `run`/`exec`.
+
+The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
+Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.

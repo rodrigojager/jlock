@@ -80,6 +80,24 @@ pub const HOLD_OPTS: &[Opt] = &[
 ];
 
 pub const TAKE: &str = "help.group.take";
+pub const RUN_OPTS: &[Opt] = &[
+    opt("owner", Some("id"), "help.opt.acquire.owner", "agent-7"),
+    opt("group", Some("group"), "help.opt.acquire.group", "task-42"),
+    opt("intent", Some("text"), "help.opt.acquire.intent", "build"),
+    opt("meta", Some("kv"), "help.opt.acquire.meta", "task=T04"),
+    opt("ttl", Some("time"), "help.opt.acquire.ttl", "2h"),
+    opt("mode", Some("mode"), "help.opt.acquire.mode", "shared"),
+    opt("wait", None, "help.opt.acquire.wait", ""),
+    opt("no-wait", None, "help.opt.acquire.no_wait", ""),
+    opt("timeout", Some("time"), "help.opt.acquire.timeout", "30s"),
+    opt(
+        "command-timeout",
+        Some("time"),
+        "help.opt.run.command_timeout",
+        "10m",
+    ),
+    JSON,
+];
 pub const SEE: &str = "help.group.see";
 pub const EMERGENCY: &str = "help.group.emergency";
 pub const MAINTENANCE: &str = "help.group.maintenance";
@@ -99,9 +117,21 @@ pub const COMMANDS: &[Command] = &[
     Command {
         name: "run",
         group: TAKE,
-        opts: ACQUIRE_OPTS,
-        codes: &["0", "2", "10", "11", "12", "14", "20", "130"],
+        opts: RUN_OPTS,
+        codes: &["0", "2", "10", "11", "12", "14", "20", "124", "130"],
         see: &["acquire", "hold"],
+    },
+    Command {
+        name: "exec",
+        group: TAKE,
+        opts: &[opt(
+            "timeout",
+            Some("time"),
+            "help.opt.run.command_timeout",
+            "10m",
+        )],
+        codes: &["0", "2", "20", "124", "130"],
+        see: &["run"],
     },
     Command {
         name: "hold",

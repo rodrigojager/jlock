@@ -26,7 +26,7 @@
   "help.group.emergency": "Urgence",
   "help.group.maintenance": "Maintenance",
   "help.group.help": "Aide",
-  "help.version": "Affiche la version sur une ligne (jlock 0.3.0).",
+  "help.version": "Affiche la version sur une ligne (jlock 0.4.0).",
   "help.label.global": "Options globales",
   "help.label.usage": "Utilisation",
   "help.label.options": "Options",
@@ -431,5 +431,14 @@
   "error.list_no_keys": "list ne prend pas de clés (reçu '{key}')",
   "error.under_path": "--under attend un chemin",
   "error.no_localappdata": "LOCALAPPDATA n'est pas défini; définissez JLOCK_HOME",
-  "error.no_home": "HOME n'est pas défini; définissez JLOCK_HOME"
+  "error.no_home": "HOME n'est pas défini; définissez JLOCK_HOME",
+
+  "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
+  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
+  "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
+  "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
+  "help.exit.124": "command deadline reached; its supervised process tree was stopped",
+  "error.exec_needs_command": "exec needs a command after '--'",
+  "help.cmd.run.more": "Foreground commands only: remaining descendants are stopped before locks are released, including after a successful wrapper exits. Windows uses a suspended launch into a private kill-on-close Job Object, so killing the supervisor also stops its descendants. Unix uses a private process group; deliberately detached sessions, hard supervisor death and remote services are outside that guarantee. A cleanup error retains the locks and reports cleanup pending; it never silently runs without containment."
 }

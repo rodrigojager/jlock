@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0 — 2026-11-11
+
+- Add `exec --timeout` for process custody without registry locks; add `run --command-timeout`.
+- Windows uses suspended launch and a private kill-on-close Job Object. Stop descendants before unlocking,
+  including on lock loss, deadline and successful wrapper exit. Refuse unsafe containment fallback.
+- Unix commands use private process groups; document detachment and hard-parent-death limits.
+- Preserve the 0.3 registry and owner/resource semantics; this release also ships the previously unreleased 0.3 redesign.
+- Deterministic regressions cover inherited pipes, lock loss, timeout, supervisor death and unrelated siblings.
+
 ## 0.3.0 — unreleased
 
 - **Owners are paths** (`gt:run/T18/exec-1`). An owner, its ancestors and its descendants never block

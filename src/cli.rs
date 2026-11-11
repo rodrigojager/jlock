@@ -219,6 +219,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "release" => crate::cmd::release::run(rest),
         "hold" => crate::cmd::hold::run(rest),
         "run" => crate::cmd::run::run(rest),
+        "exec" => crate::cmd::exec::run(rest),
         "heartbeat" => crate::cmd::heartbeat::run(rest),
         "renew" => crate::cmd::renew::run(rest),
         "graph" => crate::cmd::graph::run(rest),

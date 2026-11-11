@@ -5,22 +5,11 @@ use crate::cli::{fs_error, usage, CmdResult, Failure, EXIT_LOST, EXIT_USAGE};
 use crate::cmd::acquire::{acquire_all, parse, report, wants, SetOutcome};
 use crate::cmd::hold::Keeper;
 use crate::i18n::txt;
+use crate::process_tree::Tree;
 use crate::store::Store;
 use crate::wait;
-use std::process::{Command, ExitStatus};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-
-fn exit_code(status: ExitStatus) -> i32 {
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        if let Some(sig) = status.signal() {
-            return 128 + sig;
-        }
-    }
-    status.code().unwrap_or(1)
-}
 
 pub fn run(args: Vec<String>) -> CmdResult {
     let (opts, command) = parse(args, "run")?;
@@ -39,7 +28,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     }
     let _ = crate::index::rewrite(&store);
     let mut keeper = Keeper::new(&store, outcome.keys(), &opts.ident.owner, opts.json);
-    let mut child = match Command::new(&command[0]).args(&command[1..]).spawn() {
+    let mut child = match Tree::spawn(&command) {
         Ok(child) => child,
         Err(e) => {
             keeper.release_all();
@@ -49,24 +38,40 @@ pub fn run(args: Vec<String>) -> CmdResult {
             });
         }
     };
-    let code = loop {
+    let command_deadline = opts.command_timeout.map(|t| Instant::now() + t);
+    let mut lost = None;
+    let result = loop {
         match child.try_wait() {
-            Ok(Some(status)) => break exit_code(status),
+            Ok(Some(code)) => break Ok(code),
             Ok(None) => {}
             Err(e) => {
-                keeper.release_all();
-                return Err(fs_error(txt!("error.waiting_for", cmd = command[0]), &e));
+                break Err(fs_error(txt!("error.waiting_for", cmd = command[0]), &e));
             }
         }
         if let Some(trouble) = keeper.tick() {
             // The lock is gone: the command must not go on unprotected.
-            let _ = child.kill();
-            let _ = child.wait();
-            keeper.lose(&trouble, true);
-            return Ok(EXIT_LOST);
+            lost = Some(trouble);
+            break Ok(EXIT_LOST);
+        }
+        if wait::interrupted() {
+            break Ok(130);
+        }
+        if command_deadline.is_some_and(|d| Instant::now() >= d) {
+            break Ok(124);
         }
         sleep(Duration::from_millis(20));
     };
+    while let Err(e) = child.stop() {
+        eprintln!("jlock: command cleanup pending; retaining locks: {e}");
+        if lost.is_none() {
+            lost = keeper.tick();
+        }
+        sleep(Duration::from_secs(1));
+    }
+    if let Some(trouble) = lost {
+        keeper.lose(&trouble, true);
+        return Ok(EXIT_LOST);
+    }
     keeper.release_all();
-    Ok(code)
+    result
 }

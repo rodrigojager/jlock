@@ -16,6 +16,7 @@ mod key;
 mod lease;
 mod log;
 mod oslock;
+mod process_tree;
 mod queue;
 mod resources;
 mod selfreplace;
@@ -28,6 +29,7 @@ mod cmd {
     pub mod about;
     pub mod acquire;
     pub mod doctor;
+    pub mod exec;
     pub mod gc;
     pub mod graph;
     pub mod heartbeat;

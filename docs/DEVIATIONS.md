@@ -137,3 +137,15 @@ implementation and why.
   exclusive by default (`machine` too: a benchmark that forgets the mode must not silently share); the
   user catalogue is `<JLOCK_HOME>/resources.json`; `*` stays, for emergencies. Details: `docs/USAGE.md`,
   `docs/API-0.3.md`.
+
+## 15. Foreground process custody before release (0.4)
+
+Killing only a shell left its descendants running with inherited output pipes, and normal wrapper exit could
+release locks while descendants still wrote files. `exec` now provides native custody without acquiring locks;
+`run` uses the same custody and cleans up before releasing locks. No scheduler, registry or owner-family rewrite
+is involved. Command deadlines are independent of queue timeouts and do not retry work.
+
+Windows starts through Rust's standard command launcher while suspended, assigns a private Job Object, then
+resumes only that child's primary thread. Assignment failure refuses execution. Unix keeps the group leader
+waitable until group cleanup to prevent PID reuse; deliberate detachment and hard supervisor death remain
+explicit limitations. Cleanup failure retains ownership and reports the condition instead of declaring success.

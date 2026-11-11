@@ -33,6 +33,7 @@ pub struct AcquireOpts {
     pub ident: Ident,
     pub wait: bool,
     pub timeout: Option<Duration>,
+    pub command_timeout: Option<Duration>,
     pub json: bool,
     /// `hold --detach`: answer and return, leaving a second process to keep the lock.
     pub detach: bool,
@@ -59,6 +60,7 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
         },
         wait: true,
         timeout: None,
+        command_timeout: None,
         json: false,
         detach: false,
         release_on_eof: false,
@@ -96,6 +98,9 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
                 "wait" => opts.wait = true,
                 "no-wait" => opts.wait = false,
                 "timeout" => opts.timeout = Some(parse_duration(&p.value(&f)?)?),
+                "command-timeout" if cmd == "run" => {
+                    opts.command_timeout = Some(parse_duration(&p.value(&f)?)?)
+                }
                 "json" => opts.json = true,
                 "detach" => opts.detach = true,
                 "release-on-eof" => opts.release_on_eof = true,

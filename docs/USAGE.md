@@ -529,3 +529,18 @@ Plain `acquire` is not enough for an agent: its lock expires after `JLOCK_STALE_
 files runs under a child owner (`jlock run src/parser.rs --owner agent-7/task-42/test -- cargo test`):
 it is granted at once, nested in the task's hold, while other agents keep waiting. The skills in
 [`skills/`](../skills/README.md) teach Claude Code, OpenCode and Codex this workflow.
+
+## Foreground process custody (0.4)
+
+`jlock exec [--timeout <duration>] -- <argv...>` starts a supervised foreground command without a lock.
+`jlock run <keys...> [--command-timeout <duration>] -- <argv...>` retains ownership until cleanup.
+`run --timeout` still bounds lock acquisition only. Command timeout returns 124; interruption returns 130;
+loss of ownership returns 14. Normal exit preserves the root command's exit status after cleanup.
+
+Windows uses a private kill-on-close Job Object assigned before the child resumes, including batch launchers.
+Unix uses a private process group and signals its ordinary descendants before reaping the leader. Deliberate
+detachment, hard supervisor death on Unix, remote jobs and Docker daemon workloads require their own lifecycle.
+Persistent background services must not be launched under these foreground commands. Cleanup failure reports
+`cleanup pending`; `run` retains and renews its locks while retrying. Do not force-release those locks by age.
+
+There is no registry migration from 0.3. Install alongside any active binary and select it for future sessions.
