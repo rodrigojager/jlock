@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+
+- Use supported macOS 15 runners for CI and release archives; macOS 14 jobs are no longer accepted.
+- Includes the foreground custody protections from 0.4.0, whose archive publication was blocked by the runner configuration.
+
 ## 0.4.0 — 2026-11-11
 
 - Add `exec --timeout` for process custody without registry locks; add `run --command-timeout`.

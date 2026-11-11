@@ -26,7 +26,7 @@
   "help.group.emergency": "紧急",
   "help.group.maintenance": "维护",
   "help.group.help": "帮助",
-  "help.version": "在一行中输出版本（jlock 0.4.0）。",
+  "help.version": "在一行中输出版本（jlock 0.4.1）。",
   "help.label.global": "全局选项",
   "help.label.usage": "用法",
   "help.label.options": "选项",

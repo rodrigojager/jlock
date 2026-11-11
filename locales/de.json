@@ -26,7 +26,7 @@
   "help.group.emergency": "Notfall",
   "help.group.maintenance": "Wartung",
   "help.group.help": "Hilfe",
-  "help.version": "Gibt die Version in einer Zeile aus (jlock 0.4.0).",
+  "help.version": "Gibt die Version in einer Zeile aus (jlock 0.4.1).",
   "help.label.global": "Globale Optionen",
   "help.label.usage": "Aufruf",
   "help.label.options": "Optionen",

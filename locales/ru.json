@@ -26,7 +26,7 @@
   "help.group.emergency": "Экстренные",
   "help.group.maintenance": "Обслуживание",
   "help.group.help": "Справка",
-  "help.version": "Печатает версию одной строкой (jlock 0.4.0).",
+  "help.version": "Печатает версию одной строкой (jlock 0.4.1).",
   "help.label.global": "Глобальные параметры",
   "help.label.usage": "Использование",
   "help.label.options": "Параметры",
