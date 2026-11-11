@@ -96,6 +96,12 @@ pub const RUN_OPTS: &[Opt] = &[
         "help.opt.run.command_timeout",
         "10m",
     ),
+    opt(
+        "total-timeout",
+        Some("time"),
+        "help.opt.run.total_timeout",
+        "10m",
+    ),
     JSON,
 ];
 pub const SEE: &str = "help.group.see";

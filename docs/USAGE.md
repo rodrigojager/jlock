@@ -544,3 +544,7 @@ Persistent background services must not be launched under these foreground comma
 `cleanup pending`; `run` retains and renews its locks while retrying. Do not force-release those locks by age.
 
 There is no registry migration from 0.3. Install alongside any active binary and select it for future sessions.
+
+`run --total-timeout` bounds queue plus payload with one deadline. It returns 124 even when the budget
+expires in the queue and never starts a payload after expiry. Use this instead of nesting supervisors:
+on Unix each supervisor creates its own process group, so an outer hard timeout cannot clean an inner group.

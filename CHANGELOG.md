@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.2
+
+- Add `run --total-timeout` to bound queue plus payload with one custodian and a single budget.
+- Avoid nesting supervisors for serialized deadlines: on Unix an inner private process group would escape an outer hard timeout.
+
 ## 0.4.1
 
 - Use supported macOS 15 runners for CI and release archives; macOS 14 jobs are no longer accepted.

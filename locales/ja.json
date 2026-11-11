@@ -26,7 +26,7 @@
   "help.group.emergency": "緊急時",
   "help.group.maintenance": "保守",
   "help.group.help": "ヘルプ",
-  "help.version": "バージョンを 1 行で表示する（jlock 0.4.1）。",
+  "help.version": "バージョンを 1 行で表示する（jlock 0.4.2）。",
   "help.label.global": "グローバルオプション",
   "help.label.usage": "使い方",
   "help.label.options": "オプション",
@@ -440,5 +440,6 @@
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
   "help.exit.124": "command deadline reached; its supervised process tree was stopped",
   "error.exec_needs_command": "exec needs a command after '--'",
-  "help.cmd.run.more": "Foreground commands only: remaining descendants are stopped before locks are released, including after a successful wrapper exits. Windows uses a suspended launch into a private kill-on-close Job Object, so killing the supervisor also stops its descendants. Unix uses a private process group; deliberately detached sessions, hard supervisor death and remote services are outside that guarantee. A cleanup error retains the locks and reports cleanup pending; it never silently runs without containment."
+  "help.cmd.run.more": "Foreground commands only: remaining descendants are stopped before locks are released, including after a successful wrapper exits. Windows uses a suspended launch into a private kill-on-close Job Object, so killing the supervisor also stops its descendants. Unix uses a private process group; deliberately detached sessions, hard supervisor death and remote services are outside that guarantee. A cleanup error retains the locks and reports cleanup pending; it never silently runs without containment.",
+  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d."
 }

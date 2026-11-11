@@ -16,18 +16,37 @@ pub fn run(args: Vec<String>) -> CmdResult {
     if command.is_empty() {
         return Err(usage(txt!("error.run_needs_command")));
     }
+    let started = Instant::now();
+    let total_deadline = opts.total_timeout.map(|t| started + t);
     // CTRL+C reaches the command too; jlock keeps the lock until the command is gone.
     wait::install_interrupt_handler();
     let wants = wants(&opts)?;
     let store = Store::open()?;
-    let deadline = opts.timeout.map(|t| Instant::now() + t);
+    let deadline = [opts.timeout.map(|t| started + t), total_deadline]
+        .into_iter()
+        .flatten()
+        .min();
     let outcome = acquire_all(&store, &wants, &opts.ident, opts.wait, deadline)
         .map_err(|e| fs_error(txt!("error.cannot_lock"), &e))?;
     if !matches!(outcome, SetOutcome::Granted { .. }) {
-        return Ok(report(&opts, &wants, &outcome));
+        let code = report(&opts, &wants, &outcome);
+        return Ok(
+            if code == crate::cli::EXIT_TIMEOUT
+                && total_deadline.is_some_and(|d| Instant::now() >= d)
+            {
+                124
+            } else {
+                code
+            },
+        );
     }
     let _ = crate::index::rewrite(&store);
     let mut keeper = Keeper::new(&store, outcome.keys(), &opts.ident.owner, opts.json);
+    // A grant can race with the deadline: release it without ever starting the payload.
+    if total_deadline.is_some_and(|d| Instant::now() >= d) {
+        keeper.release_all();
+        return Ok(124);
+    }
     let mut child = match Tree::spawn(&command) {
         Ok(child) => child,
         Err(e) => {
@@ -38,7 +57,13 @@ pub fn run(args: Vec<String>) -> CmdResult {
             });
         }
     };
-    let command_deadline = opts.command_timeout.map(|t| Instant::now() + t);
+    let command_deadline = [
+        opts.command_timeout.map(|t| Instant::now() + t),
+        total_deadline,
+    ]
+    .into_iter()
+    .flatten()
+    .min();
     let mut lost = None;
     let result = loop {
         match child.try_wait() {

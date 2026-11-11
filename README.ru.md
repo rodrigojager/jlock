@@ -379,6 +379,7 @@ MIT, см. [`LICENSE`](LICENSE).
 
 `jlock exec --timeout 10m -- <command...>` supervises a foreground command without taking a lock.
 `jlock run <keys...> --command-timeout 10m -- <command...>` keeps its locks through descendant cleanup.
+`run --total-timeout 10m` bounds queue plus payload with one custodian and one budget.
 `run --timeout` still limits only the lock queue. A command deadline returns **124**; loss of a lock returns **14**.
 Neither outcome automatically retries the command.
 

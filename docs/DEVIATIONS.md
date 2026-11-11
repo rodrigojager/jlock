@@ -149,3 +149,7 @@ Windows starts through Rust's standard command launcher while suspended, assigns
 resumes only that child's primary thread. Assignment failure refuses execution. Unix keeps the group leader
 waitable until group cleanup to prevent PID reuse; deliberate detachment and hard supervisor death remain
 explicit limitations. Cleanup failure retains ownership and reports the condition instead of declaring success.
+
+`run --total-timeout` bounds queue plus payload with one deadline. It returns 124 even when the budget
+expires in the queue and never starts a payload after expiry. Use this instead of nesting supervisors:
+on Unix each supervisor creates its own process group, so an outer hard timeout cannot clean an inner group.

@@ -146,6 +146,73 @@ fn command_deadline_cleans_tree_before_releasing_lock() {
 }
 
 #[test]
+fn total_deadline_in_queue_never_launches_payload() {
+    let env = Env::new("tree-total-queue");
+    let mut holder = env.spawn(&["hold", "name:tree", "--owner", "other"]);
+    assert!(env.wait_for(Duration::from_secs(3), || env
+        .holder_owner("name:tree")
+        .as_deref()
+        == Some("other")));
+    let me = std::env::current_exe().unwrap();
+    let mut cmd = env.cmd(&[
+        "run",
+        "name:tree",
+        "--owner",
+        "tree",
+        "--total-timeout",
+        "300ms",
+        "--",
+        me.to_str().unwrap(),
+        "tree_helper",
+        "--exact",
+    ]);
+    cmd.env("TREE_MODE", "leaf")
+        .env("TREE_READY", env.home.join("ready"))
+        .env("TREE_LATE", env.home.join("late"));
+    let done = Kid::start(cmd).finish(Duration::from_secs(3));
+    assert_eq!(done.code, 124, "{}", done.stderr);
+    assert!(!env.home.join("ready").exists());
+    assert_eq!(env.holder_owner("name:tree").as_deref(), Some("other"));
+    holder.send("release");
+    assert_eq!(holder.finish(Duration::from_secs(3)).code, 0);
+}
+
+#[test]
+fn total_deadline_does_not_reset_when_queue_grants() {
+    let env = Env::new("tree-total-budget");
+    let mut holder = env.spawn(&["hold", "name:tree", "--owner", "other"]);
+    assert!(env.wait_for(Duration::from_secs(3), || env
+        .holder_owner("name:tree")
+        .as_deref()
+        == Some("other")));
+    let mut cmd = command(&env, true, false);
+    let args: Vec<_> = cmd.get_args().map(|a| a.to_os_string()).collect();
+    cmd = env.cmd(&[]);
+    for a in args {
+        if a == "--" {
+            cmd.args(["--total-timeout", "1000ms"]);
+        }
+        cmd.arg(a);
+    }
+    cmd.env("TREE_MODE", "parent")
+        .env("TREE_READY", env.home.join("ready"))
+        .env("TREE_LATE", env.home.join("late"));
+    let start = Instant::now();
+    let kid = Kid::start(cmd);
+    std::thread::sleep(Duration::from_millis(600));
+    holder.send("release");
+    assert_eq!(holder.finish(Duration::from_secs(3)).code, 0);
+    assert_eq!(kid.finish(Duration::from_secs(4)).code, 124);
+    assert!(env.home.join("ready").exists());
+    assert!(
+        start.elapsed() < Duration::from_millis(1500),
+        "queue time was added back to the budget"
+    );
+    assert!(env.run(&["status", "name:tree"]).stdout.starts_with("free"));
+    assert_stopped(&env);
+}
+
+#[test]
 fn lock_loss_stops_descendants_too() {
     let env = Env::new("tree-lock-loss");
     let cmd = command(&env, true, false);
