@@ -64,6 +64,25 @@ ask for a quiet machine with `*`, and had free-text names collide:
 The on-disk layout changed (one file per hold) and is not compatible with 0.2. Details: `CHANGELOG.md`,
 `docs/USAGE.md`, `docs/API-0.3.md`.
 
+## Done: 0.4, foreground process safety
+
+`exec --timeout`, `run --command-timeout` and `run --total-timeout`: a foreground command in a private Job
+Object (Windows) or process group (Unix), its descendants stopped before the call returns or the locks are
+released.
+
+## Done: 0.5, command custody (Windows)
+
+Asked for by jtasks 0.9.0, which starts, watches and ends the work of each task:
+
+1. **`jlock capabilities`**: the version and the contract numbers (`custody`, `processInspect`, `custodyScope`).
+2. **`jlock process inspect`**: present, absent or unknown, with an identity token of the incarnation.
+3. **`jlock custody start|status|stop`**: a command in a named Job Object with durable records (intent,
+   receipt, beat, final) that another process can end by its name and confirm; `--id`/`--custody` on
+   `exec`/`run` for foreground commands.
+
+Windows only: elsewhere `capabilities` says `custody: 0` and the custody commands refuse. Details:
+`CHANGELOG.md`, `docs/USAGE.md` ("Command custody"), `docs/PLAN.md` section 15.
+
 ## Then: Linux and macOS hardening
 
 The code compiles for Unix and the design is portable, but it has only ever run on Windows. Plan:
@@ -80,6 +99,8 @@ The code compiles for Unix and the design is portable, but it has only ever run 
   `JLOCK_CANONICAL=0` to disable); case folded on macOS and Windows, with `JLOCK_CASE=sensitive` for
   case-sensitive volumes.
 - Static musl builds, arm64 for Linux and macOS, size and startup checks.
+- Command custody on Unix: a design of its own (a process group is not a named, openable group), announced
+  through a new `custodyScope`; until then `custody: 0`.
 - Packaging: Homebrew tap first; `.deb`/`.rpm` and AUR once the suite is green on real Linux; shell
   completions for bash/zsh/fish/PowerShell; a man page generated from the same help table.
 

@@ -6,7 +6,9 @@
 use serde_json::{json, Value};
 
 /// The answer for one pid.
+/// Only Windows finds a process `Present`; elsewhere every answer is `Unknown`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(not(windows), allow(dead_code))]
 pub enum Inspection {
     Present { identity: String },
     Absent { reason: Option<String> },

@@ -116,6 +116,28 @@ test environment); everyone has to use the same name. Never take `*` to get a qu
   `jlock run src/auth.rs --owner claude:k7f2/test -- cargo test`. When you release your task's
   locks, the nested ones end too. Do not use `/` in your own owner for anything else.
 
+## A command that must outlive your turn (Windows)
+
+For a server, a long test run or anything another session may have to end later, put it in custody
+instead of starting it in the background yourself. First check that this jlock has it:
+`jlock capabilities --json` must say `"custody": 1` (elsewhere the custody commands refuse with
+"unsupported on this platform").
+
+```
+jlock custody start --id T04-dev --custody .jlock-custody --quiet 10m --json -- npm run dev
+jlock custody status --id T04-dev --custody .jlock-custody --json
+jlock custody stop --id T04-dev --custody .jlock-custody --reason "task finished" --json
+```
+
+- `start` writes its records in `<custody>/<id>/` before anything runs, starts the command in a named
+  group and returns at once; the output goes to `output.log` there. The same id never starts a second
+  process (`"duplicate": true`).
+- `status` only reads: `running`, `ended` (with `final.json`), `lost` (its keeper died), `launch-failed`...
+- `stop` ends the whole tree by the group's name, from any session, and answers exit 0 only when it
+  confirmed that nothing is left (`cleanupConfirmed: true`). Exit 15 means it could not confirm: tell the
+  user; never kill processes by pid or by name to make up for it.
+- A foreground command can leave the same records: `jlock exec --id T04-test --custody .jlock-custody -- cargo test`.
+
 ## Keys
 
 | Key | Means | Conflicts with |

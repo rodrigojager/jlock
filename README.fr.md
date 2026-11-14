@@ -336,6 +336,7 @@ ne sont pas d'une même famille.
 | 12 | interblocage: la demande fermerait un cycle |
 | 13 | non propriétaire |
 | 14 | verrou perdu (`hold`/`run`/`renew`) |
+| 15 | `custody stop` : nettoyage non confirmé (`cleanupConfirmed: false`) |
 | 20 | erreur du système de fichiers; le message contient l'erreur du SE |
 | 130 | interrompu (CTRL+C) pendant l'attente |
 
@@ -401,3 +402,23 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## Garde des commandes (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <commande...>` lance une commande
+qui survit à l'appel, dans un Job Object nommé, avec des enregistrements durables dans `<dir>/<id>/` :
+`intent.json` avant qu'aucun processus n'existe, `receipt.json` avant que la commande ne tourne, `beat.json`
+toutes les 10 s, `final.json` à la fin, et la sortie dans `output.log`. Le même id ne lance jamais un second
+processus. `jlock custody status` lit les enregistrements (`running`, `ended`, `lost`, `launch-failed`...).
+`jlock custody stop --reason <texte>` arrête tout l'arbre par le nom du groupe depuis **n'importe quel**
+processus, même si le gardien est mort, et ne sort avec 0 qu'avec `cleanupConfirmed: true` ; le code **15**
+signifie que le nettoyage n'a pas pu être confirmé. Le silence ne vaut jamais la mort, et rien n'est arrêté
+par pid ni par nom d'exécutable. `exec` et `run` acceptent `--id <id> --custody <dir>` pour laisser les mêmes
+enregistrements pour une commande au premier plan.
+
+`jlock capabilities --json` dit ce qu'un binaire offre : `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"` sous Windows ; `0`, `0`, `"none"` ailleurs, où les commandes de garde refusent avec
+"unsupported on this platform". `jlock process inspect --pid <pid> [--identity <token>]` répond `present`,
+`absent` ou `unknown` pour une incarnation d'un processus et n'arrête jamais rien. Un Job Object n'atteint pas
+le travail confié à un service qui existait déjà (Docker, un démon). Référence :
+[`docs/USAGE.md`](docs/USAGE.md).

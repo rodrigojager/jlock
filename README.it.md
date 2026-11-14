@@ -331,6 +331,7 @@ non sono di una stessa famiglia.
 | 12 | deadlock: la richiesta chiuderebbe un ciclo |
 | 13 | non proprietario |
 | 14 | blocco perso (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: pulizia non confermata (`cleanupConfirmed: false`) |
 | 20 | errore del file system; il messaggio riporta l'errore del SO |
 | 130 | interrotto (CTRL+C) durante l'attesa |
 
@@ -396,3 +397,22 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## Custodia dei comandi (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <comando...>` avvia un comando
+che sopravvive alla chiamata, in un Job Object con nome, con registrazioni durevoli in `<dir>/<id>/`:
+`intent.json` prima che esista qualsiasi processo, `receipt.json` prima che il comando giri, `beat.json` ogni
+10 s, `final.json` alla fine, e l'output in `output.log`. Lo stesso id non avvia mai un secondo processo.
+`jlock custody status` legge le registrazioni (`running`, `ended`, `lost`, `launch-failed`...).
+`jlock custody stop --reason <testo>` termina l'intero albero tramite il nome del gruppo da **qualsiasi**
+processo, anche con il custode morto, ed esce con 0 solo con `cleanupConfirmed: true`; il codice **15**
+significa che la pulizia non è stata confermata. Il silenzio non vale mai come morte, e niente viene terminato
+per pid né per nome dell'eseguibile. `exec` e `run` accettano `--id <id> --custody <dir>` per lasciare le
+stesse registrazioni per un comando in primo piano.
+
+`jlock capabilities --json` dice cosa offre un binario: `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"` su Windows; `0`, `0`, `"none"` altrove, dove i comandi di custodia rifiutano con
+"unsupported on this platform". `jlock process inspect --pid <pid> [--identity <token>]` risponde `present`,
+`absent` o `unknown` per un'incarnazione di un processo e non termina mai nulla. Un Job Object non raggiunge il
+lavoro affidato a un servizio già esistente (Docker, un demone). Riferimento: [`docs/USAGE.md`](docs/USAGE.md).

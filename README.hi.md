@@ -325,6 +325,7 @@ Windows और macOS पर अक्षरों का छोटा-बड़�
 | 12 | डेडलॉक: अनुरोध एक चक्र पूरा कर देता |
 | 13 | स्वामी नहीं |
 | 14 | लॉक खो गया (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: सफ़ाई की पुष्टि नहीं हुई (`cleanupConfirmed: false`) |
 | 20 | फ़ाइल सिस्टम त्रुटि; संदेश में OS की त्रुटि होती है |
 | 130 | प्रतीक्षा के दौरान बाधित (CTRL+C) |
 
@@ -389,5 +390,23 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## कमांड की अभिरक्षा (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <command...>` ऐसी कमांड शुरू करता है
+जो कॉल के बाद भी चलती रहती है, एक नाम वाले Job Object में, और `<dir>/<id>/` में टिकाऊ रिकॉर्ड छोड़ता है: कोई भी
+प्रोसेस बनने से पहले `intent.json`, कमांड चलने से पहले `receipt.json`, हर 10 s पर `beat.json`, अंत में `final.json`,
+और आउटपुट `output.log` में। एक ही id कभी दूसरा प्रोसेस शुरू नहीं करता। `jlock custody status` रिकॉर्ड पढ़ता है
+(`running`, `ended`, `lost`, `launch-failed`...)। `jlock custody stop --reason <text>` **किसी भी** प्रोसेस से, संरक्षक
+के मर जाने पर भी, समूह के नाम से पूरा पेड़ ख़त्म करता है, और 0 से तभी निकलता है जब `cleanupConfirmed: true` हो;
+कोड **15** का अर्थ है कि सफ़ाई की पुष्टि नहीं हो सकी। चुप्पी को कभी मृत्यु नहीं माना जाता, और कुछ भी pid या
+executable के नाम से ख़त्म नहीं किया जाता। `exec` और `run` `--id <id> --custody <dir>` लेते हैं, ताकि अग्रभूमि
+की कमांड के लिए भी वही रिकॉर्ड बनें।
+
+`jlock capabilities --json` बताता है कि बाइनरी क्या समर्थन करती है: Windows पर `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"`; बाक़ी जगह `0`, `0`, `"none"`, जहाँ अभिरक्षा की कमांड "unsupported on this platform" कहकर
+मना करती हैं। `jlock process inspect --pid <pid> [--identity <token>]` किसी प्रोसेस के एक अवतार के लिए `present`,
+`absent` या `unknown` बताता है और कभी कुछ ख़त्म नहीं करता। Job Object उस काम तक नहीं पहुँचता जो पहले से मौजूद
+किसी सेवा (Docker, कोई daemon) को सौंपा गया हो। संदर्भ: [`docs/USAGE.md`](docs/USAGE.md)।
 
 <sub>यह अनुवाद किसी मूल वक्ता की समीक्षा की प्रतीक्षा में है; सुधारों का स्वागत है — देखें [`CONTRIBUTING.md`](CONTRIBUTING.md)।</sub>

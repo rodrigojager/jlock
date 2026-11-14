@@ -25,7 +25,7 @@
   "help.group.emergency": "緊急時",
   "help.group.maintenance": "保守",
   "help.group.help": "ヘルプ",
-  "help.version": "バージョンを 1 行で表示する（jlock 0.4.2）。",
+  "help.version": "バージョンを 1 行で表示する（jlock 0.5.0）。",
   "help.label.global": "グローバルオプション",
   "help.label.usage": "使い方",
   "help.label.options": "オプション",

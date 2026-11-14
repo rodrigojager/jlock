@@ -25,7 +25,7 @@
   "help.group.emergency": "Emergency",
   "help.group.maintenance": "Maintenance",
   "help.group.help": "Help",
-  "help.version": "Print the version on one line (jlock 0.4.2).",
+  "help.version": "Print the version on one line (jlock 0.5.0).",
   "help.label.global": "Global options",
   "help.label.usage": "Usage",
   "help.label.options": "Options",

@@ -328,6 +328,7 @@ flowchart TD
 | 12 | взаимоблокировка: запрос замкнул бы цикл |
 | 13 | не владелец |
 | 14 | блокировка потеряна (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: очистка не подтверждена (`cleanupConfirmed: false`) |
 | 20 | ошибка файловой системы; сообщение содержит ошибку ОС |
 | 130 | прервано (CTRL+C) во время ожидания |
 
@@ -393,5 +394,23 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## Опека над командами (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <команда...>` запускает команду,
+которая переживает вызов, в именованном Job Object, с долговечными записями в `<dir>/<id>/`: `intent.json`
+до появления любого процесса, `receipt.json` до того, как команда начнёт работу, `beat.json` каждые 10 с,
+`final.json` в конце, а вывод — в `output.log`. Один и тот же id никогда не запускает второй процесс.
+`jlock custody status` читает записи (`running`, `ended`, `lost`, `launch-failed`...).
+`jlock custody stop --reason <текст>` завершает всё дерево по имени группы из **любого** процесса, даже если
+опекун умер, и выходит с 0 только при `cleanupConfirmed: true`; код **15** означает, что очистку подтвердить не
+удалось. Тишина никогда не считается смертью, и ничего не завершается по pid или по имени исполняемого файла.
+`exec` и `run` принимают `--id <id> --custody <dir>`, чтобы оставить те же записи для команды на переднем плане.
+
+`jlock capabilities --json` сообщает, что умеет бинарник: `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"` в Windows; `0`, `0`, `"none"` в других системах, где команды опеки отказывают с
+"unsupported on this platform". `jlock process inspect --pid <pid> [--identity <token>]` отвечает `present`,
+`absent` или `unknown` для одного воплощения процесса и никогда ничего не завершает. Job Object не достаёт до
+работы, переданной уже существовавшей службе (Docker, демон). Справка: [`docs/USAGE.md`](docs/USAGE.md).
 
 <sub>Этот перевод ждёт проверки носителем языка; исправления приветствуются — см. [`CONTRIBUTING.md`](CONTRIBUTING.md).</sub>

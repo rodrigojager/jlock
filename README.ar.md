@@ -364,6 +364,7 @@ flowchart TD
 | 12 | جمود: الطلب كان سيغلق حلقة |
 | 13 | لست المالك |
 | 14 | فُقد القفل (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: لم يُؤكَّد التنظيف (`cleanupConfirmed: false`) |
 | 20 | خطأ في نظام الملفات؛ والرسالة تحمل خطأ نظام التشغيل |
 | 130 | مُقاطَع (CTRL+C) أثناء الانتظار |
 
@@ -433,6 +434,23 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## حراسة الأوامر (0.5، Windows)
+
+يبدأ `jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <command...>` أمرًا يعيش بعد
+انتهاء الاستدعاء، داخل Job Object له اسم، مع سجلات دائمة في `<dir>/<id>/`: `intent.json` قبل وجود أي عملية،
+و`receipt.json` قبل أن يعمل الأمر، و`beat.json` كل 10 ثوانٍ، و`final.json` في النهاية، والمخرجات في `output.log`.
+المعرّف نفسه لا يبدأ عملية ثانية أبدًا. يقرأ `jlock custody status` السجلات (`running`، `ended`، `lost`،
+`launch-failed`...). ويُنهي `jlock custody stop --reason <text>` الشجرة كلها باسم المجموعة من **أي** عملية، حتى
+بعد موت الحارس، ولا يخرج بالرمز 0 إلا مع `cleanupConfirmed: true`؛ والرمز **15** يعني أن التنظيف لم يمكن تأكيده.
+الصمت لا يُعَدّ موتًا أبدًا، ولا يُنهى شيء بالـ pid ولا باسم الملف التنفيذي. ويقبل `exec` و`run` الخيارين
+`--id <id> --custody <dir>` لترك السجلات نفسها لأمر في المقدمة.
+
+يقول `jlock capabilities --json` ما يدعمه الملف التنفيذي: `custody: 1` و`processInspect: 1` و`custodyScope: "job"`
+على Windows؛ و`0` و`0` و`"none"` في غيره، حيث ترفض أوامر الحراسة برسالة "unsupported on this platform".
+ويجيب `jlock process inspect --pid <pid> [--identity <token>]` بـ `present` أو `absent` أو `unknown` عن تجسّد واحد
+لعملية، ولا يُنهي شيئًا أبدًا. لا يصل Job Object إلى عمل سُلِّم إلى خدمة كانت موجودة من قبل (Docker، أو خدمة daemon).
+المرجع: [`docs/USAGE.md`](docs/USAGE.md).
 
 <sub>هذه الترجمة بانتظار مراجعة متحدث أصلي باللغة؛ التصحيحات مرحَّب بها: انظر [CONTRIBUTING.md](CONTRIBUTING.md).</sub>
 

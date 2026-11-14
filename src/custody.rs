@@ -394,6 +394,24 @@ pub fn stop_requested(rec: &Path) -> bool {
     rec.join(STOP_REQUEST).exists()
 }
 
+/// Whether custody exists on this platform: Windows only (`capabilities` says `custody: 0`
+/// elsewhere).
+pub const SUPPORTED: bool = cfg!(windows);
+
+/// The refusal of a custody command (`custody`, `exec`/`run` with `--id`/`--custody`) on a
+/// platform without custody: a usage error, "<cmd>: unsupported on this platform". Takes the
+/// platform as an argument so the refusal is tested on every platform.
+pub fn require_support(supported: bool, cmd: &str) -> Result<(), crate::cli::Failure> {
+    if supported {
+        Ok(())
+    } else {
+        Err(crate::cli::usage(crate::i18n::txt!(
+            "error.unsupported_platform",
+            cmd = cmd
+        )))
+    }
+}
+
 /// `--id` and `--custody` of `exec` and `run`: both or neither. `None` without them (the command
 /// runs as it always did); the absolute custody folder and the id with them.
 pub fn foreground_opts(
@@ -408,9 +426,7 @@ pub fn foreground_opts(
         (Some(id), Some(dir)) if !dir.trim().is_empty() => (id, dir),
         _ => return Err(usage(txt!("error.foreground_needs_both", cmd = cmd))),
     };
-    if !cfg!(windows) {
-        return Err(usage(txt!("error.unsupported_platform", cmd = cmd)));
-    }
+    require_support(SUPPORTED, cmd)?;
     if !valid_id(&id) {
         return Err(usage(txt!("error.custody_bad_id", value = id)));
     }
@@ -891,6 +907,29 @@ mod tests {
         let (hex, id) = rest.split_at(12);
         assert!(hex.bytes().all(|b| b.is_ascii_hexdigit()), "{name}");
         assert_eq!(id, "-a1");
+    }
+
+    #[test]
+    fn without_custody_every_custody_command_is_refused_as_usage() {
+        for cmd in ["custody", "exec", "run"] {
+            let f = require_support(false, cmd).unwrap_err();
+            assert_eq!(f.code, crate::cli::EXIT_USAGE, "{cmd}");
+            assert_eq!(f.msg.en, format!("{cmd}: unsupported on this platform"));
+        }
+        assert!(require_support(true, "custody").is_ok());
+        assert_eq!(SUPPORTED, cfg!(windows));
+    }
+
+    #[test]
+    fn foreground_options_follow_the_platform() {
+        let got = foreground_opts("exec", Some("a1".into()), Some("custody".into()));
+        if SUPPORTED {
+            assert!(got.unwrap().is_some());
+        } else {
+            let f = got.expect_err("refused");
+            assert_eq!(f.msg.en, "exec: unsupported on this platform");
+        }
+        assert!(foreground_opts("exec", None, None).unwrap().is_none());
     }
 
     #[test]

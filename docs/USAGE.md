@@ -457,8 +457,10 @@ inside a file system error (exit 20) comes from the system, in the system's lang
 | 12 | deadlock |
 | 13 | not the owner (`release`, `heartbeat`, `renew`) |
 | 14 | lock lost (`hold`, `run`), or past its deadline (`renew`) |
-| 2 | wrong usage |
-| 20 | file system error (permission, disk full, file held by another program); the OS message is shown |
+| 15 | `custody stop`: cleanup not confirmed (`cleanupConfirmed: false`, the reason in `error`) |
+| 2 | wrong usage; also every custody command outside Windows ("unsupported on this platform") |
+| 20 | file system error (permission, disk full, file held by another program); the OS message is shown; `custody start`: `launch-failed` |
+| 124 | command deadline reached (`exec --timeout`, `run --command-timeout`, `run --total-timeout`) |
 | 130 | interrupted (CTRL+C) while waiting; the ticket was removed |
 
 `run` passes the command's own exit code through once the lock was granted.
@@ -477,6 +479,9 @@ inside a file system error (exit 20) comes from the system, in the system's lang
 | `JLOCK_HINTS` | `1` | `0` turns off the tips printed after some results |
 | `JLOCK_UPDATE_BASE` | the project on GitHub | where `update` looks for releases (`file://` works; the tests use a folder) |
 | `JLOCK_DEBUG` | unset | any value: trace to stderr |
+| `JLOCK_CUSTODY_BEAT_MS` | 10000 | how often the custodian replaces `beat.json` |
+| `JLOCK_CUSTODY_SELF_FENCE_MS` | 30000 | a custodian that cannot write `beat.json` for this long ends its own job |
+| `JLOCK_CUSTODY_STOP_MS` | 15000 | default `custody stop --timeout`; how long a custodian waits for its job to empty |
 
 ## On disk
 
@@ -548,3 +553,119 @@ There is no registry migration from 0.3. Install alongside any active binary and
 `run --total-timeout` bounds queue plus payload with one deadline. It returns 124 even when the budget
 expires in the queue and never starts a payload after expiry. Use this instead of nesting supervisors:
 on Unix each supervisor creates its own process group, so an outer hard timeout cannot clean an inner group.
+
+## Command custody (0.5)
+
+A command in custody runs in a **named** Job Object and leaves durable records, so that **another
+process** (the next agent, a supervisor that restarted, a person) can find it by its name, end it and
+confirm that nothing of it is left. Silence is never taken as proof of death: `cleanupConfirmed: true`
+only when the job was opened by its name and holds zero processes, or, with the job gone, when the
+command's root was checked absent by identity on an open handle. Nothing is ever ended by pid or by
+executable name. Windows only; elsewhere `capabilities` says `custody: 0` and every custody command (also
+`exec`/`run` with `--id`/`--custody`) exits 2 with "unsupported on this platform". The full contract is in
+[`PLAN.md`](PLAN.md), section 15 (Portuguese); what the specification left open is in
+[`DEVIATIONS.md`](DEVIATIONS.md) (entries 16–19).
+
+### `capabilities` — what this jlock can do
+
+```
+jlock capabilities --json
+{ "version": "0.5.0", "capabilities": { "custody": 1, "processInspect": 1 }, "custodyScope": "job" }
+```
+
+Outside Windows: `custody: 0`, `processInspect: 0`, `custodyScope: "none"`. A number goes up only when its
+contract changes incompatibly. Tools read this before relying on custody.
+
+### `process inspect` — is this pid still that process?
+
+```
+jlock process inspect --pid <pid> [--identity <token>] --json
+```
+
+Answers `{ "state": "present" | "absent" | "unknown", "identity"?, "reason"? }`. On Windows the process is
+opened with a limited query right and its creation time and exit code are read on that same handle;
+`identity` is an opaque token of that incarnation (`win:<pid>:<creation filetime>`). `absent` only when
+the system says there is no such process or it has exited; access denied or any other error is `unknown`
+with a `reason`, never `absent`. With `--identity`, a present process of another incarnation answers
+`absent` with `reason: "replaced"`: the pid was reused, and the new process is never touched. It never
+stops anything. Outside Windows the answer is `unknown`, `reason: "unsupported"`.
+
+### `custody start` — a command that outlives the call
+
+```
+jlock custody start --id <id> --custody <dir> [--cwd <dir>] [--limit <time>] [--quiet <time>] --json -- <command...>
+```
+
+`<dir>` is chosen by the caller; the records go in `<dir>/<id>/`, and `<id>` matches
+`^[A-Za-z0-9._-]{1,64}$` (`.` and `..` are refused).
+
+1. `intent.json` is created (`create_new`) before any process exists. An id that already has one never
+   starts a second process: the answer is its current state with `"duplicate": true` (exit 0).
+2. A custodian (this same jlock) is started detached from the terminal and from the caller's group, as the
+   keeper of `hold --detach`.
+3. The custodian creates the job `Local\jlock-custody-<12 hex of sha1 of dir>-<id>` (kill-on-close, no
+   breakaway), creates the command suspended with its output and errors in `output.log`, puts it in the
+   job, writes `receipt.json` and only then lets it run. The custodian stays outside the job; the command
+   inherits no handle of it.
+4. `start` answers `{ "state": "running", "id", "receipt": {…} }` once the receipt exists, and returns. A
+   failure before the receipt answers `{ "state": "launch-failed", "reason" }` with exit 20.
+
+While the command runs the custodian replaces `beat.json` every 10 s (`JLOCK_CUSTODY_BEAT_MS`). Past
+`--limit`, or with `output.log` not growing for `--quiet` (no default: the caller decides), it ends the job
+and writes `final.json` with `reason` `limit` or `quiet`. If it cannot write a beat for 30 s
+(`JLOCK_CUSTODY_SELF_FENCE_MS`) it ends its own job and leaves without `final.json` (`status` then says
+`lost`). When the command ends by itself, it ends whatever is left in the job, confirms zero processes and
+writes `final.json` with `reason: "exited"` and `exitCode`.
+
+### `custody status` — read only
+
+```
+jlock custody status --id <id> --custody <dir> --json
+```
+
+Answers `{ "state", "intent"?, "receipt"?, "beat"?, "final"?, "job": { "open": bool, "activeProcesses"? } }`.
+`state` is one of `absent` (no intent), `launching`, `launch-failed` (an intent without a receipt and
+without a live custodian), `running`, `ended` (`final.json` exists) or `lost` (a receipt, no
+`final.json`, and the custodian, by identity, is gone). It closes every handle it opens and changes
+nothing.
+
+### `custody stop` — end it from any process and confirm
+
+```
+jlock custody stop --id <id> --custody <dir> --reason <text> [--timeout 15s] --json
+```
+
+Opens the job by its name, ends it and waits for zero processes within `--timeout` (default 15 s,
+`JLOCK_CUSTODY_STOP_MS`), then writes `final.json` once (`by: "stop"`, `reason` `stopped` with `--reason`
+in `detail`, or `custodian-lost` when the custodian was already gone) and answers it with exit 0. It works
+with the custodian dead, and also when another process still holds a handle of the job. With the job
+gone it confirms only if the root of the receipt is `absent` by identity; it never creates the job again
+and never ends anything by pid. Without that proof it answers `cleanupConfirmed: false` with the reason in
+`error` and exits **15**. Idempotent: a confirmed `final.json` already there is answered as is.
+
+### `exec` and `run` with `--id` and `--custody`
+
+```
+jlock exec --id <id> --custody <dir> [--timeout <time>] -- <command...>
+jlock run <keys...> --id <id> --custody <dir> [options] -- <command...>
+```
+
+The foreground commands of 0.4 with the same records (`mode: "foreground"`; no `output.log`: the output
+goes to the caller) and the named job, so `custody status` reads them and `custody stop` ends them from
+another process. Both options or neither; an id that already has an intent is a usage error (exit 2) and
+starts nothing. Without the two options nothing changes.
+
+### Records
+
+| File | When | Content |
+|---|---|---|
+| `intent.json` | before any process, `create_new` | `{ v: 1, id, argv, cwd, limitMs?, quietMs?, mode: "detached" \| "foreground", createdAt }` |
+| `receipt.json` | command created suspended and already in the job, **before** it runs | `{ v: 1, id, pid, identity, job, scope: "job", custodianPid, custodianIdentity, startedAt }` |
+| `beat.json` | every 10 s, by the custodian | `{ v: 1, id, seq, at, lastOutputAt, outputBytes }` |
+| `final.json` | once, by whoever confirmed the end | `{ v: 1, id, reason, detail?, exitCode?, cleanupConfirmed, scope, activeProcesses, endedAt, by: "custodian" \| "stop" }` |
+| `output.log` | `custody start` only | the command's output and errors, in order of arrival |
+
+`reason`: `exited`, `limit`, `quiet`, `stopped`, `custodian-lost`, `interrupted`.
+
+A Job Object does not reach work handed to a service that already existed (Docker, WMI, a daemon). The
+receipt's `scope` is `job`.

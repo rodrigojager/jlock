@@ -320,6 +320,7 @@ conflict only when their keys conflict, at least one is exclusive, and their own
 | 12 | deadlock: the request would close a cycle |
 | 13 | not the owner |
 | 14 | lock lost (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: cleanup not confirmed (`cleanupConfirmed: false`) |
 | 20 | file system error; the message carries the OS error |
 | 130 | interrupted (CTRL+C) while waiting |
 
@@ -385,3 +386,21 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## Command custody (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <command...>` starts a command
+that outlives the call, in a named Job Object, with durable records in `<dir>/<id>/`: `intent.json` before
+any process exists, `receipt.json` before the command runs, `beat.json` every 10 s, `final.json` at the end,
+and the output in `output.log`. The same id never starts a second process. `jlock custody status` reads the
+records (`running`, `ended`, `lost`, `launch-failed`...). `jlock custody stop --reason <text>` ends the whole
+tree by the job's name from **any** process, even after the custodian died, and exits 0 only with
+`cleanupConfirmed: true`; exit **15** means the cleanup could not be confirmed. Silence is never taken as
+death, and nothing is ended by pid or by executable name. `exec` and `run` take `--id <id> --custody <dir>`
+to leave the same records for a foreground command.
+
+`jlock capabilities --json` says what a binary supports: `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"` on Windows; `0`, `0`, `"none"` elsewhere, where the custody commands refuse with
+"unsupported on this platform". `jlock process inspect --pid <pid> [--identity <token>]` answers `present`,
+`absent` or `unknown` for one incarnation of a process and never stops anything. A Job Object does not reach
+work handed to a service that already existed (Docker, a daemon). Reference: [`docs/USAGE.md`](docs/USAGE.md).

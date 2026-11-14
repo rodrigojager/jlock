@@ -328,6 +328,7 @@ delas não são da mesma família.
 | 12 | deadlock: o pedido fecharia um ciclo |
 | 13 | não é o dono |
 | 14 | trava perdida (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: limpeza não confirmada (`cleanupConfirmed: false`) |
 | 20 | erro de sistema de arquivos; a mensagem traz o erro do SO |
 | 130 | interrompido (CTRL+C) durante a espera |
 
@@ -393,3 +394,23 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## Custódia de comandos (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <comando...>` inicia um comando
+que sobrevive à chamada, num Job Object com nome, com registros duráveis em `<dir>/<id>/`: `intent.json`
+antes de existir qualquer processo, `receipt.json` antes de o comando rodar, `beat.json` a cada 10 s,
+`final.json` no fim, e a saída em `output.log`. O mesmo id nunca inicia um segundo processo.
+`jlock custody status` lê os registros (`running`, `ended`, `lost`, `launch-failed`...).
+`jlock custody stop --reason <texto>` encerra a árvore inteira pelo nome do grupo a partir de **qualquer**
+processo, mesmo com o invólucro morto, e sai com 0 só com `cleanupConfirmed: true`; o código **15** quer dizer
+que a limpeza não pôde ser confirmada. Silêncio nunca vale como morte, e nada é encerrado por pid nem por nome
+de executável. `exec` e `run` aceitam `--id <id> --custody <dir>` para deixar os mesmos registros de um
+comando em primeiro plano.
+
+`jlock capabilities --json` diz o que um binário oferece: `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"` no Windows; `0`, `0`, `"none"` nos outros sistemas, onde os comandos de custódia recusam
+com "unsupported on this platform". `jlock process inspect --pid <pid> [--identity <token>]` responde
+`present`, `absent` ou `unknown` para uma encarnação de um processo e nunca encerra nada. Um Job Object não
+alcança trabalho entregue a um serviço que já existia (Docker, um daemon). Referência:
+[`docs/USAGE.md`](docs/USAGE.md).

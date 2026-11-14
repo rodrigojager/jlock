@@ -263,6 +263,7 @@ Windows と macOS では大文字と小文字を区別しない（`D:\Proj\SRC` 
 | 12 | デッドロック: 要求が循環を閉じることになる |
 | 13 | 所有者でない |
 | 14 | ロック喪失（`hold`/`run`/`renew`） |
+| 15 | `custody stop`：後始末を確認できなかった（`cleanupConfirmed: false`） |
 | 20 | ファイルシステムのエラー。メッセージに OS のエラーが含まれる |
 | 130 | 待機中に中断された（CTRL+C） |
 
@@ -322,5 +323,22 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## コマンドの保管（0.5、Windows）
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <コマンド...>` は、呼び出しより長く生きる
+コマンドを名前付きの Job Object で起動し、`<dir>/<id>/` に永続的な記録を残す：どのプロセスより先に `intent.json`、
+コマンドが動き出す前に `receipt.json`、10 秒ごとに `beat.json`、最後に `final.json`、出力は `output.log`。同じ id が
+2 つ目のプロセスを起動することはない。`jlock custody status` は記録を読む（`running`、`ended`、`lost`、
+`launch-failed`…）。`jlock custody stop --reason <テキスト>` は、保管役が死んでいても、**どの**プロセスからでも
+ジョブ名でツリー全体を終了し、`cleanupConfirmed: true` のときだけ 0 で終わる。終了コード **15** は後始末を確認
+できなかったことを意味する。沈黙を死とみなすことはなく、pid や実行ファイル名で何かを終了することもない。
+`exec` と `run` は `--id <id> --custody <dir>` を受け取り、フォアグラウンドのコマンドにも同じ記録を残す。
+
+`jlock capabilities --json` はバイナリが何に対応するかを示す：Windows では `custody: 1`、`processInspect: 1`、
+`custodyScope: "job"`。その他では `0`、`0`、`"none"` で、保管コマンドは "unsupported on this platform" で拒否する。
+`jlock process inspect --pid <pid> [--identity <token>]` はプロセスの 1 つの実体について `present`、`absent`、
+`unknown` を答え、何も終了しない。Job Object は既存のサービス（Docker、デーモン）に渡された作業には届かない。
+参照：[`docs/USAGE.md`](docs/USAGE.md)。
 
 <sub>この翻訳はネイティブスピーカーによるレビューを待っている。修正は歓迎する（[`CONTRIBUTING.md`](CONTRIBUTING.md) を参照）。</sub>

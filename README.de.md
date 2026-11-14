@@ -332,6 +332,7 @@ Besitzer nicht zu einer Familie gehören.
 | 12 | Deadlock: Die Anfrage würde einen Zyklus schließen |
 | 13 | nicht der Besitzer |
 | 14 | Sperre verloren (`hold`/`run`/`renew`) |
+| 15 | `custody stop`: Aufräumen nicht bestätigt (`cleanupConfirmed: false`) |
 | 20 | Dateisystemfehler; die Meldung enthält den Fehler des Betriebssystems |
 | 130 | beim Warten unterbrochen (CTRL+C) |
 
@@ -397,3 +398,23 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## Gewahrsam für Befehle (0.5, Windows)
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <Befehl...>` startet einen
+Befehl, der den Aufruf überdauert, in einem benannten Job Object, mit dauerhaften Aufzeichnungen in
+`<dir>/<id>/`: `intent.json`, bevor irgendein Prozess existiert, `receipt.json`, bevor der Befehl läuft,
+`beat.json` alle 10 s, `final.json` am Ende, und die Ausgabe in `output.log`. Dieselbe id startet nie einen
+zweiten Prozess. `jlock custody status` liest die Aufzeichnungen (`running`, `ended`, `lost`,
+`launch-failed`...). `jlock custody stop --reason <Text>` beendet den ganzen Baum über den Namen der Gruppe
+aus **jedem** Prozess, auch wenn der Wächter tot ist, und endet mit 0 nur bei `cleanupConfirmed: true`; Code
+**15** heißt, dass das Aufräumen nicht bestätigt werden konnte. Stille gilt nie als Tod, und nichts wird per
+pid oder Programmname beendet. `exec` und `run` nehmen `--id <id> --custody <dir>`, um dieselben
+Aufzeichnungen für einen Befehl im Vordergrund zu hinterlassen.
+
+`jlock capabilities --json` sagt, was ein Binary kann: `custody: 1`, `processInspect: 1`,
+`custodyScope: "job"` unter Windows; `0`, `0`, `"none"` anderswo, wo die Gewahrsamsbefehle mit
+"unsupported on this platform" ablehnen. `jlock process inspect --pid <pid> [--identity <token>]` antwortet
+`present`, `absent` oder `unknown` für eine Inkarnation eines Prozesses und beendet nie etwas. Ein Job Object
+erreicht keine Arbeit, die an einen bereits laufenden Dienst übergeben wurde (Docker, ein Daemon). Referenz:
+[`docs/USAGE.md`](docs/USAGE.md).

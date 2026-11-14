@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.0
+
+Command custody, the contract jtasks 0.9.0 consumes (Windows). Full reference: `docs/USAGE.md`
+("Command custody"); contract: `docs/PLAN.md` section 15; open points decided: `docs/DEVIATIONS.md` 16–19.
+
+- Add `jlock capabilities [--json]`: `version`, `capabilities.custody`, `capabilities.processInspect` and
+  `custodyScope` (`1`, `1`, `job` on Windows; `0`, `0`, `none` elsewhere).
+- Add `jlock process inspect --pid <pid> [--identity <token>]`: `present` (with an identity token of the
+  incarnation), `absent` (only when the system says so; `reason: "replaced"` for a reused pid) or `unknown`
+  (access denied or any error). Never stops anything.
+- Add `jlock custody start --id <id> --custody <dir> [--cwd] [--limit] [--quiet] -- <command>`: writes
+  `intent.json` before any process, starts a detached custodian that creates the named job
+  `Local\jlock-custody-<hash>-<id>` (kill-on-close, no breakaway), launches the command suspended with its
+  output in `output.log`, writes `receipt.json` before letting it run and stays outside the job. A repeated
+  id never starts a second process (`duplicate: true`). The custodian writes `beat.json` every 10 s, ends the
+  job on `--limit` or `--quiet`, fences itself when it cannot write its beat for 30 s, and writes
+  `final.json` with `cleanupConfirmed` once the job is confirmed empty.
+- Add `jlock custody status`: `absent`, `launching`, `launch-failed`, `running`, `ended` or `lost`, with the
+  records and the job's state; read only.
+- Add `jlock custody stop --reason <text> [--timeout]`: any process ends the job by its name, waits for zero
+  processes and records `final.json` (`by: "stop"`). Exit 0 only with `cleanupConfirmed: true`; new exit
+  code **15** when cleanup cannot be confirmed. Idempotent. Never ends anything by pid or executable name.
+- Add `--id <id> --custody <dir>` to `exec` and `run`: the same records (`mode: "foreground"`) and named job
+  for foreground commands. Without the two options `exec` and `run` behave as in 0.4.
+- New settings for tests and tuning: `JLOCK_CUSTODY_BEAT_MS`, `JLOCK_CUSTODY_SELF_FENCE_MS`,
+  `JLOCK_CUSTODY_STOP_MS`.
+- Outside Windows the custody commands (and `--id`/`--custody`) exit 2 with "unsupported on this platform";
+  `process inspect` answers `unknown`, `reason: "unsupported"`. No partial POSIX custody.
+- Help, catalogs (eleven languages), READMEs and the agent skills document custody.
+
 ## 0.4.3
 
 - Includes the foreground supervision from 0.4.0–0.4.2: `exec --timeout`, `run --command-timeout` and `run --total-timeout`, private Windows Job Objects and Unix process groups, cleanup before lock release, and no changes to the 0.3 registry/owner-family protocol.

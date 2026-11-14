@@ -27,6 +27,9 @@ O layout em disco muda: `holds/<grant>.json` (uma por posse) e `holds/<grant>.le
 arquivo `gate` de vida curta, no lugar de `holder.json`/`lease.json`; sem compatibilidade com a 0.2.
 Onde as seções abaixo falam de `holder.json`, leia-se "o arquivo da posse". A referência atualizada está
 em `docs/USAGE.md` e `docs/API-0.3.md`; o porquê em `docs/DEVIATIONS.md` §14.
+Revisão 8, 14/11/2026 (0.5): custódia de comandos (seção 15): `capabilities`, `process inspect`,
+`custody start|status|stop` e `--id`/`--custody` em `exec`/`run`; código de saída 15. Os pontos estão
+marcados com **[rev. 8]**; o que a especificação deixou aberto está em `docs/DEVIATIONS.md` §16–§19.
 
 ---
 
@@ -219,6 +222,8 @@ Em Rust: `OpenOptions::new().write(true).create_new(true)` é a criação exclus
 | 2 | uso incorreto (argumentos) |
 | 20 | erro de sistema de arquivos (permissão, disco cheio, arquivo preso); a mensagem traz o código do SO e o caminho |
 | 130 | **[rev. 4]** interrompido (CTRL+C/SIGINT/SIGTERM) durante a espera; a senha foi apagada antes de sair |
+| 15 | **[rev. 8]** `custody stop`: limpeza não confirmada (`cleanupConfirmed: false`); seção 15 |
+| 124 | prazo do comando estourado (`exec --timeout`, `run --command-timeout`, `run --total-timeout`; 0.4) |
 
 Em `run`, o código do comando é repassado quando a trava foi concedida; os códigos acima aparecem só quando a
 trava não foi obtida ou foi perdida.
@@ -543,3 +548,100 @@ macOS têm plano próprio em `docs/PLAN-LINUX-MACOS.md`.
 
 11 i18n (`en` + `pt-BR`) → 12 help/about → 13 doctor → 14 release e instaladores → 15 update → 16 traduções
 para os nove idiomas restantes → 17 READMEs. Depois: Linux e macOS (`docs/PLAN-LINUX-MACOS.md`, tickets U1–U8).
+
+## 15. Custódia de comandos (0.5) **[rev. 8]**
+
+O contrato que o jtasks 0.9.0 consome: iniciar um comando num Job Object **com nome**, deixar registros
+duráveis e permitir que **outro processo** o encerre pelo nome e confirme que não sobrou nada. A especificação
+de origem é `D:/jtasks/docs/PLAN-CUSTODIA-jlock.md`; os nomes de comandos, campos e arquivos abaixo são o
+contrato. Tudo é saída `--json`, igual em todos os idiomas. O que a especificação deixou aberto e a
+implementação decidiu está em `docs/DEVIATIONS.md` §16–§19.
+
+### Decisões
+
+- Silêncio nunca é prova de morte. `cleanupConfirmed: true` só com o grupo aberto pelo nome e zero processos
+  ativos, ou, com o grupo inexistente, com a identidade da raiz conferida como ausente num identificador
+  aberto. Raiz que saiu, grupo vazio recriado ou pedido de encerramento aceito **não** bastam.
+- Nada encerra processo por pid depois de uma conferência (é corrida), nem por nome de executável. Encerrar é
+  sempre pelo grupo com nome que o próprio jlock criou.
+- O invólucro fica fora do grupo do comando; o comando não herda identificador do grupo.
+- A intenção é gravada antes de qualquer processo; o recibo, antes de soltar o comando suspenso. Um id que já
+  tem intenção nunca inicia um segundo processo.
+- Windows primeiro. Fora do Windows: `custody: 0`, e os comandos de custódia (também `--id`/`--custody` de
+  `exec`/`run`) saem com o código 2 e "unsupported on this platform". Nada de implementação POSIX parcial.
+- O comportamento de `exec` e `run` sem `--id`/`--custody` não muda.
+
+### Capacidades e identidade de processo
+
+- `jlock capabilities --json` → `{ "version": "0.5.0", "capabilities": { "custody": 1, "processInspect": 1 },
+  "custodyScope": "job" }`. Fora do Windows: `custody: 0`, `processInspect: 0`, `custodyScope: "none"`. O
+  número sobe quando o contrato muda de forma incompatível.
+- `jlock process inspect --pid <pid> [--identity <token>] --json` → `{ "state": "present" | "absent" |
+  "unknown", "identity"?, "reason"? }`. No Windows: `OpenProcess` com direito limitado de consulta,
+  `GetProcessTimes` e o código de saída no mesmo identificador aberto; `identity` é um token opaco da
+  encarnação (`win:<pid>:<creation filetime>`). `absent` só quando o sistema diz que não existe processo com
+  esse pid ou que ele já saiu; acesso negado ou qualquer erro é `unknown` com `reason`. Com `--identity`, um
+  processo presente de outra encarnação responde `absent`, `reason: "replaced"`. Nunca encerra nada.
+
+### Registros de um comando
+
+Pasta `<custody>/<id>/`, onde `<custody>` é escolhida por quem chama e `<id>` casa com `^[A-Za-z0-9._-]{1,64}$`
+(`.` e `..` recusados). Gravações conforme a seção 7.5 (`create_new` para criar, `.tmp` + `rename` para
+substituir; `receipt.json` e `final.json` publicados inteiros e uma vez só, DEVIATIONS §16).
+
+| Arquivo | Quando | Conteúdo |
+|---|---|---|
+| `intent.json` | antes de qualquer processo, com `create_new` | `{ v: 1, id, argv, cwd, limitMs?, quietMs?, mode: "detached" \| "foreground", createdAt }` |
+| `receipt.json` | com o comando criado suspenso e já no grupo, **antes** de soltá-lo | `{ v: 1, id, pid, identity, job, scope: "job", custodianPid, custodianIdentity, startedAt }` |
+| `beat.json` | a cada 10 s, pelo invólucro | `{ v: 1, id, seq, at, lastOutputAt, outputBytes }` |
+| `final.json` | uma vez, por quem confirmou o fim | `{ v: 1, id, reason, detail?, exitCode?, cleanupConfirmed, scope, activeProcesses, endedAt, by: "custodian" \| "stop" }` |
+| `output.log` | modo `detached` | saída e erro do comando, em ordem de chegada |
+
+`reason`: `exited`, `limit`, `quiet`, `stopped` (pedido de `custody stop`, com o texto de `--reason` em
+`detail`), `custodian-lost`, `interrupted`. Arquivos privados fora do contrato: `launch.lock`,
+`custodian.json` (§16) e `stop.json` (§18).
+
+### Comandos
+
+- `jlock custody start --id <id> --custody <dir> [--cwd <dir>] [--limit <duração>] [--quiet <duração>] --json -- <argv>`:
+  grava `intent.json` (se já existe, não inicia nada e responde o estado atual com `"duplicate": true`,
+  código 0); inicia o invólucro (o próprio jlock) solto do terminal e do grupo de quem chama, como o guardião de
+  `hold --detach`; o invólucro cria o grupo `Local\jlock-custody-<12 hex do sha1 de dir>-<id>` (encerrar ao
+  fechar, sem saída do grupo), cria o comando suspenso com saída e erro no `output.log`, associa ao grupo,
+  grava `receipt.json` e solta o comando, ficando fora do grupo. O primeiro processo responde
+  `{ "state": "running", "id", "receipt" }` só depois de o recibo existir. Falha antes do recibo:
+  `{ "state": "launch-failed", "reason" }`, código 20.
+- O invólucro, enquanto o comando vive: grava `beat.json` a cada `JLOCK_CUSTODY_BEAT_MS` (10000); encerra o
+  grupo e grava `final.json` com `limit` ou `quiet` quando o prazo estoura (`quiet`: `output.log` sem crescer
+  por `quietMs`; sem padrão); se não consegue gravar o sinal por `JLOCK_CUSTODY_SELF_FENCE_MS` (30000),
+  encerra o próprio grupo e sai sem `final.json`. Ao fim do comando, encerra o que restou no grupo, confirma
+  zero processos e grava `final.json` (`exited`, `exitCode`).
+- `jlock custody status --id <id> --custody <dir> --json` → `{ "state": "absent" | "launching" |
+  "launch-failed" | "running" | "ended" | "lost", "intent"?, "receipt"?, "beat"?, "final"?, "job": { "open":
+  bool, "activeProcesses"? } }`. `lost`: há recibo, não há final e o invólucro (por identidade) não existe
+  mais. `launch-failed`: há intenção sem recibo e sem invólucro vivo. Só lê; fecha todo identificador que abrir.
+- `jlock custody stop --id <id> --custody <dir> --reason <texto> [--timeout 15s] --json`: abre o grupo pelo
+  nome, encerra, espera zero processos dentro do prazo (`JLOCK_CUSTODY_STOP_MS`, 15000), grava `final.json` se
+  ainda não existe (`by: "stop"`). Código 0 com `cleanupConfirmed: true` (a resposta é o próprio
+  `final.json`); código **15** com `cleanupConfirmed: false` e o motivo em `error`. Idempotente.
+- `jlock exec --id <id> --custody <dir> …` e `jlock run <chave> … --id <id> --custody <dir> …`: os comandos em
+  primeiro plano da 0.4 com os mesmos registros (`mode: "foreground"`, sem `output.log`) e o grupo com nome.
+  As duas opções juntas ou nenhuma; id com intenção é erro de uso (código 2) e não inicia nada (§19).
+
+### Limites ditos
+
+Um Job Object não alcança trabalho entregue a um serviço que já existia (Docker, WMI, um daemon). O `scope`
+do recibo é `job`; qualquer outro escopo futuro (grupo de processos POSIX) não autoriza troca de agente no
+jtasks.
+
+### Testes
+
+Reais, só com filhos do próprio binário de teste, encerrados por PID (`tests/capabilities.rs`,
+`tests/process_inspect.rs`, `tests/custody.rs`, `tests/custody_watch.rs`, `tests/custody_stop.rs`,
+`tests/custody_foreground.rs`): início repetido não cria segundo processo; queda entre intenção e recibo vira
+`launch-failed`; matar o invólucro encerra a árvore, `status` diz `lost` e `stop` confirma; outro processo
+segurando o grupo com o invólucro morto não impede o `stop`; o neto morre no `stop` e nenhum processo de fora é
+tocado; `limit` e `quiet` gravam o motivo certo e saída contínua não dispara `quiet`; `exec --id` deixa os
+registros e limpa a árvore antes de responder. A resposta fora do Windows é conferida por testes de unidade
+que rodam em qualquer plataforma (`answer_for` em `src/cmd/capabilities.rs`, `require_support` em
+`src/custody.rs`) e por `cargo check --target x86_64-unknown-linux-gnu`.

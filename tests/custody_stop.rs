@@ -10,7 +10,6 @@ mod common;
 use common::Env;
 #[cfg(windows)]
 use serde_json::{json, Value};
-#[cfg(windows)]
 use std::path::PathBuf;
 use std::time::Duration;
 

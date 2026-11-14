@@ -261,6 +261,7 @@ flowchart TD
 | 12 | 死锁：该请求会使环闭合 |
 | 13 | 不是所有者 |
 | 14 | 锁已丢失（`hold`/`run`/`renew`） |
+| 15 | `custody stop`：未能确认清理完成（`cleanupConfirmed: false`） |
 | 20 | 文件系统错误；消息中带有操作系统的错误 |
 | 130 | 等待期间被中断（CTRL+C） |
 
@@ -320,5 +321,20 @@ OS process custody: manage those explicitly. Do not launch persistent background
 
 The registry, owner families, shared resources, queue fairness and renewal protocol remain compatible with 0.3.
 Install to a new versioned directory while old agents run; select it for new sessions and keep their old binary intact.
+
+## 命令托管（0.5，Windows）
+
+`jlock custody start --id <id> --custody <dir> [--limit 2h] [--quiet 10m] -- <命令...>` 启动一个比调用本身活得更久的命令，
+放在一个具名的 Job Object 中，并在 `<dir>/<id>/` 留下持久记录：任何进程存在之前写 `intent.json`，命令运行之前写
+`receipt.json`，每 10 秒写 `beat.json`，结束时写 `final.json`，输出写入 `output.log`。同一个 id 绝不会启动第二个进程。
+`jlock custody status` 读取这些记录（`running`、`ended`、`lost`、`launch-failed`……）。
+`jlock custody stop --reason <文本>` 可以从**任何**进程按作业名结束整棵进程树，即使托管进程已死；只有在
+`cleanupConfirmed: true` 时才以 0 退出；退出码 **15** 表示无法确认清理完成。沉默从不被当作死亡，也从不按 pid
+或可执行文件名结束任何东西。`exec` 和 `run` 接受 `--id <id> --custody <dir>`，为前台命令留下同样的记录。
+
+`jlock capabilities --json` 说明二进制支持什么：Windows 上为 `custody: 1`、`processInspect: 1`、
+`custodyScope: "job"`；其他系统上为 `0`、`0`、`"none"`，托管命令会以 "unsupported on this platform" 拒绝。
+`jlock process inspect --pid <pid> [--identity <token>]` 针对进程的某一次化身回答 `present`、`absent` 或 `unknown`，
+从不结束任何东西。Job Object 管不到交给已存在服务（Docker、守护进程）的工作。参考：[`docs/USAGE.md`](docs/USAGE.md)。
 
 <sub>本译文尚待母语者审校，欢迎指正：见 [CONTRIBUTING.md](CONTRIBUTING.md)。</sub>

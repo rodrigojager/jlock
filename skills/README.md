@@ -2,8 +2,8 @@
 
 A skill teaches an AI coding agent when and how to use jlock: take the files of a task before editing
 them (`jlock hold ... --detach`), give them back at the end (`jlock release`), check a lock after a long
-pause (`jlock heartbeat`), run builds and servers one at a time (`jlock run`), and what to do when a file
-is taken. The three skills say the same thing; each uses its tool's name in `--owner` and lives where
+pause (`jlock heartbeat`), run builds and servers one at a time (`jlock run`), keep a command that outlives the turn in custody
+so any session can stop it and confirm (`jlock custody`, Windows), and what to do when a file is taken. The three skills say the same thing; each uses its tool's name in `--owner` and lives where
 that tool looks for skills.
 
 | Agent | Skill | Installed for the user at | Or for one project at |

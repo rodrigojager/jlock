@@ -117,9 +117,7 @@ fn parse(args: Vec<String>) -> Result<Opts, Failure> {
 }
 
 pub fn run(args: Vec<String>) -> CmdResult {
-    if !cfg!(windows) {
-        return Err(usage(txt!("error.unsupported_platform", cmd = "custody")));
-    }
+    custody::require_support(custody::SUPPORTED, "custody")?;
     let o = parse(args)?;
     match o.action.as_str() {
         "start" if std::env::var_os(KEEPER_ENV).is_some() => keeper(&o),
