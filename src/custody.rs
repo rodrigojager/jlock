@@ -3,6 +3,7 @@
 //!
 //! Records (see `jlock help custody`): `intent.json` (before any process, created exclusively),
 //! `receipt.json` (with the command suspended and already in its job, before it runs),
+//! `beat.json` (the keeper's sign of life, replaced every `JLOCK_CUSTODY_BEAT_MS`),
 //! `final.json` (once, by whoever confirmed the end), `output.log` (the command's output and
 //! errors). Two private files help tell `launching` from `launch-failed`: `launch.lock`, which the
 //! first process holds an OS lock on from before the intent until it answers, and
@@ -87,6 +88,40 @@ pub fn publish_once(path: &Path, value: &Value) -> io::Result<()> {
     };
     let _ = crate::fsx::remove_with_retry(&tmp);
     result
+}
+
+/// A duration in milliseconds from the environment, or `default_ms` when it is unset or not a
+/// whole number.
+pub fn setting_ms(name: &str, default_ms: u64) -> std::time::Duration {
+    let ms = std::env::var(name)
+        .ok()
+        .and_then(|v| v.trim().parse().ok())
+        .unwrap_or(default_ms);
+    std::time::Duration::from_millis(ms)
+}
+
+/// How often the keeper writes `beat.json` (`JLOCK_CUSTODY_BEAT_MS`, 10 s).
+pub fn beat_every() -> std::time::Duration {
+    setting_ms("JLOCK_CUSTODY_BEAT_MS", 10_000)
+}
+
+/// How long the keeper goes on without a beat written before it ends its own job
+/// (`JLOCK_CUSTODY_SELF_FENCE_MS`, 30 s).
+pub fn self_fence_after() -> std::time::Duration {
+    setting_ms("JLOCK_CUSTODY_SELF_FENCE_MS", 30_000)
+}
+
+/// How long ending a job waits for it to be empty (`JLOCK_CUSTODY_STOP_MS`, 15 s).
+pub fn stop_wait() -> std::time::Duration {
+    setting_ms("JLOCK_CUSTODY_STOP_MS", 15_000)
+}
+
+/// Replaces `beat.json` in `rec`: written whole to `beat.json.tmp`, then renamed over the old one.
+pub fn write_beat(rec: &Path, beat: &Value) -> io::Result<()> {
+    let path = rec.join(BEAT);
+    let tmp = rec.join(format!("{BEAT}.tmp"));
+    std::fs::write(&tmp, format!("{beat}\n").as_bytes())?;
+    std::fs::rename(&tmp, &path)
 }
 
 /// Whether the keeper named by a record (`custodianPid` + `custodianIdentity`, or `pid` +

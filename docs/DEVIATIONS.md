@@ -188,3 +188,20 @@ The contract is `D:/jtasks/docs/PLAN-CUSTODIA-jlock.md` ("Registros de um comand
 - **The custodian** is started with the arguments `custody start --id <id> --custody <dir> -- <argv>` and
   the private variable `JLOCK_CUSTODY_KEEPER`, which the command never inherits; it reads the command from
   `intent.json`. It waits for the job to empty for `JLOCK_CUSTODY_STOP_MS` after ending it.
+
+## 17. The custodian's watch: points the custody specification leaves open (0.5, J03)
+
+- **`lastOutputAt` is `null`** until the custodian has seen `output.log` grow at least once; it is the
+  wall-clock time at which the growth was seen (the log is polled every 25 ms), not the time of the write.
+  `outputBytes` is the size of `output.log`, read through the custodian's own handle.
+- **The first beat is written as soon as the command runs** (`seq` 1), then every
+  `JLOCK_CUSTODY_BEAT_MS`; `seq` counts beats written, so it never skips. The `limit` and `quiet` deadlines
+  and the self-fence count from the moment the command is let run, on the monotonic clock.
+- **A beat that cannot be written is not retried with the waits of section 7.5**: those waits (up to about
+  3 s) would delay the self-fence. The loop itself retries it 100 ms later (or sooner with a shorter beat),
+  and the self-fence counts from the last beat written.
+- **The self-fence** ends the job, waits for it to empty and leaves without `final.json`, as specified
+  (`custodian-lost` is for whoever checks); `status` then reads `lost`.
+- **The self-fence test cannot swap the command's folder for a file**: Windows refuses to rename a folder
+  while a file in it is open, and the command itself holds `output.log` open. The test makes every beat
+  fail in the same way instead, by turning `beat.json.tmp` (the beat's temporary name) into a folder.

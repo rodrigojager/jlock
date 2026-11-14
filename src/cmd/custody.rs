@@ -8,8 +8,10 @@
 //!
 //! The keeper: creates the named job (kill-on-close, no breakaway, a handle nobody inherits),
 //! creates the command suspended with its output in `output.log`, puts it in the job, writes
-//! `receipt.json`, lets it run, tells the first process, and stays out of the job. When the command
-//! ends it ends whatever is left in the job, confirms that nothing is, and writes `final.json`.
+//! `receipt.json`, lets it run, tells the first process, and stays out of the job. While the command
+//! runs it writes `beat.json` and ends the job with `limit` or `quiet` when a deadline passes; if it
+//! cannot write a beat for the fence time it ends its own job and leaves. When the command ends it
+//! ends whatever is left in the job, confirms that nothing is, and writes `final.json`.
 #![cfg_attr(not(windows), allow(dead_code, unused_imports))]
 
 use crate::cli::{
@@ -302,15 +304,6 @@ fn reader<R: std::io::Read + Send + 'static>(pipe: Option<R>) -> std::thread::Jo
     })
 }
 
-/// How long the keeper waits for the job to be empty after ending it.
-fn stop_wait() -> Duration {
-    let ms = std::env::var("JLOCK_CUSTODY_STOP_MS")
-        .ok()
-        .and_then(|v| v.trim().parse().ok())
-        .unwrap_or(15_000);
-    Duration::from_millis(ms)
-}
-
 fn keeper_error(text: String) -> Failure {
     Failure {
         code: EXIT_FS,
@@ -321,7 +314,7 @@ fn keeper_error(text: String) -> Failure {
 /// The keeper: the detached `jlock` that owns the job of one command.
 #[cfg(windows)]
 fn keeper(o: &Opts) -> CmdResult {
-    use crate::custody::Job;
+    use crate::custody::{stop_wait, Job};
     use crate::process_identity::inspect;
     use std::os::windows::process::CommandExt;
     use std::process::{Command, Stdio};
@@ -359,6 +352,10 @@ fn keeper(o: &Opts) -> CmdResult {
         .open(&log_path)
         .map_err(|e| keeper_error(format!("cannot open output.log: {e}")))?;
     let log_err = log
+        .try_clone()
+        .map_err(|e| keeper_error(format!("cannot open output.log: {e}")))?;
+    // Our own handle, to measure how far the log has grown even if its folder cannot be reached.
+    let log_size = log
         .try_clone()
         .map_err(|e| keeper_error(format!("cannot open output.log: {e}")))?;
     // The command must not inherit the pipes to the first process (it would wait for them).
@@ -409,17 +406,133 @@ fn keeper(o: &Opts) -> CmdResult {
         return Err(keeper_error(format!("cannot start the command: {e}")));
     }
     crate::detach::ready();
-    let code = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break status.code(),
-            Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            Err(_) => break None,
-        }
+    let limits = Limits {
+        limit: intent["limitMs"].as_u64().map(Duration::from_millis),
+        quiet: intent["quietMs"].as_u64().map(Duration::from_millis),
+        beat: custody::beat_every(),
+        fence: custody::self_fence_after(),
     };
-    // Whatever the command left behind in its job ends before the end is recorded.
-    let left = job.terminate(stop_wait());
-    write_final(o, &rec, "exited", code, left);
-    Ok(EXIT_OK)
+    let end = watch(o, &rec, &mut child, &log_size, &limits);
+    match end {
+        End::Exited(code) => {
+            // Whatever the command left behind in its job ends before the end is recorded.
+            let left = job.terminate(stop_wait());
+            write_final(o, &rec, "exited", code, left);
+            Ok(EXIT_OK)
+        }
+        End::Over(reason) => {
+            let left = job.terminate(stop_wait());
+            let code = child.try_wait().ok().flatten().and_then(|s| s.code());
+            write_final(o, &rec, reason, code, left);
+            Ok(EXIT_OK)
+        }
+        End::Fenced => {
+            // Nobody can see that this command is watched: it does not go on unwatched. The end
+            // is not recorded here (the records cannot be written); `custodian-lost` is for
+            // whoever checks.
+            let _ = job.terminate(stop_wait());
+            let _ = child.wait();
+            Err(keeper_error(
+                "cannot write beat.json: ended the command's job".into(),
+            ))
+        }
+    }
+}
+
+/// The deadlines the keeper watches a command by.
+struct Limits {
+    /// Longest the command may run (`limitMs` of the intent).
+    limit: Option<Duration>,
+    /// Longest `output.log` may go without growing (`quietMs` of the intent).
+    quiet: Option<Duration>,
+    /// How often `beat.json` is written.
+    beat: Duration,
+    /// How long without a beat written before the keeper ends its own job.
+    fence: Duration,
+}
+
+/// How the watch of a command ended.
+#[derive(Debug)]
+enum End {
+    /// The command ended by itself, with this exit code.
+    Exited(Option<i32>),
+    /// A deadline passed: `limit` or `quiet`.
+    Over(&'static str),
+    /// No beat could be written for the fence time.
+    Fenced,
+}
+
+/// Watches the running command until it ends or a deadline passes, writing `beat.json` on the
+/// way. Deadlines run on the monotonic clock; `at` and `lastOutputAt` are wall-clock times.
+/// `quiet` measures how far `output.log` has grown (its size), not its modification time. A beat
+/// that cannot be written is tried again shortly; the fence counts from the last one written.
+#[cfg(windows)]
+fn watch(
+    o: &Opts,
+    rec: &Path,
+    child: &mut std::process::Child,
+    log: &std::fs::File,
+    limits: &Limits,
+) -> End {
+    use std::time::Instant;
+
+    const TICK: Duration = Duration::from_millis(25);
+    let retry_beat = limits.beat.min(Duration::from_millis(100));
+    let started = Instant::now();
+    let mut last_beat_ok = started;
+    let mut next_beat = started;
+    let mut seq: u64 = 0;
+    let mut bytes = log.metadata().map(|m| m.len()).unwrap_or(0);
+    let mut last_growth = started;
+    let mut last_output_at: Option<String> = None;
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return End::Exited(status.code()),
+            Ok(None) => {}
+            Err(_) => return End::Exited(None),
+        }
+        let now = Instant::now();
+        if let Ok(len) = log.metadata().map(|m| m.len()) {
+            if len != bytes {
+                bytes = len;
+                last_growth = now;
+                last_output_at = Some(custody::now());
+            }
+        }
+        if limits
+            .limit
+            .is_some_and(|l| now.duration_since(started) >= l)
+        {
+            return End::Over("limit");
+        }
+        if limits
+            .quiet
+            .is_some_and(|q| now.duration_since(last_growth) >= q)
+        {
+            return End::Over("quiet");
+        }
+        if now >= next_beat {
+            let beat = json!({
+                "v": 1,
+                "id": o.id,
+                "seq": seq + 1,
+                "at": custody::now(),
+                "lastOutputAt": last_output_at,
+                "outputBytes": bytes,
+            });
+            if custody::write_beat(rec, &beat).is_ok() {
+                seq += 1;
+                last_beat_ok = now;
+                next_beat = now + limits.beat;
+            } else {
+                next_beat = now + retry_beat;
+            }
+        }
+        if now.duration_since(last_beat_ok) >= limits.fence {
+            return End::Fenced;
+        }
+        std::thread::sleep(TICK);
+    }
 }
 
 #[cfg(windows)]
