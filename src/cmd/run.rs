@@ -1,9 +1,12 @@
 //! `jlock run <keys> -- <command>`: like `flock(1)`. Takes the keys, runs the command as a child
 //! while renewing the heartbeat, releases at the end and passes the command's exit code through.
+//! With `--id` and `--custody` the command also leaves the records of `custody`
+//! (`mode: "foreground"`, the intent before the keys are asked for) and runs in a named job.
 
 use crate::cli::{fs_error, usage, CmdResult, Failure, EXIT_LOST, EXIT_USAGE};
 use crate::cmd::acquire::{acquire_all, parse, report, wants, SetOutcome};
 use crate::cmd::hold::Keeper;
+use crate::custody::{self, Supervised};
 use crate::i18n::txt;
 use crate::process_tree::Tree;
 use crate::store::Store;
@@ -12,7 +15,8 @@ use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 pub fn run(args: Vec<String>) -> CmdResult {
-    let (opts, command) = parse(args, "run")?;
+    let (mut opts, command) = parse(args, "run")?;
+    let kept = custody::foreground_opts("run", opts.custody_id.take(), opts.custody_dir.take())?;
     if command.is_empty() {
         return Err(usage(txt!("error.run_needs_command")));
     }
@@ -22,6 +26,18 @@ pub fn run(args: Vec<String>) -> CmdResult {
     wait::install_interrupt_handler();
     let wants = wants(&opts)?;
     let store = Store::open()?;
+    // The intent comes before any process: an id that already has one never starts a command,
+    // nor waits for the keys.
+    let intent = match &kept {
+        Some((dir, id)) => {
+            let limit = [opts.command_timeout, opts.total_timeout]
+                .into_iter()
+                .flatten()
+                .min();
+            Some(crate::cmd::exec::intent(dir, id, &command, limit, "run")?)
+        }
+        None => None,
+    };
     let deadline = [opts.timeout.map(|t| started + t), total_deadline]
         .into_iter()
         .flatten()
@@ -47,7 +63,11 @@ pub fn run(args: Vec<String>) -> CmdResult {
         keeper.release_all();
         return Ok(124);
     }
-    let mut child = match Tree::spawn(&command) {
+    let spawned = match intent {
+        Some(intent) => intent.launch().map(Supervised::Kept),
+        None => Tree::spawn(&command).map(Supervised::Tree),
+    };
+    let mut child = match spawned {
         Ok(child) => child,
         Err(e) => {
             keeper.release_all();
@@ -65,28 +85,33 @@ pub fn run(args: Vec<String>) -> CmdResult {
     .flatten()
     .min();
     let mut lost = None;
+    let mut reason = "exited";
     let result = loop {
         match child.try_wait() {
             Ok(Some(code)) => break Ok(code),
             Ok(None) => {}
             Err(e) => {
+                reason = "interrupted";
                 break Err(fs_error(txt!("error.waiting_for", cmd = command[0]), &e));
             }
         }
         if let Some(trouble) = keeper.tick() {
             // The lock is gone: the command must not go on unprotected.
             lost = Some(trouble);
+            reason = "interrupted";
             break Ok(EXIT_LOST);
         }
         if wait::interrupted() {
+            reason = "interrupted";
             break Ok(130);
         }
         if command_deadline.is_some_and(|d| Instant::now() >= d) {
+            reason = "limit";
             break Ok(124);
         }
         sleep(Duration::from_millis(20));
     };
-    while let Err(e) = child.stop() {
+    while let Err(e) = child.stop(reason) {
         eprintln!("jlock: command cleanup pending; retaining locks: {e}");
         if lost.is_none() {
             lost = keeper.tick();

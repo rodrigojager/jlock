@@ -17,7 +17,6 @@
     "resource": "resource",
     "nested": "nested"
   },
-
   "help.tagline": "machine-wide locks for files, folders and names",
   "help.intro": "jlock lets programs, scripts, people and AI agents on one machine take turns. Before touching a file, a folder or any named resource (a port, the desktop, a deploy), they ask jlock for its lock: one owner at a time (or several together, in shared mode), the others wait in line in order of arrival. A lock left by a process that died is recovered by itself, a request that would deadlock is refused, and jlock list shows who holds what. There is no server: the state is a folder on disk.",
   "help.usage_line": "Usage: jlock <command> [options]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "tag",
   "help.meta.mode": "mode",
   "help.opt.json": "Print one JSON object with a result field instead of text lines.",
-
   "help.exit.0": "ok",
   "help.exit.2": "wrong usage: a bad option or value (the message says which)",
   "help.exit.10": "busy: not taken, with --no-wait",
@@ -60,7 +58,6 @@
   "help.exit.14": "lock lost: broken with unlock --force, or expired",
   "help.exit.20": "file system error (permission, disk full, a file held by another program); the OS message says which",
   "help.exit.130": "interrupted (CTRL+C) while waiting; the place in the queue was given up",
-
   "help.cmd.acquire.summary": "Take keys and keep them after the command ends.",
   "help.cmd.acquire.usage": "<key...> [options]",
   "help.cmd.acquire.desc": "Takes every key given, all or none, in a fixed order, so two callers asking for the same keys in different orders never block each other. A free key is granted at once; a taken one is waited for in a fair queue, in order of arrival, without limit unless --timeout or --no-wait says otherwise. Each key is taken exclusive unless --mode shared or its own @shared says otherwise: shared holds of a key coexist, an exclusive one waits for them, and a shared request never overtakes an exclusive one that was waiting before it. The lock stays after jlock exits: renew it with jlock heartbeat, or use hold or run, which renew it for you. Asking again for a key you already hold is granted at once.",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "Wait in the queue until the keys are free. This is the default.",
   "help.opt.acquire.no_wait": "Do not wait: if a key is taken, answer busy (exit 10) with its holder and the place you would have had.",
   "help.opt.acquire.timeout": "Wait at most this long, then leave the queue and give up (exit 11). Units: ms, s, m, h, d. Default: no limit.",
-
   "help.cmd.run.summary": "Hold keys while a command runs, like flock(1).",
   "help.cmd.run.usage": "<key...> [options] -- <command...>",
   "help.cmd.run.desc": "Takes the keys (with the same options as acquire), runs the command written after --, renews the lock while it runs and releases it when it ends. Everything after -- belongs to the command, even words that look like jlock options. jlock exits with the command's own exit code. If the lock is lost the command is stopped and run exits 14; if run itself is killed, the lock expires.",
   "help.cmd.run.examples": "# One build at a time on this machine\njlock run D:\\proj\\dist -- cargo build --release\n# Give up after waiting 2 minutes\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "the command's own exit code, once the keys were granted (0 when it succeeds)",
   "help.exit.run.14": "lock lost while the command ran; the command was stopped",
-
   "help.cmd.hold.summary": "Hold keys until told to stop.",
   "help.cmd.hold.usage": "<key...> [options]",
   "help.cmd.hold.desc": "Takes the keys (with the same options as acquire), prints granted, then keeps running and renewing the lock. It releases and exits 0 when it reads the line release on its standard input, on CTRL+C, or when it is terminated; it also ends with 0 when its owner gives the keys back with jlock release. While it runs, the operating system also locks its hold files, so the lock is freed the moment the process dies. If the lock is taken away it prints lost and exits 14. With --detach it answers and returns at once, and a second process keeps the lock in the background: the simplest way for an agent to hold the files of a whole task.",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "Answer and return like acquire (granted, busy, timeout, with the same exit codes), while a second jlock hold keeps the lock alive in the background until jlock release, the --ttl, or unlock --force. One call for an agent, with the answer in hand.",
   "help.opt.hold.release_on_eof": "End when standard input closes: the end of the input counts as the line release, so a program that stays open and runs hold in the foreground, holding its standard input, lets go of the lock the moment it dies (even on Windows, where a dead parent does not end its children). Not with --detach: the background process has no standard input.",
   "help.exit.hold.0": "released, after release, CTRL+C or termination",
-
   "help.cmd.release.summary": "Give keys back.",
   "help.cmd.release.usage": "[<key...>] [options]",
   "help.cmd.release.desc": "Gives back the keys named, if you are their owner (exit 13 otherwise). Without keys it releases everything the owner holds; with --group, everything the owner holds in that group. The holds nested in the ones released end with them. The next one in the queue gets each key, and a key's folder disappears once nobody holds or waits for it.",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agent-7\n# Everything agent-7 holds\njlock release --owner agent-7\n# The whole group, whoever owns each lock\njlock release --group task-42 --any-owner",
   "help.exit.release.0": "released (or there was nothing to release)",
   "help.exit.release.13": "a key named is not yours; the others were released",
-
   "help.cmd.renew.summary": "Push back the deadline of locks you hold.",
   "help.cmd.renew.usage": "[<key...>] [options]",
   "help.cmd.renew.desc": "Moves the deadline (--ttl) of locks you hold to now plus the ttl, and renews their heartbeat: for work that may outlast the ttl it asked for. Without --ttl it uses the ttl the lock was taken with. Without keys it renews everything the owner holds; with --group, everything the owner holds in that group. The lock is never let go while it is renewed, and a hold or run keeping it goes on as before. A lock already past its deadline cannot be renewed: it expires (exit 14) and has to be taken again.",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agent-7",
   "help.exit.heartbeat.0": "renewed",
   "help.exit.heartbeat.13": "lost: the lock is not yours any more (broken or expired)",
-
   "help.cmd.status.summary": "Show who holds one key and who waits for it.",
   "help.cmd.status.usage": "<key> [options]",
   "help.cmd.status.desc": "Shows whether the key is free or held, and by whom: each hold with its mode (shared or exclusive), the hold it is nested in, since when, the last heartbeat, the group and the intent. Then the queue, in order, with the mode each waiter asks for, and the other keys that block it: a folder above it, files inside it, or *. A dead lock found on the way is expired.",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:port-3000 --json",
-
   "help.cmd.list.summary": "Show everything locked on this machine.",
   "help.cmd.list.usage": "[options]",
   "help.cmd.list.desc": "Lists every key that is held or has a queue. It reads the registry folder itself, never a summary, so it is always the truth.",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "Only dead locks and tickets (heartbeat older than JLOCK_STALE_MS, or past the ttl).",
   "help.opt.list.watch": "Redraw every second until CTRL+C.",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agent-7 --json",
-
   "help.cmd.graph.summary": "Show who waits for whom, and any cycle.",
   "help.cmd.graph.usage": "[options]",
   "help.cmd.graph.desc": "Each line is one waiter, whom it waits for, and through which key, with the modes on both sides. A cycle (A waits for B while B waits for A) is a deadlock; jlock refuses the request that would close one, so a cycle only shows for an instant. Shared holds and an owner's own family (ancestors, descendants) never make a line; an owner waits whenever one of its descendants waits, so a chain that comes back to a waiter's ancestor is a cycle too.",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[options]",
   "help.cmd.resources.desc": "Lists the registered resources: the built-in ones (desktop, clipboard, port:<n>, machine...) and your own, from resources.json in the registry folder, each with the mode taken when a request names none and its description. A resource: key whose name is not listed is refused, with the closest name as a suggestion, so a typo never becomes another resource. A resource only conflicts with the very same resource and argument, never with paths or name: keys.",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "Break someone else's lock (needs --force).",
   "help.cmd.unlock.usage": "(<key...> | --owner <id> | --group <group>) --force [options]",
   "help.cmd.unlock.desc": "For emergencies: breaks the locks named, whoever owns them, and writes to the log who forced and why. The owner's hold or run notices at its next heartbeat and stops with 14, the holds nested in a broken one end with it, and the next one in the queue gets the key. To give back your own lock, use release.",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"agent hung\"\njlock unlock --owner agent-3 --force",
   "help.exit.unlock.0": "done (also when there was nothing to break)",
   "help.exit.unlock.2": "wrong usage, or --force is missing",
-
   "help.cmd.gc.summary": "Clean up now: expire dead locks, remove empty folders.",
   "help.cmd.gc.usage": "[options]",
   "help.cmd.gc.desc": "Runs the global sweep at once: expires locks and tickets whose owners died, deletes leftovers, removes empty key folders, rotates the log, rewrites index.json, and prints what it removed. Every command already does this, at most once every JLOCK_SWEEP_MS.",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "Explain jlock, or one command.",
   "help.cmd.help.usage": "[<command>]",
   "help.cmd.help.desc": "Without a command: what jlock is and the list of commands. With a command: its options with defaults and examples, and its exit codes. jlock <command> --help shows the same page.",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "no such command (the closest name is suggested)",
-
   "help.cmd.about.summary": "Who made jlock, and where to find it.",
   "help.cmd.about.usage": "[options]",
   "help.cmd.about.desc": "Prints the version, the author with GitHub and LinkedIn, the repository, the license and the links to the documentation. It does not use the network.",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "Machine-wide locks for files, folders and names: a fair queue, recovery of locks left by dead processes, deadlock detection, no server.",
   "about.author": "author",
   "about.repository": "repository",
@@ -180,13 +165,11 @@
   "about.usage": "usage",
   "about.roadmap": "roadmap",
   "about.footer": "jlock by {author} · {github} · {linkedin}",
-
   "tip.busy": "tip: jlock status {key} shows who holds it and the queue; drop --no-wait to wait your turn",
   "tip.timeout": "tip: wait longer with a bigger --timeout, or see who holds it with jlock status {key}",
   "tip.deadlock": "tip: release what you hold and ask again, or take all the keys in one acquire",
   "tip.not_owner": "tip: the lock belongs to {owner}; use --owner {owner}, or jlock unlock --force to break it",
   "tip.lost": "tip: someone broke or expired your lock on {key}; stop changing it, check jlock status {key}, and take it again with jlock acquire",
-
   "help.cmd.update.summary": "Install the latest release of jlock over this one.",
   "help.cmd.update.usage": "[options]",
   "help.cmd.update.desc": "Asks GitHub for the latest release (or takes the version given), downloads the archive for this system, checks it against the SHA256SUMS of the release, puts the new jlock in place of the one running, and runs it once to confirm its version; if that fails, the old one is put back. It uses the system's curl (PowerShell on Windows when there is no curl). This is the only command that uses the network, and only when you run it.",
@@ -196,7 +179,6 @@
   "help.meta.version": "version",
   "help.exit.update.0": "updated, already up to date, or (with --check) compared",
   "help.exit.update.20": "no release found, download or checksum failed, or the folder cannot be written; the message says which",
-
   "update.current": "this version:   {version}",
   "update.latest": "latest release: {version}",
   "update.available": "an update is available: jlock update installs it",
@@ -216,14 +198,12 @@
   "update.restore_failed": "the new jlock did not work and the old one could not be put back at {path}; reinstall with install.sh or install.ps1",
   "update.no_exe": "cannot tell where this jlock is",
   "update.bad_version": "bad version '{version}' (use v0.2.0)",
-
   "help.cmd.doctor.summary": "Check that this machine is ready for locks.",
   "help.cmd.doctor.usage": "[options]",
   "help.cmd.doctor.desc": "Checks, in order: the version and the executable running; the registry folder (JLOCK_HOME), where it comes from, and whether it is a writable folder; the three file operations the protocol stands on (create_new, rename, remove) in that folder; the OS lock that hold and run use; the file system; the JLOCK_* variables; whether this jlock is the first one in PATH; what the registry holds now; and curl, for update. Each line says ok, warn or fail, and how to fix it. It only suggests: it never changes anything, and the only files it writes are its own temporary ones, removed before it ends.",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "no check failed (warnings do not change the code)",
   "help.exit.doctor.20": "at least one check failed",
-
   "doctor.name.version": "version",
   "doctor.name.home": "registry folder",
   "doctor.name.primitives": "primitives",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "install curl with your package manager; nothing else in jlock needs it",
   "doctor.skipped": "not checked: the registry folder is not usable",
   "doctor.skipped_fix": "fix the registry folder first (see above)",
-
   "acquire.granted": "granted {key}",
   "acquire.busy": "busy {key} held by {owner}{via} (position {position})",
   "acquire.timeout": "timeout {key} held by {owner}{via} (position {position})",
@@ -294,23 +273,18 @@
   "acquire.nested": " (nested in {owner})",
   "acquire.and_others_one": " and {n} other",
   "acquire.and_others_other": " and {n} others",
-
   "result.released": "released {key}",
   "result.lost": "lost {key}",
-
   "heartbeat.renewed": "renewed {key}",
   "renew.until": "renewed {key} until {until}",
   "renew.not_owner": "not_owner {key} held by {holder}",
   "renew.not_locked": "not_owner {key} (not locked)",
   "renew.nothing": "nothing to renew",
-
   "release.not_owner": "not_owner {key} held by {holder}",
   "release.not_locked": "not_owner {key} (not locked)",
   "release.nothing": "nothing to release",
-
   "unlock.forced": "forced {key} (was {owner})",
   "unlock.nothing": "nothing to force",
-
   "status.held": "held {key}",
   "status.free": "free {key}",
   "status.by": "by {owner} ({mode}) since {since} ({ago} ago)",
@@ -331,7 +305,6 @@
   "status.why_above": "why: a lock on a folder covers everything inside it, so a held folder above this key blocks it",
   "status.why_inside": "why: a folder can only be taken when nothing inside it is, so these keys inside it block it",
   "status.why_all": "why: * conflicts with every key",
-
   "list.nothing": "nothing locked",
   "list.col_key": "KEY",
   "list.col_mode": "MODE",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(dead) the heartbeat stopped and nobody holds the OS lock: it will be expired",
   "list.legend_late": "(late) the heartbeat is late, but the process holding the lock is alive (OS lock held)",
   "list.legend_nested": "(nested) a hold inside a hold of the owner's ancestor: it ends when that hold ends",
-
   "graph.no_waiters": "no waiters",
   "graph.edge_held": "{from} -> {to}  ({key} held {to_mode} by {holder}; wants {mode})",
   "graph.edge_queued": "{from} -> {to}  ({key} queued behind {holder}, {to_mode}; wants {mode})",
@@ -370,19 +342,16 @@
   "resource.machine": "the whole machine: exclusive asks for it quiet (benchmarks, timing tests); shared says a job loads it",
   "resource.network": "the network link (big downloads or uploads, network-sensitive tests)",
   "resource.port": "a TCP or UDP port of this machine, by number (resource:port:8080)",
-
   "gc.expired_locks": "expired locks",
   "gc.expired_tickets": "expired tickets",
   "gc.broken_consumed": "broken consumed",
   "gc.folders_removed": "folders removed",
   "gc.log_bytes": "log bytes",
   "gc.error": "error: {error}",
-
   "warn.bad_ms": "ignoring {name}={value} (want a positive number of ms)",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS ({stale}) should be well above JLOCK_HEARTBEAT_MS ({heartbeat})",
   "warn.resources_file": "ignoring {path}: {error}",
   "warn.resources_entry": "ignoring resource '{name}' in resources.json: {why}",
-
   "error.missing_command": "missing command",
   "error.unknown_command": "unknown command '{cmd}'. Commands: {list}",
   "error.unknown_command_near": "unknown command '{cmd}'; did you mean '{near}'? Commands: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under wants a path",
   "error.no_localappdata": "LOCALAPPDATA is not set; set JLOCK_HOME",
   "error.no_home": "HOME is not set; set JLOCK_HOME",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process: unexpected argument '{arg}'",
   "error.process_needs_pid": "process inspect needs --pid",
   "error.bad_pid": "bad pid '{value}' (a positive number)",
-
   "help.cmd.custody.summary": "Run a command detached in a named job, with durable records.",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <path> [options] [-- <command...>]",
   "help.cmd.custody.desc": "start writes intent.json in <custody>/<id>/ before any process exists and starts a detached custodian (this same jlock). The custodian creates the named job Local\\jlock-custody-<hash>-<id> (kill-on-close, no breakaway), creates the command suspended with its output and errors in output.log, puts it in the job, writes receipt.json and only then lets it run; start then answers state running with the receipt and returns. The custodian stays outside the job. When the command ends by itself, the custodian ends whatever it left in the job, confirms that no process is left and writes final.json (reason exited, exitCode, cleanupConfirmed). An id that already has an intent never starts a second process: the answer is its current state with duplicate true. status only reads: absent, launching, launch-failed (an intent without a receipt and without a live custodian), running, ended or lost (a receipt, no final.json, and the custodian is gone), with the records and whether the job is open. Windows only; elsewhere it refuses with unsupported on this platform. While the command runs, the custodian replaces beat.json every 10 s (JLOCK_CUSTODY_BEAT_MS) with seq, at, lastOutputAt and outputBytes; if it cannot write it for 30 s (JLOCK_CUSTODY_SELF_FENCE_MS), it ends the job itself and leaves without final.json. stop works from any process, even with the custodian gone: it opens the job by its name, ends it and waits for zero processes (--timeout, default 15 s, JLOCK_CUSTODY_STOP_MS), then writes final.json once (reason stopped with --reason in detail, or custodian-lost when the custodian was already gone; by stop) and answers it; a confirmed final.json already there is answered as is. When the job no longer exists, it confirms only if the command's root, checked by identity, is gone; it never ends anything by pid and never creates the job again. Without that proof it answers cleanupConfirmed false with the reason in error and exits 15.",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start: --cwd is not a folder: {path}",
   "error.custody_busy": "custody start: another start of '{id}' is still in progress",
   "error.custody_records": "cannot use the custody records folder",
-  "error.unsupported_platform": "{cmd}: unsupported on this platform"
+  "error.unsupported_platform": "{cmd}: unsupported on this platform",
+  "help.opt.foreground.id": "The command's id in custody (1 to 64 of A-Z a-z 0-9 . _ -); with --custody, writes intent.json, receipt.json, beat.json and final.json in <custody>/<id>/ (mode foreground; output stays here) and runs it in a named job that custody status reads and custody stop ends.",
+  "help.opt.foreground.custody": "The folder of the custody records; only together with --id.",
+  "error.foreground_needs_both": "{cmd}: --id and --custody go together",
+  "error.custody_duplicate": "{cmd}: custody id '{id}' already has an intent; nothing was started"
 }

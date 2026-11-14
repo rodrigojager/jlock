@@ -148,6 +148,16 @@ fn capabilities_and_process_help_in_every_language() {
         ] {
             assert!(custody.contains(want), "{lang}: {want} in {custody}");
         }
+        for name in ["exec", "run"] {
+            let page = env.run(&["--lang", lang, "help", name]).stdout;
+            for want in ["--id <", "--custody <"] {
+                assert!(page.contains(want), "{lang}: {want} in help {name}: {page}");
+            }
+            assert!(!page.contains("help.opt."), "{lang}: raw key in {name}");
+            for line in page.lines() {
+                assert!(i18n::width(line) <= 100, "{lang} {name}: {line}");
+            }
+        }
     }
 }
 

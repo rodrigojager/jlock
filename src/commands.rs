@@ -102,8 +102,19 @@ pub const RUN_OPTS: &[Opt] = &[
         "help.opt.run.total_timeout",
         "10m",
     ),
+    ID,
+    CUSTODY,
     JSON,
 ];
+
+/// `--id` and `--custody` of `exec` and `run`: a foreground command in custody.
+pub const ID: Opt = opt("id", Some("id"), "help.opt.foreground.id", "T04-exec-1");
+pub const CUSTODY: Opt = opt(
+    "custody",
+    Some("path"),
+    "help.opt.foreground.custody",
+    "D:\\run\\custody",
+);
 pub const SEE: &str = "help.group.see";
 pub const EMERGENCY: &str = "help.group.emergency";
 pub const MAINTENANCE: &str = "help.group.maintenance";
@@ -130,14 +141,18 @@ pub const COMMANDS: &[Command] = &[
     Command {
         name: "exec",
         group: TAKE,
-        opts: &[opt(
-            "timeout",
-            Some("time"),
-            "help.opt.run.command_timeout",
-            "10m",
-        )],
+        opts: &[
+            opt(
+                "timeout",
+                Some("time"),
+                "help.opt.run.command_timeout",
+                "10m",
+            ),
+            ID,
+            CUSTODY,
+        ],
         codes: &["0", "2", "20", "124", "130"],
-        see: &["run"],
+        see: &["run", "custody"],
     },
     Command {
         name: "custody",

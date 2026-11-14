@@ -17,7 +17,6 @@
     "resource": "recurso",
     "nested": "aninhada"
   },
-
   "help.tagline": "travas para a máquina inteira: arquivos, pastas e nomes",
   "help.intro": "O jlock faz programas, scripts, pessoas e agentes de IA de uma mesma máquina se revezarem. Antes de mexer num arquivo, numa pasta ou em qualquer recurso com nome (uma porta, a área de trabalho, um deploy), eles pedem a trava ao jlock: um dono por vez (ou vários juntos, no modo shared), os outros esperam na fila, em ordem de chegada. A trava deixada por um processo que morreu é recuperada sozinha, um pedido que causaria deadlock é recusado, e jlock list mostra quem tem o quê. Não há servidor: o estado é uma pasta no disco.",
   "help.usage_line": "Uso: jlock <comando> [opções]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "idioma",
   "help.meta.mode": "modo",
   "help.opt.json": "Imprime um objeto JSON com o campo result em vez de linhas de texto.",
-
   "help.exit.0": "ok",
   "help.exit.2": "uso incorreto: opção ou valor inválido (a mensagem diz qual)",
   "help.exit.10": "ocupada: não foi pega, com --no-wait",
@@ -60,7 +58,6 @@
   "help.exit.14": "trava perdida: quebrada com unlock --force, ou expirada",
   "help.exit.20": "erro de sistema de arquivos (permissão, disco cheio, arquivo preso por outro programa); a mensagem do SO diz qual",
   "help.exit.130": "interrompido (CTRL+C) durante a espera; o lugar na fila foi abandonado",
-
   "help.cmd.acquire.summary": "Pega chaves e as mantém depois que o comando termina.",
   "help.cmd.acquire.usage": "<chave...> [opções]",
   "help.cmd.acquire.desc": "Pega todas as chaves dadas, todas ou nenhuma, numa ordem fixa: dois pedidos das mesmas chaves em ordens diferentes nunca se travam. Chave livre é concedida na hora; chave ocupada é esperada numa fila justa, em ordem de chegada, sem limite, a menos que --timeout ou --no-wait digam outra coisa. Cada chave é pega em modo exclusive, a menos que --mode shared ou o próprio @shared digam outra coisa: as posses shared de uma chave convivem, uma exclusive espera por elas, e um pedido shared nunca passa na frente de um exclusive que já esperava. A trava continua depois que o jlock sai: renove-a com jlock heartbeat, ou use hold ou run, que renovam por você. Pedir de novo uma chave que você já tem é concedido na hora.",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "Espera na fila até as chaves ficarem livres. É o padrão.",
   "help.opt.acquire.no_wait": "Não espera: se uma chave está ocupada, responde ocupada (saída 10) com o dono e a posição que você teria.",
   "help.opt.acquire.timeout": "Espera no máximo esse tempo, depois sai da fila e desiste (saída 11). Unidades: ms, s, m, h, d. Padrão: sem limite.",
-
   "help.cmd.run.summary": "Segura chaves enquanto um comando roda, como o flock(1).",
   "help.cmd.run.usage": "<chave...> [opções] -- <comando...>",
   "help.cmd.run.desc": "Pega as chaves (com as mesmas opções do acquire), roda o comando escrito depois de --, renova a trava enquanto ele roda e a libera quando ele termina. Tudo o que vem depois de -- é do comando, mesmo palavras que parecem opções do jlock. O jlock sai com o código de saída do próprio comando. Se a trava for perdida, o comando é parado e o run sai com 14; se o próprio run for morto, a trava expira.",
   "help.cmd.run.examples": "# Um build por vez nesta máquina\njlock run D:\\proj\\dist -- cargo build --release\n# Desiste depois de esperar 2 minutos\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "o código de saída do próprio comando, depois de concedidas as chaves (0 quando dá certo)",
   "help.exit.run.14": "trava perdida enquanto o comando rodava; o comando foi parado",
-
   "help.cmd.hold.summary": "Segura chaves até mandarem parar.",
   "help.cmd.hold.usage": "<chave...> [opções]",
   "help.cmd.hold.desc": "Pega as chaves (com as mesmas opções do acquire), imprime concedida, e continua rodando e renovando a trava. Libera e sai com 0 quando lê a linha release na entrada padrão, com CTRL+C, ou quando é encerrado; também termina com 0 quando o dono devolve as chaves com jlock release. Enquanto roda, o sistema operacional também trava os arquivos da posse, então a trava é solta no instante em que o processo morre. Se a trava for tomada, imprime perdida e sai com 14. Com --detach ele responde e volta na hora, e um segundo processo mantém a trava em segundo plano: o jeito mais simples de um agente segurar os arquivos de uma tarefa inteira.",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "Responde e volta como o acquire (concedida, ocupada, tempo esgotado, com os mesmos códigos de saída), enquanto um segundo jlock hold mantém a trava viva em segundo plano até jlock release, o --ttl ou unlock --force. Uma chamada só para um agente, com a resposta na mão.",
   "help.opt.hold.release_on_eof": "Termina quando a entrada padrão fecha: o fim da entrada vale como a linha release, então um programa que fica aberto e roda o hold em primeiro plano, segurando a entrada padrão, solta a trava no instante em que morre (mesmo no Windows, onde um pai morto não encerra os filhos). Não combina com --detach: o processo em segundo plano não tem entrada padrão.",
   "help.exit.hold.0": "liberada, depois de release, CTRL+C ou encerramento",
-
   "help.cmd.release.summary": "Devolve chaves.",
   "help.cmd.release.usage": "[<chave...>] [opções]",
   "help.cmd.release.desc": "Devolve as chaves citadas, se você for o dono (senão, saída 13). Sem chaves, libera tudo o que o dono tem; com --group, tudo o que o dono tem naquele grupo. As posses aninhadas nas liberadas terminam junto com elas. O próximo da fila pega cada chave, e a pasta da chave some quando ninguém mais a tem nem espera por ela.",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agente-7\n# Tudo o que agente-7 tem\njlock release --owner agente-7\n# O grupo inteiro, seja quem for o dono de cada trava\njlock release --group tarefa-42 --any-owner",
   "help.exit.release.0": "liberadas (ou não havia nada a liberar)",
   "help.exit.release.13": "uma das chaves citadas não é sua; as outras foram liberadas",
-
   "help.cmd.renew.summary": "Adia o prazo das travas que você tem.",
   "help.cmd.renew.usage": "[<chave...>] [opções]",
   "help.cmd.renew.desc": "Passa o prazo (--ttl) das travas que você tem para agora mais o ttl, e renova o heartbeat delas: para um trabalho que pode durar mais que o ttl pedido. Sem --ttl, usa o ttl com que a trava foi pega. Sem chaves, renova tudo o que o dono tem; com --group, tudo o que o dono tem naquele grupo. A trava não é solta em momento nenhum durante a renovação, e um hold ou run que a mantém segue como antes. Uma trava que já passou do prazo não pode ser renovada: ela expira (saída 14) e precisa ser pega de novo.",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agente-7",
   "help.exit.heartbeat.0": "renovada",
   "help.exit.heartbeat.13": "perdida: a trava não é mais sua (quebrada ou expirada)",
-
   "help.cmd.status.summary": "Mostra quem tem uma chave e quem espera por ela.",
   "help.cmd.status.usage": "<chave> [opções]",
   "help.cmd.status.desc": "Mostra se a chave está livre ou travada, e por quem: cada posse com seu modo (shared ou exclusive), a posse em que está aninhada, desde quando, o último heartbeat, o grupo e a intenção. Depois a fila, em ordem, com o modo que cada esperador pede, e as outras chaves que a bloqueiam: uma pasta acima, arquivos dentro dela, ou *. Uma trava morta encontrada no caminho é expirada.",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:porta-3000 --json",
-
   "help.cmd.list.summary": "Mostra tudo o que está travado nesta máquina.",
   "help.cmd.list.usage": "[opções]",
   "help.cmd.list.desc": "Lista toda chave travada ou com fila. Lê a própria pasta do registro, nunca um resumo, então é sempre a verdade.",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "Só travas e senhas mortas (heartbeat mais velho que JLOCK_STALE_MS, ou ttl vencido).",
   "help.opt.list.watch": "Redesenha a cada segundo até CTRL+C.",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agente-7 --json",
-
   "help.cmd.graph.summary": "Mostra quem espera por quem, e os ciclos.",
   "help.cmd.graph.usage": "[opções]",
   "help.cmd.graph.desc": "Cada linha é um esperador, por quem ele espera e por qual chave, com os modos dos dois lados. Um ciclo (A espera B enquanto B espera A) é um deadlock; o jlock recusa o pedido que fecharia um, então um ciclo só aparece por um instante. Posses shared e a própria família de um dono (ancestrais, descendentes) nunca geram uma linha; um dono espera sempre que um de seus descendentes espera, então uma cadeia que volta a um ancestral de um esperador também é um ciclo.",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[opções]",
   "help.cmd.resources.desc": "Lista os recursos registrados: os embutidos (desktop, clipboard, port:<n>, machine...) e os seus, de resources.json na pasta do registro, cada um com o modo usado quando o pedido não indica nenhum e sua descrição. Uma chave resource: cujo nome não está na lista é recusada, com o nome mais próximo como sugestão, para que um erro de digitação nunca vire outro recurso. Um recurso só conflita com o mesmo recurso e o mesmo argumento, nunca com caminhos nem chaves name:.",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "Quebra a trava de outro (exige --force).",
   "help.cmd.unlock.usage": "(<chave...> | --owner <id> | --group <grupo>) --force [opções]",
   "help.cmd.unlock.desc": "Para emergências: quebra as travas citadas, seja quem for o dono, e registra no log quem forçou e por quê. O hold ou run do dono percebe no próximo heartbeat e para com 14, as posses aninhadas numa quebrada terminam junto com ela, e o próximo da fila pega a chave. Para devolver a sua própria trava, use release.",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"agente travou\"\njlock unlock --owner agente-3 --force",
   "help.exit.unlock.0": "feito (também quando não havia nada a quebrar)",
   "help.exit.unlock.2": "uso incorreto, ou falta --force",
-
   "help.cmd.gc.summary": "Limpa agora: expira travas mortas, remove pastas vazias.",
   "help.cmd.gc.usage": "[opções]",
   "help.cmd.gc.desc": "Roda a varredura global na hora: expira travas e senhas cujos donos morreram, apaga sobras, remove pastas de chave vazias, rotaciona o log, reescreve o index.json e mostra o que removeu. Todo comando já faz isso, no máximo uma vez a cada JLOCK_SWEEP_MS.",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "Explica o jlock, ou um comando.",
   "help.cmd.help.usage": "[<comando>]",
   "help.cmd.help.desc": "Sem comando: o que é o jlock e a lista de comandos. Com um comando: as opções com padrão e exemplo, e os códigos de saída. jlock <comando> --help mostra a mesma página.",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "comando inexistente (o nome mais parecido é sugerido)",
-
   "help.cmd.about.summary": "Quem fez o jlock, e onde encontrá-lo.",
   "help.cmd.about.usage": "[opções]",
   "help.cmd.about.desc": "Mostra a versão, o autor com GitHub e LinkedIn, o repositório, a licença e os links da documentação. Não usa a rede.",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "Travas para a máquina inteira, em arquivos, pastas e nomes: fila justa, recuperação de travas deixadas por processos mortos, detecção de deadlock, sem servidor.",
   "about.author": "autor",
   "about.repository": "repositório",
@@ -180,13 +165,11 @@
   "about.usage": "uso",
   "about.roadmap": "roadmap",
   "about.footer": "jlock por {author} · {github} · {linkedin}",
-
   "tip.busy": "dica: jlock status {key} mostra quem a tem e a fila; tire o --no-wait para esperar a sua vez",
   "tip.timeout": "dica: espere mais com um --timeout maior, ou veja quem a tem com jlock status {key}",
   "tip.deadlock": "dica: libere o que você tem e peça de novo, ou pegue todas as chaves num só acquire",
   "tip.not_owner": "dica: a trava é de {owner}; use --owner {owner}, ou jlock unlock --force para quebrá-la",
   "tip.lost": "dica: alguém quebrou ou expirou a sua trava em {key}; pare de alterá-la, confira jlock status {key} e pegue de novo com jlock acquire",
-
   "help.cmd.update.summary": "Instala a última versão publicada do jlock por cima desta.",
   "help.cmd.update.usage": "[opções]",
   "help.cmd.update.desc": "Pergunta ao GitHub qual é o último release (ou usa a versão dada), baixa o arquivo deste sistema, confere com o SHA256SUMS do release, põe o novo jlock no lugar do que está rodando e o executa uma vez para confirmar a versão; se isso falhar, o antigo volta. Usa o curl do sistema (no Windows, o PowerShell quando não há curl). É o único comando que usa a rede, e só quando você o roda.",
@@ -196,7 +179,6 @@
   "help.meta.version": "versão",
   "help.exit.update.0": "atualizado, já estava na última, ou (com --check) comparado",
   "help.exit.update.20": "nenhum release encontrado, falha no download ou na soma, ou a pasta não é gravável; a mensagem diz qual",
-
   "update.current": "esta versão:    {version}",
   "update.latest": "último release:  {version}",
   "update.available": "há uma atualização: jlock update a instala",
@@ -216,14 +198,12 @@
   "update.restore_failed": "o novo jlock não funcionou e o antigo não pôde ser reposto em {path}; reinstale com install.sh ou install.ps1",
   "update.no_exe": "não foi possível saber onde este jlock está",
   "update.bad_version": "versão inválida '{version}' (use v0.2.0)",
-
   "help.cmd.doctor.summary": "Confere se esta máquina está pronta para travas.",
   "help.cmd.doctor.usage": "[opções]",
   "help.cmd.doctor.desc": "Confere, nesta ordem: a versão e o executável em execução; a pasta do registro (JLOCK_HOME), de onde ela vem e se é uma pasta gravável; as três operações de arquivo em que o protocolo se apoia (create_new, rename, remove) nessa pasta; a trava do SO que hold e run usam; o sistema de arquivos; as variáveis JLOCK_*; se este jlock é o primeiro no PATH; o que o registro tem agora; e o curl, para o update. Cada linha diz ok, aviso ou falha, e como corrigir. Ele só sugere: nunca muda nada, e os únicos arquivos que grava são os seus temporários, apagados antes de terminar.",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "nenhuma checagem falhou (avisos não mudam o código)",
   "help.exit.doctor.20": "pelo menos uma checagem falhou",
-
   "doctor.name.version": "versão",
   "doctor.name.home": "pasta do registro",
   "doctor.name.primitives": "primitivas",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "instale o curl pelo gerenciador de pacotes; nada mais no jlock precisa dele",
   "doctor.skipped": "não conferido: a pasta do registro não está utilizável",
   "doctor.skipped_fix": "corrija primeiro a pasta do registro (veja acima)",
-
   "acquire.granted": "concedida {key}",
   "acquire.busy": "ocupada {key}, com {owner}{via} (posição {position})",
   "acquire.timeout": "tempo esgotado {key}, com {owner}{via} (posição {position})",
@@ -294,23 +273,18 @@
   "acquire.nested": " (aninhada em {owner})",
   "acquire.and_others_one": " e mais {n}",
   "acquire.and_others_other": " e mais {n}",
-
   "result.released": "liberada {key}",
   "result.lost": "perdida {key}",
-
   "heartbeat.renewed": "renovada {key}",
   "renew.until": "renovada {key} até {until}",
   "renew.not_owner": "não é o dono {key}: a trava é de {holder}",
   "renew.not_locked": "não é o dono {key} (não está travada)",
   "renew.nothing": "nada a renovar",
-
   "release.not_owner": "não é o dono {key}: a trava é de {holder}",
   "release.not_locked": "não é o dono {key} (não está travada)",
   "release.nothing": "nada a liberar",
-
   "unlock.forced": "forçada {key} (era de {owner})",
   "unlock.nothing": "nada a forçar",
-
   "status.held": "travada {key}",
   "status.free": "livre {key}",
   "status.by": "por {owner} ({mode}) desde {since} (há {ago})",
@@ -331,7 +305,6 @@
   "status.why_above": "por quê: uma trava numa pasta cobre tudo o que está dentro dela, então uma pasta acima desta chave, travada, a bloqueia",
   "status.why_inside": "por quê: uma pasta só pode ser pega quando nada dentro dela está travado, então estas chaves dentro dela a bloqueiam",
   "status.why_all": "por quê: * conflita com todas as chaves",
-
   "list.nothing": "nada travado",
   "list.col_key": "CHAVE",
   "list.col_mode": "MODO",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(morta) o heartbeat parou e ninguém segura a trava do SO: será expirada",
   "list.legend_late": "(atrasada) o heartbeat está atrasado, mas o processo dono da trava está vivo (trava do SO presa)",
   "list.legend_nested": "(aninhada) uma posse dentro de uma posse de um ancestral do dono: termina quando aquela posse termina",
-
   "graph.no_waiters": "ninguém esperando",
   "graph.edge_held": "{from} -> {to}  ({key} travada {to_mode} por {holder}; quer {mode})",
   "graph.edge_queued": "{from} -> {to}  ({key} na fila atrás de {holder}, {to_mode}; quer {mode})",
@@ -370,19 +342,16 @@
   "resource.machine": "a máquina inteira: exclusive pede por ela quieta (benchmarks, testes de tempo); shared diz que uma tarefa a sobrecarrega",
   "resource.network": "o link de rede (downloads ou uploads grandes, testes sensíveis à rede)",
   "resource.port": "uma porta TCP ou UDP desta máquina, por número (resource:port:8080)",
-
   "gc.expired_locks": "travas expiradas",
   "gc.expired_tickets": "senhas expiradas",
   "gc.broken_consumed": "broken/ consumidos",
   "gc.folders_removed": "pastas removidas",
   "gc.log_bytes": "bytes do log",
   "gc.error": "erro: {error}",
-
   "warn.bad_ms": "ignorando {name}={value} (espera um número positivo de ms)",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS ({stale}) deveria ser bem maior que JLOCK_HEARTBEAT_MS ({heartbeat})",
   "warn.resources_file": "ignorando {path}: {error}",
   "warn.resources_entry": "ignorando o recurso '{name}' em resources.json: {why}",
-
   "error.missing_command": "falta o comando",
   "error.unknown_command": "comando desconhecido '{cmd}'. Comandos: {list}",
   "error.unknown_command_near": "comando desconhecido '{cmd}'; quis dizer '{near}'? Comandos: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under espera um caminho",
   "error.no_localappdata": "LOCALAPPDATA não está definida; defina JLOCK_HOME",
   "error.no_home": "HOME não está definida; defina JLOCK_HOME",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process: argumento inesperado '{arg}'",
   "error.process_needs_pid": "process inspect precisa de --pid",
   "error.bad_pid": "pid inválido '{value}' (um número positivo)",
-
   "help.cmd.custody.summary": "Roda um comando solto num job com nome, com registros duráveis.",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <caminho> [opções] [-- <command...>]",
   "help.cmd.custody.desc": "start grava intent.json em <custody>/<id>/ antes de existir qualquer processo e inicia um custodiante solto (este mesmo jlock). O custodiante cria o job com nome Local\\jlock-custody-<hash>-<id> (encerrar-ao-fechar, sem saída do job), cria o comando suspenso com a saída e os erros em output.log, coloca-o no job, grava receipt.json e só então o solta; start responde então o estado running com o recibo e volta. O custodiante fica fora do job. Quando o comando termina sozinho, o custodiante encerra o que ele deixou no job, confirma que não sobrou processo e grava final.json (reason exited, exitCode, cleanupConfirmed). Um id que já tem intenção nunca inicia um segundo processo: a resposta é o estado atual com duplicate true. status só lê: absent, launching, launch-failed (intenção sem recibo e sem custodiante vivo), running, ended ou lost (há recibo, não há final.json e o custodiante não existe mais), com os registros e se o job está aberto. Só no Windows; fora dele recusa com unsupported on this platform. Enquanto o comando roda, o invólucro substitui beat.json a cada 10 s (JLOCK_CUSTODY_BEAT_MS) com seq, at, lastOutputAt e outputBytes; se não consegue gravá-lo por 30 s (JLOCK_CUSTODY_SELF_FENCE_MS), encerra ele mesmo o grupo e sai sem final.json. stop funciona de qualquer processo, mesmo sem o custodiante: abre o job pelo nome, encerra-o e espera zero processos (--timeout, padrão 15 s, JLOCK_CUSTODY_STOP_MS), então grava final.json uma vez (reason stopped com o --reason em detail, ou custodian-lost quando o custodiante já não existia; by stop) e o responde; um final.json confirmado que já existe é respondido como está. Quando o job não existe mais, só confirma se a raiz do comando, conferida pela identidade, não existe; nunca encerra nada por pid e nunca cria o job de novo. Sem essa prova responde cleanupConfirmed false com o motivo em error e sai com 15.",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start: --cwd não é uma pasta: {path}",
   "error.custody_busy": "custody start: outro start de '{id}' ainda está em andamento",
   "error.custody_records": "não foi possível usar a pasta dos registros de custódia",
-  "error.unsupported_platform": "{cmd}: não suportado nesta plataforma (unsupported on this platform)"
+  "error.unsupported_platform": "{cmd}: não suportado nesta plataforma (unsupported on this platform)",
+  "help.opt.foreground.id": "O id do comando na custódia (1 a 64 de A-Z a-z 0-9 . _ -); com --custody, grava intent.json, receipt.json, beat.json e final.json em <custody>/<id>/ (modo foreground; a saída fica aqui) e o roda num job com nome que custody status lê e custody stop encerra.",
+  "help.opt.foreground.custody": "A pasta dos registros de custódia; só junto com --id.",
+  "error.foreground_needs_both": "{cmd}: --id e --custody vão juntos",
+  "error.custody_duplicate": "{cmd}: o id de custódia '{id}' já tem intenção; nada foi iniciado"
 }

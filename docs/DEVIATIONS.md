@@ -236,3 +236,26 @@ The contract is `D:/jtasks/docs/PLAN-CUSTODIA-jlock.md` ("Registros de um comand
 - **The test-only fault** that makes the wait run out is `JLOCK_TEST_CUSTODY_STOP_FAULT=skip-terminate`
   (the stop does not end the job, so its processes outlive the wait). It exists only in debug builds
   (`cfg(debug_assertions)`, which `cargo test` builds); a release binary ignores it.
+
+## 19. `exec` and `run` with `--id` and `--custody`: points the custody specification leaves open (0.5, J05)
+
+- **Both or neither.** One of the two options alone is a usage error (`error.foreground_needs_both`); an
+  id that already has `intent.json` is a usage error too (`error.custody_duplicate`, exit 2) and nothing
+  is started. Outside Windows the pair is refused with "unsupported on this platform".
+- **`run` writes the intent before it asks for the keys**, so a duplicate id never waits in a queue nor
+  takes a key. A request that is then refused (busy, timeout, deadlock) leaves the intent without a
+  receipt: `launching` while `run` waits (its own pid and identity are in `custodian.json`),
+  `launch-failed` once it has left. `limitMs` is the smaller of `--command-timeout` and
+  `--total-timeout`; for `exec` it is `--timeout`. `cwd` is the caller's current folder.
+- **`beat.json` in the foreground** keeps the shape of the detached one, but the output goes to the
+  caller and is not measured: `lastOutputAt` is null and `outputBytes` 0. There is no self-fence: the
+  caller sees the foreground command directly, and its job closes with `exec`/`run`.
+- **`reason` of `final.json`**: `exited`, `limit` (`exec --timeout`, `run --command-timeout` or
+  `--total-timeout`), `interrupted` (CTRL+C, an error waiting for the command, and also a lock lost by
+  `run`, which the specification's list has no word for), or `stopped` when a `custody stop` asked for
+  the end. `final.json` is written only once the job is empty (`cleanupConfirmed: true`), with
+  `exitCode` and `by: "custodian"`; while it cannot be confirmed, `exec`/`run` report cleanup pending and
+  try again, as without the options.
+- **A stop wins.** Seeing `stop.json`, `exec`/`run` wait (up to `JLOCK_CUSTODY_STOP_MS` plus 1 s) for the
+  stop to write `final.json` and leave it as is; if the stop gives up without one, they record
+  `stopped` themselves. Their exit code is then the command's own, as terminated by the job (1).

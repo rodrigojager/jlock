@@ -17,7 +17,6 @@
     "resource": "Ressource",
     "nested": "verschachtelt"
   },
-
   "help.tagline": "rechnerweite Sperren für Dateien, Ordner und Namen",
   "help.intro": "jlock lässt Programme, Skripte, Menschen und KI-Agenten auf einer Maschine abwechselnd arbeiten. Bevor sie eine Datei, einen Ordner oder irgendeine benannte Ressource (einen Port, den Desktop, ein Deployment) anfassen, fragen sie bei jlock nach deren Sperre: ein Besitzer zugleich (oder mehrere gemeinsam, im Modus shared), die anderen warten in der Warteschlange in der Reihenfolge ihres Eintreffens. Eine Sperre, die ein gestorbener Prozess hinterlassen hat, wird von selbst wiederhergestellt, eine Anfrage, die einen Deadlock verursachen würde, wird abgelehnt, und jlock list zeigt, wer was hält. Es gibt keinen Server: Der Zustand ist ein Ordner auf der Festplatte.",
   "help.usage_line": "Aufruf: jlock <befehl> [optionen]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "sprache",
   "help.meta.mode": "modus",
   "help.opt.json": "Gibt ein JSON-Objekt mit dem Feld result statt Textzeilen aus.",
-
   "help.exit.0": "ok",
   "help.exit.2": "falscher Aufruf: ungültige Option oder ungültiger Wert (die Meldung sagt, welche)",
   "help.exit.10": "belegt: nicht erhalten, mit --no-wait",
@@ -60,7 +58,6 @@
   "help.exit.14": "Sperre verloren: mit unlock --force aufgebrochen oder abgelaufen",
   "help.exit.20": "Dateisystemfehler (Berechtigung, Festplatte voll, eine von einem anderen Programm gehaltene Datei); die Meldung des Betriebssystems sagt, welcher",
   "help.exit.130": "beim Warten unterbrochen (CTRL+C); der Platz in der Warteschlange wurde aufgegeben",
-
   "help.cmd.acquire.summary": "Nimmt Schlüssel und behält sie über das Ende des Befehls hinaus.",
   "help.cmd.acquire.usage": "<schlüssel...> [optionen]",
   "help.cmd.acquire.desc": "Nimmt alle angegebenen Schlüssel, alle oder keinen, in fester Reihenfolge: Zwei Anfragen nach denselben Schlüsseln in unterschiedlicher Reihenfolge blockieren sich nie. Ein freier Schlüssel wird sofort erteilt; auf einen belegten wird in einer fairen Warteschlange gewartet, in der Reihenfolge des Eintreffens, ohne Limit, sofern --timeout oder --no-wait nichts anderes sagen. Jeder Schlüssel wird im Modus exclusive genommen, sofern --mode shared oder sein eigenes @shared nichts anderes sagen: Shared-Sperren eines Schlüssels bestehen nebeneinander, eine exclusive wartet auf sie, und eine shared-Anfrage überholt nie eine exclusive, die schon vorher wartete. Die Sperre bleibt, nachdem jlock beendet ist: Erneuern Sie sie mit jlock heartbeat oder nutzen Sie hold oder run, die sie für Sie erneuern. Einen Schlüssel erneut anzufordern, den Sie schon halten, wird sofort erteilt.",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "Wartet in der Warteschlange, bis die Schlüssel frei sind. Das ist der Standard.",
   "help.opt.acquire.no_wait": "Wartet nicht: Ist ein Schlüssel belegt, antwortet es mit belegt (Exit 10), samt seinem Besitzer und dem Platz, den du gehabt hättest.",
   "help.opt.acquire.timeout": "Wartet höchstens so lange, verlässt dann die Warteschlange und gibt auf (Exit 11). Einheiten: ms, s, m, h, d. Standard: keine Grenze.",
-
   "help.cmd.run.summary": "Hält Schlüssel, während ein Befehl läuft, wie flock(1).",
   "help.cmd.run.usage": "<schlüssel...> [optionen] -- <befehl...>",
   "help.cmd.run.desc": "Nimmt die Schlüssel (mit denselben Optionen wie acquire), führt den nach -- geschriebenen Befehl aus, erneuert die Sperre, solange er läuft, und gibt sie frei, wenn er endet. Alles nach -- gehört zum Befehl, auch Wörter, die wie jlock-Optionen aussehen. jlock endet mit dem Exit-Code des Befehls selbst. Geht die Sperre verloren, wird der Befehl gestoppt und run endet mit 14; wird run selbst abgeschossen, läuft die Sperre ab.",
   "help.cmd.run.examples": "# Nur ein Build gleichzeitig auf diesem Rechner\njlock run D:\\proj\\dist -- cargo build --release\n# Nach 2 Minuten Warten aufgeben\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "der Exit-Code des Befehls selbst, sobald die Schlüssel erteilt wurden (0 bei Erfolg)",
   "help.exit.run.14": "Sperre verloren, während der Befehl lief; der Befehl wurde gestoppt",
-
   "help.cmd.hold.summary": "Hält Schlüssel, bis es gestoppt wird.",
   "help.cmd.hold.usage": "<schlüssel...> [optionen]",
   "help.cmd.hold.desc": "Nimmt die Schlüssel (mit denselben Optionen wie acquire), gibt erteilt aus, läuft dann weiter und erneuert die Sperre. Es gibt frei und endet mit 0, wenn es die Zeile release auf seiner Standardeingabe liest, bei CTRL+C oder wenn es beendet wird; es endet auch mit 0, wenn sein Besitzer die Schlüssel mit jlock release zurückgibt. Solange es läuft, sperrt auch das Betriebssystem seine Sperrdateien, sodass die Sperre in dem Moment frei wird, in dem der Prozess stirbt. Wird ihm die Sperre weggenommen, gibt es verloren aus und endet mit 14. Mit --detach antwortet es und kehrt sofort zurück, und ein zweiter Prozess hält die Sperre im Hintergrund: der einfachste Weg für einen Agenten, die Dateien einer ganzen Aufgabe zu halten.",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "Antwortet und kehrt zurück wie acquire (erteilt, belegt, Zeitüberschreitung, mit denselben Exit-Codes), während ein zweites jlock hold die Sperre im Hintergrund am Leben hält, bis jlock release, --ttl oder unlock --force sie beenden. Ein einziger Aufruf für einen Agenten, mit sofortiger Antwort.",
   "help.opt.hold.release_on_eof": "Endet, wenn die Standardeingabe geschlossen wird: das Ende der Eingabe gilt als die Zeile release, sodass ein Programm, das offen bleibt und hold im Vordergrund ausführt und dabei seine Standardeingabe hält, die Sperre in dem Moment freigibt, in dem es stirbt (auch unter Windows, wo ein toter Elternprozess seine Kinder nicht beendet). Nicht mit --detach: der Hintergrundprozess hat keine Standardeingabe.",
   "help.exit.hold.0": "freigegeben, nach release, CTRL+C oder Beendigung",
-
   "help.cmd.release.summary": "Gibt Schlüssel zurück.",
   "help.cmd.release.usage": "[<schlüssel...>] [optionen]",
   "help.cmd.release.desc": "Gibt die genannten Schlüssel zurück, wenn Sie ihr Besitzer sind (sonst Exit 13). Ohne Schlüssel gibt es alles frei, was der Besitzer hält; mit --group alles, was der Besitzer in dieser Gruppe hält. Die in den freigegebenen verschachtelten Sperren enden mit ihnen. Der Nächste in der Warteschlange erhält jeden Schlüssel, und der Ordner eines Schlüssels verschwindet, sobald ihn niemand mehr hält oder auf ihn wartet.",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agent-7\n# Alles, was agent-7 hält\njlock release --owner agent-7\n# Die ganze Gruppe, egal wem jede Sperre gehört\njlock release --group aufgabe-42 --any-owner",
   "help.exit.release.0": "freigegeben (oder es gab nichts freizugeben)",
   "help.exit.release.13": "ein genannter Schlüssel gehört dir nicht; die anderen wurden freigegeben",
-
   "help.cmd.renew.summary": "Die Frist gehaltener Sperren verschieben.",
   "help.cmd.renew.usage": "[<schlüssel...>] [optionen]",
   "help.cmd.renew.desc": "Setzt die Frist (--ttl) deiner Sperren auf jetzt plus ttl und erneuert ihren Heartbeat: für Arbeit, die länger dauern kann als der angefragte ttl. Ohne --ttl gilt der ttl, mit dem die Sperre genommen wurde. Ohne Schlüssel erneuert es alles, was der Besitzer hält; mit --group alles, was er in dieser Gruppe hält. Die Sperre wird beim Erneuern nie losgelassen, und ein hold oder run, der sie hält, läuft weiter wie zuvor. Eine Sperre, deren Frist schon abgelaufen ist, kann nicht erneuert werden: Sie läuft ab (Exit 14) und muss neu genommen werden.",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agent-7",
   "help.exit.heartbeat.0": "erneuert",
   "help.exit.heartbeat.13": "verloren: die Sperre gehört dir nicht mehr (aufgebrochen oder abgelaufen)",
-
   "help.cmd.status.summary": "Zeigt, wer einen Schlüssel hält und wer darauf wartet.",
   "help.cmd.status.usage": "<schlüssel> [optionen]",
   "help.cmd.status.desc": "Zeigt, ob der Schlüssel frei oder gehalten ist, und von wem: jede Sperre mit ihrem Modus (shared oder exclusive), die Sperre, in der sie verschachtelt ist, seit wann, der letzte Heartbeat, die Gruppe und die Absicht. Dann die Warteschlange, der Reihe nach, mit dem Modus, den jeder Wartende verlangt, und die anderen Schlüssel, die ihn blockieren: ein Ordner darüber, Dateien darin, oder *. Eine auf dem Weg gefundene tote Sperre wird ablaufen gelassen.",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:port-3000 --json",
-
   "help.cmd.list.summary": "Zeigt alles, was auf diesem Rechner gesperrt ist.",
   "help.cmd.list.usage": "[optionen]",
   "help.cmd.list.desc": "Listet jeden Schlüssel auf, der gehalten wird oder eine Warteschlange hat. Es liest den Registry-Ordner selbst, nie eine Zusammenfassung, und zeigt daher immer den tatsächlichen Stand.",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "Nur tote Sperren und Tickets (Heartbeat älter als JLOCK_STALE_MS oder ttl überschritten).",
   "help.opt.list.watch": "Zeichnet jede Sekunde neu, bis CTRL+C.",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agent-7 --json",
-
   "help.cmd.graph.summary": "Zeigt, wer auf wen wartet, und etwaige Zyklen.",
   "help.cmd.graph.usage": "[optionen]",
   "help.cmd.graph.desc": "Jede Zeile ist ein Wartender, auf wen er wartet und über welchen Schlüssel, mit den Modi auf beiden Seiten. Ein Zyklus (A wartet auf B, während B auf A wartet) ist ein Deadlock; jlock lehnt die Anfrage ab, die einen schließen würde, daher ist ein Zyklus nur für einen Augenblick zu sehen. Shared-Sperren und die eigene Familie eines Besitzers (Vorfahren, Nachkommen) erzeugen nie eine Zeile; ein Besitzer wartet immer, wenn einer seiner Nachkommen wartet, daher ist auch eine Kette, die zu einem Vorfahren eines Wartenden zurückführt, ein Zyklus.",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[optionen]",
   "help.cmd.resources.desc": "Listet die registrierten Ressourcen auf: die eingebauten (desktop, clipboard, port:<n>, machine...) und Ihre eigenen aus resources.json im Registry-Ordner, jede mit dem Modus, der gilt, wenn eine Anfrage keinen nennt, und ihrer Beschreibung. Ein resource:-Schlüssel, dessen Name nicht aufgelistet ist, wird abgelehnt, mit dem ähnlichsten Namen als Vorschlag, damit ein Tippfehler nie zu einer anderen Ressource wird. Eine Ressource steht nur mit derselben Ressource und demselben Argument in Konflikt, nie mit Pfaden oder name:-Schlüsseln.",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "Bricht die Sperre eines anderen auf (braucht --force).",
   "help.cmd.unlock.usage": "(<schlüssel...> | --owner <id> | --group <gruppe>) --force [optionen]",
   "help.cmd.unlock.desc": "Für Notfälle: bricht die genannten Sperren, wem auch immer sie gehören, und schreibt ins Log, wer erzwungen hat und warum. Das hold oder run des Besitzers bemerkt es bei seinem nächsten Heartbeat und endet mit 14, die in einer gebrochenen Sperre verschachtelten Sperren enden mit ihr, und der Nächste in der Warteschlange erhält den Schlüssel. Um Ihre eigene Sperre zurückzugeben, nutzen Sie release.",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"Agent hängt\"\njlock unlock --owner agent-3 --force",
   "help.exit.unlock.0": "erledigt (auch wenn es nichts aufzubrechen gab)",
   "help.exit.unlock.2": "falscher Aufruf, oder --force fehlt",
-
   "help.cmd.gc.summary": "Jetzt aufräumen: tote Sperren ablaufen lassen, leere Ordner entfernen.",
   "help.cmd.gc.usage": "[optionen]",
   "help.cmd.gc.desc": "Führt die globale Bereinigung sofort aus: lässt Sperren und Tickets ablaufen, deren Besitzer gestorben sind, löscht Überreste, entfernt leere Schlüsselordner, rotiert das Log, schreibt index.json neu und gibt aus, was entfernt wurde. Jeder Befehl macht das ohnehin, höchstens einmal alle JLOCK_SWEEP_MS.",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "Erklärt jlock oder einen Befehl.",
   "help.cmd.help.usage": "[<befehl>]",
   "help.cmd.help.desc": "Ohne Befehl: was jlock ist und die Liste der Befehle. Mit einem Befehl: seine Optionen mit Standardwerten und Beispielen und seine Exit-Codes. jlock <befehl> --help zeigt dieselbe Seite.",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "unbekannter Befehl (der ähnlichste Name wird vorgeschlagen)",
-
   "help.cmd.about.summary": "Wer jlock gemacht hat und wo man es findet.",
   "help.cmd.about.usage": "[optionen]",
   "help.cmd.about.desc": "Gibt die Version, den Autor mit GitHub und LinkedIn, das Repository, die Lizenz und die Links zur Dokumentation aus. Es nutzt kein Netzwerk.",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "Rechnerweite Sperren für Dateien, Ordner und Namen: eine faire Warteschlange, Rückgewinnung von Sperren toter Prozesse, Deadlock-Erkennung, kein Server.",
   "about.author": "Autor",
   "about.repository": "Repository",
@@ -180,13 +165,11 @@
   "about.usage": "Verwendung",
   "about.roadmap": "Roadmap",
   "about.footer": "jlock von {author} · {github} · {linkedin}",
-
   "tip.busy": "Tipp: jlock status {key} zeigt, wer ihn hält, und die Warteschlange; lass --no-wait weg, um zu warten, bis du dran bist",
   "tip.timeout": "Tipp: warte länger mit einem größeren --timeout, oder sieh mit jlock status {key} nach, wer ihn hält",
   "tip.deadlock": "Tipp: gib frei, was du hältst, und frag erneut, oder nimm alle Schlüssel in einem einzigen acquire",
   "tip.not_owner": "Tipp: die Sperre gehört {owner}; nutze --owner {owner}, oder jlock unlock --force, um sie aufzubrechen",
   "tip.lost": "Tipp: jemand hat deine Sperre auf {key} aufgebrochen oder ablaufen lassen; ändere ihn nicht weiter, prüfe jlock status {key} und nimm ihn erneut mit jlock acquire",
-
   "help.cmd.update.summary": "Installiert das neueste Release von jlock über dieses.",
   "help.cmd.update.usage": "[optionen]",
   "help.cmd.update.desc": "Fragt GitHub nach dem neuesten Release (oder nimmt die angegebene Version), lädt das Archiv für dieses System herunter, prüft es gegen die SHA256SUMS des Releases, setzt das neue jlock an die Stelle des laufenden und startet es einmal, um seine Version zu bestätigen; schlägt das fehl, wird das alte zurückgesetzt. Es nutzt das curl des Systems (unter Windows PowerShell, wenn kein curl da ist). Das ist der einzige Befehl, der das Netzwerk nutzt, und nur, wenn du ihn ausführst.",
@@ -196,7 +179,6 @@
   "help.meta.version": "version",
   "help.exit.update.0": "aktualisiert, bereits aktuell oder (mit --check) verglichen",
   "help.exit.update.20": "kein Release gefunden, Download oder Prüfsumme fehlgeschlagen, oder der Ordner ist nicht beschreibbar; die Meldung sagt, was",
-
   "update.current": "diese Version:    {version}",
   "update.latest": "neuestes Release: {version}",
   "update.available": "ein Update ist verfügbar: jlock update installiert es",
@@ -216,14 +198,12 @@
   "update.restore_failed": "das neue jlock funktionierte nicht, und das alte konnte unter {path} nicht zurückgesetzt werden; installiere neu mit install.sh oder install.ps1",
   "update.no_exe": "kann nicht feststellen, wo dieses jlock liegt",
   "update.bad_version": "ungültige Version '{version}' (nutze v0.2.0)",
-
   "help.cmd.doctor.summary": "Prüft, ob dieser Rechner für Sperren bereit ist.",
   "help.cmd.doctor.usage": "[optionen]",
   "help.cmd.doctor.desc": "Prüft der Reihe nach: die Version und das laufende Programm; den Registry-Ordner (JLOCK_HOME), woher er kommt und ob er ein beschreibbarer Ordner ist; die drei Dateioperationen, auf denen das Protokoll beruht (create_new, rename, remove), in diesem Ordner; die OS-Sperre, die hold und run nutzen; das Dateisystem; die JLOCK_*-Variablen; ob dieses jlock das erste im PATH ist; was die Registry gerade enthält; und curl, für update. Jede Zeile sagt ok, Warnung oder Fehler und wie man es behebt. Es schlägt nur vor: Es ändert nie etwas, und die einzigen Dateien, die es schreibt, sind seine eigenen temporären, die vor dem Ende entfernt werden.",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "keine Prüfung fehlgeschlagen (Warnungen ändern den Code nicht)",
   "help.exit.doctor.20": "mindestens eine Prüfung fehlgeschlagen",
-
   "doctor.name.version": "Version",
   "doctor.name.home": "Registry-Ordner",
   "doctor.name.primitives": "Primitive",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "installiere curl mit deinem Paketmanager; sonst braucht nichts in jlock es",
   "doctor.skipped": "nicht geprüft: der Registry-Ordner ist nicht nutzbar",
   "doctor.skipped_fix": "behebe zuerst den Registry-Ordner (siehe oben)",
-
   "acquire.granted": "erteilt {key}",
   "acquire.busy": "belegt {key}, gehalten von {owner}{via} (Position {position})",
   "acquire.timeout": "Zeitüberschreitung {key}, gehalten von {owner}{via} (Position {position})",
@@ -294,23 +273,18 @@
   "acquire.nested": " (verschachtelt in {owner})",
   "acquire.and_others_one": " und {n} weiterer",
   "acquire.and_others_other": " und {n} weitere",
-
   "result.released": "freigegeben {key}",
   "result.lost": "verloren {key}",
-
   "heartbeat.renewed": "erneuert {key}",
   "renew.until": "erneuert {key} bis {until}",
   "renew.not_owner": "nicht Besitzer {key}: gehalten von {holder}",
   "renew.not_locked": "nicht Besitzer {key} (nicht gesperrt)",
   "renew.nothing": "nichts zu erneuern",
-
   "release.not_owner": "nicht Besitzer {key}: gehalten von {holder}",
   "release.not_locked": "nicht Besitzer {key} (nicht gesperrt)",
   "release.nothing": "nichts freizugeben",
-
   "unlock.forced": "erzwungen {key} (gehörte {owner})",
   "unlock.nothing": "nichts zu erzwingen",
-
   "status.held": "gesperrt {key}",
   "status.free": "frei {key}",
   "status.by": "von {owner} ({mode}) seit {since} (vor {ago})",
@@ -331,7 +305,6 @@
   "status.why_above": "warum: eine Sperre auf einem Ordner umfasst alles darin, daher blockiert ein gehaltener Ordner oberhalb dieses Schlüssels ihn",
   "status.why_inside": "warum: ein Ordner kann nur genommen werden, wenn nichts darin gehalten wird, daher blockieren ihn diese Schlüssel darin",
   "status.why_all": "warum: * steht mit jedem Schlüssel in Konflikt",
-
   "list.nothing": "nichts gesperrt",
   "list.col_key": "SCHLÜSSEL",
   "list.col_mode": "MODUS",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(tot) der Heartbeat hat aufgehört und niemand hält die OS-Sperre: die Sperre wird ablaufen",
   "list.legend_late": "(verspätet) der Heartbeat ist verspätet, aber der Prozess, der die Sperre hält, lebt (OS-Sperre gehalten)",
   "list.legend_nested": "(verschachtelt) eine Sperre innerhalb einer Sperre eines Vorfahren des Besitzers: sie endet, wenn jene Sperre endet",
-
   "graph.no_waiters": "niemand wartet",
   "graph.edge_held": "{from} -> {to}  ({key} {to_mode} gehalten von {holder}; will {mode})",
   "graph.edge_queued": "{from} -> {to}  ({key} in der Warteschlange hinter {holder}, {to_mode}; will {mode})",
@@ -370,19 +342,16 @@
   "resource.machine": "die ganze Maschine: exclusive fordert sie ruhig an (Benchmarks, Zeitmessungen); shared sagt, dass ein Job sie belastet",
   "resource.network": "die Netzwerkverbindung (große Downloads oder Uploads, netzwerkempfindliche Tests)",
   "resource.port": "ein TCP- oder UDP-Port dieser Maschine, nach Nummer (resource:port:8080)",
-
   "gc.expired_locks": "abgelaufene Sperren",
   "gc.expired_tickets": "abgelaufene Tickets",
   "gc.broken_consumed": "broken/ verbraucht",
   "gc.folders_removed": "entfernte Ordner",
   "gc.log_bytes": "Log-Bytes",
   "gc.error": "Fehler: {error}",
-
   "warn.bad_ms": "ignoriere {name}={value} (erwartet eine positive Zahl in ms)",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS ({stale}) sollte deutlich über JLOCK_HEARTBEAT_MS ({heartbeat}) liegen",
   "warn.resources_file": "{path} wird ignoriert: {error}",
   "warn.resources_entry": "Ressource '{name}' in resources.json wird ignoriert: {why}",
-
   "error.missing_command": "Befehl fehlt",
   "error.unknown_command": "unbekannter Befehl '{cmd}'. Befehle: {list}",
   "error.unknown_command_near": "unbekannter Befehl '{cmd}'; meintest du '{near}'? Befehle: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under erwartet einen Pfad",
   "error.no_localappdata": "LOCALAPPDATA ist nicht gesetzt; setze JLOCK_HOME",
   "error.no_home": "HOME ist nicht gesetzt; setze JLOCK_HOME",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process: unerwartetes Argument '{arg}'",
   "error.process_needs_pid": "process inspect braucht --pid",
   "error.bad_pid": "ungültige pid '{value}' (eine positive Zahl)",
-
   "help.cmd.custody.summary": "Startet einen Befehl abgelöst in einem benannten Job, mit Aufzeichnungen.",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <pfad> [optionen] [-- <command...>]",
   "help.cmd.custody.desc": "start schreibt intent.json nach <custody>/<id>/, bevor ein Prozess existiert, und startet einen abgelösten Verwalter (dieses jlock selbst). Der Verwalter erzeugt den benannten Job Local\\jlock-custody-<hash>-<id> (beim Schließen beenden, kein Verlassen des Jobs), erzeugt den Befehl angehalten mit Ausgabe und Fehlern in output.log, legt ihn in den Job, schreibt receipt.json und lässt ihn erst dann laufen; start antwortet dann mit dem Zustand running und dem Beleg und kehrt zurück. Der Verwalter bleibt außerhalb des Jobs. Endet der Befehl von selbst, beendet der Verwalter, was er im Job zurückgelassen hat, bestätigt, dass kein Prozess übrig ist, und schreibt final.json (reason exited, exitCode, cleanupConfirmed). Eine id, die schon eine Absicht hat, startet nie einen zweiten Prozess: die Antwort ist ihr aktueller Zustand mit duplicate true. status liest nur: absent, launching, launch-failed (eine Absicht ohne Beleg und ohne lebenden Verwalter), running, ended oder lost (ein Beleg, kein final.json, und der Verwalter existiert nicht mehr), mit den Aufzeichnungen und ob der Job offen ist. Nur unter Windows; anderswo lehnt er mit unsupported on this platform ab. Solange der Befehl läuft, ersetzt der Verwahrer beat.json alle 10 s (JLOCK_CUSTODY_BEAT_MS) mit seq, at, lastOutputAt und outputBytes; kann er sie 30 s lang (JLOCK_CUSTODY_SELF_FENCE_MS) nicht schreiben, beendet er den Job selbst und geht ohne final.json. stop funktioniert aus jedem Prozess, auch ohne den Wächter: Es öffnet den Job über seinen Namen, beendet ihn und wartet auf null Prozesse (--timeout, Standard 15 s, JLOCK_CUSTODY_STOP_MS), schreibt dann final.json genau einmal (reason stopped mit --reason in detail, oder custodian-lost, wenn der Wächter schon fort war; by stop) und gibt es aus; ein schon vorhandenes bestätigtes final.json wird unverändert ausgegeben. Gibt es den Job nicht mehr, bestätigt es nur, wenn die Wurzel des Befehls, per Identität geprüft, fort ist; es beendet nie etwas per PID und legt den Job nie neu an. Ohne diesen Beweis antwortet es cleanupConfirmed false mit dem Grund in error und endet mit 15.",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start: --cwd ist kein Ordner: {path}",
   "error.custody_busy": "custody start: ein anderer start von '{id}' läuft noch",
   "error.custody_records": "der Ordner der Custody-Aufzeichnungen ist nicht nutzbar",
-  "error.unsupported_platform": "{cmd}: auf dieser Plattform nicht unterstützt (unsupported on this platform)"
+  "error.unsupported_platform": "{cmd}: auf dieser Plattform nicht unterstützt (unsupported on this platform)",
+  "help.opt.foreground.id": "Die id des Befehls in Custody (1 bis 64 aus A-Z a-z 0-9 . _ -); mit --custody schreibt er intent.json, receipt.json, beat.json und final.json in <custody>/<id>/ (Modus foreground; die Ausgabe bleibt hier) und läuft in einem benannten Job, den custody status liest und custody stop beendet.",
+  "help.opt.foreground.custody": "Der Ordner der Custody-Aufzeichnungen; nur zusammen mit --id.",
+  "error.foreground_needs_both": "{cmd}: --id und --custody gehören zusammen",
+  "error.custody_duplicate": "{cmd}: die Custody-id '{id}' hat schon eine Absicht; nichts wurde gestartet"
 }

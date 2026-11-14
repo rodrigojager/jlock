@@ -17,7 +17,6 @@
     "resource": "リソース",
     "nested": "入れ子"
   },
-
   "help.tagline": "ファイル・フォルダ・名前のための、マシン全体のロック",
   "help.intro": "jlock は、同じマシン上のプログラム、スクリプト、人、AI エージェントが順番に使えるようにする。ファイル、フォルダ、名前付きのリソース（ポート、デスクトップ、デプロイなど）に触れる前に、jlock にそのロックを求める。所有者は一度に 1 つ（shared モードなら複数が同時に）で、他は到着順にキューで待つ。死んだプロセスが残したロックは自動的に回復され、デッドロックになる要求は拒否され、jlock list で誰が何を保持しているか確認できる。サーバーはなく、状態はディスク上のフォルダである。",
   "help.usage_line": "使い方: jlock <コマンド> [オプション]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "タグ",
   "help.meta.mode": "モード",
   "help.opt.json": "テキスト行の代わりに、result フィールドを持つ JSON オブジェクトを 1 つ出力する。",
-
   "help.exit.0": "成功",
   "help.exit.2": "使い方の誤り: 不正なオプションまたは値（どれかはメッセージに出る）",
   "help.exit.10": "使用中: --no-wait 指定で取得できなかった",
@@ -60,7 +58,6 @@
   "help.exit.14": "ロック喪失: unlock --force で破棄されたか、失効した",
   "help.exit.20": "ファイルシステムのエラー（権限、ディスク満杯、他のプログラムが使用中のファイル）。詳細は OS のメッセージに出る",
   "help.exit.130": "待機中に中断された（CTRL+C）。キューの順番は放棄された",
-
   "help.cmd.acquire.summary": "キーを取得し、コマンド終了後も保持する。",
   "help.cmd.acquire.usage": "<キー...> [オプション]",
   "help.cmd.acquire.desc": "指定したキーをすべて、固定された順序で、全部取得するか 1 つも取得しないかのどちらかで取得する。そのため、同じキーを異なる順序で求める 2 つの呼び出しが互いをブロックすることはない。空いているキーはすぐに付与され、使用中のキーは公平なキューで到着順に待つ。--timeout か --no-wait で指定しない限り、待つ時間に上限はない。各キーは、--mode shared かキー自身の @shared で指定しない限り exclusive で取得される。キーの shared の保持どうしは共存でき、exclusive はそれらを待ち、shared の要求は先に待っていた exclusive を追い越さない。ロックは jlock が終了した後も残る。jlock heartbeat で更新するか、更新を代行する hold や run を使う。すでに保持しているキーを再び求めると、すぐに付与される。",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "キーが空くまでキューで待つ。これが既定。",
   "help.opt.acquire.no_wait": "待たない: キーが使用中なら、保持者と本来の順番を添えて 使用中（終了コード 10）と答える。",
   "help.opt.acquire.timeout": "最大この時間だけ待ち、その後キューを離れて諦める（終了コード 11）。単位: ms, s, m, h, d。既定: 無制限。",
-
   "help.cmd.run.summary": "コマンドの実行中、キーを保持する（flock(1) と同様）。",
   "help.cmd.run.usage": "<キー...> [オプション] -- <コマンド...>",
   "help.cmd.run.desc": "キーを取得し（オプションは acquire と同じ）、-- の後に書いたコマンドを実行し、実行中はロックを更新し、終了したら解放する。-- より後はすべてコマンドのもので、jlock のオプションに見える語も含む。jlock はコマンド自身の終了コードで終了する。ロックを失うとコマンドは停止され、run は 14 で終了する。run 自体が強制終了されると、ロックは失効する。",
   "help.cmd.run.examples": "# このマシンでビルドは一度に 1 つ\njlock run D:\\proj\\dist -- cargo build --release\n# 2 分待ったら諦める\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "キー取得後の、コマンド自身の終了コード（成功なら 0）",
   "help.exit.run.14": "コマンド実行中にロックを失った。コマンドは停止された",
-
   "help.cmd.hold.summary": "止めるよう指示されるまでキーを保持する。",
   "help.cmd.hold.usage": "<キー...> [オプション]",
   "help.cmd.hold.desc": "キーを取得し（オプションは acquire と同じ）、「取得」と表示した後も動き続けてロックを更新する。標準入力から release という行を読んだとき、CTRL+C のとき、または終了させられたときに、解放して 0 で終了する。所有者が jlock release でキーを返したときも 0 で終了する。実行中は OS もその保持ファイルをロックするので、プロセスが死んだ瞬間にロックは解放される。ロックを奪われると「喪失」と表示して 14 で終了する。--detach を付けると、すぐに答えて戻り、2 つ目のプロセスがバックグラウンドでロックを保持する。エージェントがタスク全体のファイルを保持する最も簡単な方法である。",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "acquire と同じように答えて戻る（取得、使用中、タイムアウト、終了コードも同じ）。その間、2 つ目の jlock hold がバックグラウンドで、jlock release、--ttl、または unlock --force までロックを生かし続ける。エージェントにとっては 1 回の呼び出しで、答えが手に入る。",
   "help.opt.hold.release_on_eof": "標準入力が閉じたら終了する。入力の終わりを release の行と同じに扱うため、前面で hold を実行し標準入力を握ったまま動き続けるプログラムは、死んだ瞬間にロックを手放す（親が死んでも子が終わらない Windows でも）。--detach とは併用できない。背景のプロセスには標準入力がない。",
   "help.exit.hold.0": "release、CTRL+C、または終了による解放",
-
   "help.cmd.release.summary": "キーを返す。",
   "help.cmd.release.usage": "[<キー...>] [オプション]",
   "help.cmd.release.desc": "指定したキーを、あなたがその所有者であれば返す（そうでなければ終了コード 13）。キーを指定しなければ、その所有者が保持するものをすべて解放し、--group を付ければ、その所有者がそのグループで保持するものをすべて解放する。解放された保持の中に入れ子になっている保持も一緒に終了する。キューの次の者が各キーを得て、誰も保持も待機もしなくなったキーのフォルダは消える。",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agent-7\n# agent-7 が保持するすべて\njlock release --owner agent-7\n# 各ロックの所有者に関係なく、グループ全体\njlock release --group task-42 --any-owner",
   "help.exit.release.0": "解放した（または解放するものがなかった）",
   "help.exit.release.13": "指定したキーの一部があなたのものではない。他は解放された",
-
   "help.cmd.renew.summary": "保持中のロックの期限を延ばす。",
   "help.cmd.renew.usage": "[<キー...>] [オプション]",
   "help.cmd.renew.desc": "保持しているロックの期限 (--ttl) を「今 + ttl」に移し、ハートビートも更新する。要求した ttl より長くかかるかもしれない作業のためのもの。--ttl がなければ、ロック取得時の ttl を使う。キーがなければ所有者が保持するすべてを、--group があればそのグループ内で保持するすべてを更新する。更新中にロックが手放されることはなく、それを保持する hold や run はそのまま動き続ける。期限をすでに過ぎたロックは更新できない。失効し（終了コード 14）、取り直す必要がある。",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agent-7",
   "help.exit.heartbeat.0": "更新した",
   "help.exit.heartbeat.13": "喪失: ロックはもうあなたのものではない（破棄または失効）",
-
   "help.cmd.status.summary": "1 つのキーを誰が保持し、誰が待っているかを表示する。",
   "help.cmd.status.usage": "<キー> [オプション]",
   "help.cmd.status.desc": "キーが空いているか保持されているか、保持している者は誰かを表示する。各保持のモード（shared または exclusive）、入れ子になっている保持、いつから、最後のハートビート、グループ、用途。続いてキューを順に、待機者ごとに求めるモードとともに表示し、さらにそれをブロックする他のキー（上位のフォルダ、その中のファイル、または *）も表示する。途中で見つかった死んだロックは失効される。",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:port-3000 --json",
-
   "help.cmd.list.summary": "このマシンでロックされているものをすべて表示する。",
   "help.cmd.list.usage": "[オプション]",
   "help.cmd.list.desc": "保持されているか、キューのあるキーをすべて一覧にする。要約ではなくレジストリのフォルダそのものを読むので、常に実際の状態を示す。",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "死んだロックとチケットのみ（ハートビートが JLOCK_STALE_MS より古い、または ttl 超過）。",
   "help.opt.list.watch": "CTRL+C まで毎秒再描画する。",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agent-7 --json",
-
   "help.cmd.graph.summary": "誰が誰を待っているか、そして循環を表示する。",
   "help.cmd.graph.usage": "[オプション]",
   "help.cmd.graph.desc": "各行は 1 つの待機者と、それが誰を、どのキーを通して待っているかを、両側のモードとともに示す。循環（A が B を待ち、B が A を待つ）はデッドロックである。jlock は循環を閉じる要求を拒否するので、循環が見えるのは一瞬だけである。shared の保持と所有者自身の一族（祖先、子孫）は行を作らない。所有者は、その子孫のどれかが待っている間は待っていることになるので、待機者の祖先に戻る連鎖も循環である。",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[オプション]",
   "help.cmd.resources.desc": "登録済みのリソースを一覧する。組み込みのもの（desktop、clipboard、port:<n>、machine...）と、レジストリフォルダの resources.json にある自分のもので、それぞれ要求がモードを指定しないときに使われるモードと説明が付く。一覧にない名前の resource: キーは拒否され、最も近い名前が候補として示されるので、打ち間違いが別のリソースになることはない。リソースが競合するのは同じリソースかつ同じ引数だけで、パスや name: のキーとは競合しない。",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "他人のロックを破棄する（--force が必要）。",
   "help.cmd.unlock.usage": "(<キー...> | --owner <id> | --group <グループ>) --force [オプション]",
   "help.cmd.unlock.desc": "緊急用: 指定したロックを、所有者が誰であっても破壊し、誰が何のために強制したかをログに書く。所有者の hold や run は次のハートビートで気づいて 14 で停止し、破壊された保持の中に入れ子になっている保持も一緒に終了し、キューの次の者がキーを得る。自分のロックを返すには release を使う。",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"agent hung\"\njlock unlock --owner agent-3 --force",
   "help.exit.unlock.0": "完了（破棄するものがなかった場合も）",
   "help.exit.unlock.2": "使い方の誤り、または --force がない",
-
   "help.cmd.gc.summary": "今すぐ掃除する: 死んだロックを失効させ、空のフォルダを削除する。",
   "help.cmd.gc.usage": "[オプション]",
   "help.cmd.gc.desc": "グローバルなスイープをすぐに実行する: 所有者が死んだロックとチケットを失効させ、残骸を削除し、空のキーのフォルダを消し、ログをローテーションし、index.json を書き直し、削除したものを表示する。どのコマンドも、最大で JLOCK_SWEEP_MS に 1 回これを行っている。",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "jlock、または 1 つのコマンドを説明する。",
   "help.cmd.help.usage": "[<コマンド>]",
   "help.cmd.help.desc": "コマンドなし: jlock とは何かと、コマンドの一覧。コマンドあり: そのオプション（既定値と例付き）と終了コード。jlock <コマンド> --help でも同じページを表示する。",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "そのようなコマンドはない（最も近い名前を提案する）",
-
   "help.cmd.about.summary": "jlock の作者と入手先。",
   "help.cmd.about.usage": "[オプション]",
   "help.cmd.about.desc": "バージョン、作者（GitHub と LinkedIn）、リポジトリ、ライセンス、ドキュメントへのリンクを表示する。ネットワークは使わない。",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "ファイル・フォルダ・名前のための、マシン全体のロック: 公平なキュー、死んだプロセスが残したロックの回収、デッドロック検出、サーバー不要。",
   "about.author": "作者",
   "about.repository": "リポジトリ",
@@ -180,13 +165,11 @@
   "about.usage": "使い方",
   "about.roadmap": "ロードマップ",
   "about.footer": "jlock 作者: {author} · {github} · {linkedin}",
-
   "tip.busy": "ヒント: jlock status {key} で保持者とキューがわかる。順番を待つなら --no-wait を外す",
   "tip.timeout": "ヒント: --timeout を大きくして長く待つか、jlock status {key} で保持者を確認する",
   "tip.deadlock": "ヒント: 保持しているものを解放してから求め直すか、すべてのキーを 1 回の acquire で取得する",
   "tip.not_owner": "ヒント: ロックは {owner} のもの。--owner {owner} を使うか、破棄するなら jlock unlock --force",
   "tip.lost": "ヒント: {key} のロックが誰かに破棄されたか失効した。変更をやめ、jlock status {key} を確認し、jlock acquire で取り直す",
-
   "help.cmd.update.summary": "jlock の最新リリースを、今のものに上書きしてインストールする。",
   "help.cmd.update.usage": "[オプション]",
   "help.cmd.update.desc": "GitHub に最新リリースを問い合わせ（または指定したバージョンを使い）、このシステム用のアーカイブをダウンロードし、リリースの SHA256SUMS と照合し、実行中の jlock を新しいものに置き換え、一度実行してバージョンを確認する。失敗したら古いものを戻す。システムの curl を使う（Windows で curl がなければ PowerShell）。ネットワークを使うのはこのコマンドだけで、それも実行したときだけである。",
@@ -196,7 +179,6 @@
   "help.meta.version": "バージョン",
   "help.exit.update.0": "更新した、すでに最新、または（--check 指定時）比較した",
   "help.exit.update.20": "リリースが見つからない、ダウンロードかチェックサムが失敗した、またはフォルダに書き込めない。どれかはメッセージに出る",
-
   "update.current": "このバージョン: {version}",
   "update.latest": "最新リリース:   {version}",
   "update.available": "新しいバージョンがある: jlock update でインストールできる",
@@ -216,14 +198,12 @@
   "update.restore_failed": "新しい jlock が動かず、古いものを {path} に戻せなかった。install.sh か install.ps1 で再インストールすること",
   "update.no_exe": "この jlock の場所がわからない",
   "update.bad_version": "不正なバージョン '{version}'（v0.2.0 の形式で）",
-
   "help.cmd.doctor.summary": "このマシンがロックを使える状態か確認する。",
   "help.cmd.doctor.usage": "[オプション]",
   "help.cmd.doctor.desc": "次の順に確認する: バージョンと実行中の実行ファイル。レジストリのフォルダ（JLOCK_HOME）、その出どころ、書き込めるフォルダかどうか。そのフォルダでの、プロトコルの土台となる 3 つのファイル操作（create_new、rename、remove）。hold と run が使う OS ロック。ファイルシステム。JLOCK_* 変数。この jlock が PATH で最初のものか。レジストリが今保持しているもの。そして update 用の curl。各行は OK・警告・失敗 のいずれかと、その直し方を示す。提案するだけで何も変更せず、書き込むのは終了前に消す自分の一時ファイルだけである。",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "失敗した確認はない（警告は終了コードを変えない）",
   "help.exit.doctor.20": "少なくとも 1 つの確認が失敗した",
-
   "doctor.name.version": "バージョン",
   "doctor.name.home": "レジストリのフォルダ",
   "doctor.name.primitives": "基本操作",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "パッケージマネージャーで curl をインストールする。jlock の他の部分では不要",
   "doctor.skipped": "未確認: レジストリのフォルダが使えない",
   "doctor.skipped_fix": "まずレジストリのフォルダを直す（上記参照）",
-
   "acquire.granted": "取得 {key}",
   "acquire.busy": "使用中 {key}、保持者 {owner}{via}（順番 {position}）",
   "acquire.timeout": "タイムアウト {key}、保持者 {owner}{via}（順番 {position}）",
@@ -294,23 +273,18 @@
   "acquire.nested": " ({owner} の中に入れ子)",
   "acquire.and_others_one": "、ほか {n} 件",
   "acquire.and_others_other": "、ほか {n} 件",
-
   "result.released": "解放 {key}",
   "result.lost": "喪失 {key}",
-
   "heartbeat.renewed": "更新 {key}",
   "renew.until": "更新 {key}（{until} まで）",
   "renew.not_owner": "所有者でない {key}: 保持者は {holder}",
   "renew.not_locked": "所有者でない {key}（ロックされていない）",
   "renew.nothing": "更新するものはない",
-
   "release.not_owner": "所有者でない {key}: 保持者は {holder}",
   "release.not_locked": "所有者でない {key}（ロックされていない）",
   "release.nothing": "解放するものはない",
-
   "unlock.forced": "強制解除 {key}（所有者は {owner} だった）",
   "unlock.nothing": "強制するものはない",
-
   "status.held": "保持中 {key}",
   "status.free": "空き {key}",
   "status.by": "所有者 {owner}（{mode}）、{since} から（{ago} 前）",
@@ -331,7 +305,6 @@
   "status.why_above": "理由: フォルダのロックはその中のすべてを対象にするため、このキーより上にある保持中のフォルダがこれをブロックしている",
   "status.why_inside": "理由: フォルダは中に何もロックされていないときにしか取得できないため、中にあるこれらのキーがブロックしている",
   "status.why_all": "理由: * はすべてのキーと競合する",
-
   "list.nothing": "ロックされているものはない",
   "list.col_key": "キー",
   "list.col_mode": "モード",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(死亡) ハートビートが止まり、誰も OS ロックを持っていない: 失効される",
   "list.legend_late": "(遅延) ハートビートは遅れているが、ロックを持つプロセスは生きている（OS ロック保持中）",
   "list.legend_nested": "(入れ子) 所有者の祖先の保持の中にある保持: その保持が終わると一緒に終わる",
-
   "graph.no_waiters": "待機者はいない",
   "graph.edge_held": "{from} -> {to}  （{key} {to_mode} で保持者 {holder}、要求は {mode}）",
   "graph.edge_queued": "{from} -> {to}  （{key} のキューで {holder} の後ろ、{to_mode}、要求は {mode}）",
@@ -370,19 +342,16 @@
   "resource.machine": "マシン全体: exclusive は静かな状態を求める（ベンチマーク、計時テスト）。shared はジョブが負荷をかけていることを示す",
   "resource.network": "ネットワーク回線（大きなダウンロードやアップロード、ネットワークに敏感なテスト）",
   "resource.port": "このマシンの TCP または UDP のポート。番号で指定する（resource:port:8080）",
-
   "gc.expired_locks": "失効したロック",
   "gc.expired_tickets": "失効したチケット",
   "gc.broken_consumed": "処理した broken/",
   "gc.folders_removed": "削除したフォルダ",
   "gc.log_bytes": "ログのバイト数",
   "gc.error": "エラー: {error}",
-
   "warn.bad_ms": "{name}={value} を無視する（ms 単位の正の数が必要）",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS（{stale}）は JLOCK_HEARTBEAT_MS（{heartbeat}）より十分大きくすべき",
   "warn.resources_file": "{path} を無視する: {error}",
   "warn.resources_entry": "resources.json のリソース '{name}' を無視する: {why}",
-
   "error.missing_command": "コマンドがない",
   "error.unknown_command": "不明なコマンド '{cmd}'。コマンド: {list}",
   "error.unknown_command_near": "不明なコマンド '{cmd}'。'{near}' のこと? コマンド: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under にはパスが必要",
   "error.no_localappdata": "LOCALAPPDATA が設定されていない。JLOCK_HOME を設定する",
   "error.no_home": "HOME が設定されていない。JLOCK_HOME を設定する",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process：余分な引数 '{arg}'",
   "error.process_needs_pid": "process inspect には --pid が必要",
   "error.bad_pid": "不正な pid '{value}'（正の整数）",
-
   "help.cmd.custody.summary": "名前付きジョブでコマンドを切り離して実行し、記録を残します。",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <パス> [オプション] [-- <command...>]",
   "help.cmd.custody.desc": "start はプロセスが存在する前に <custody>/<id>/ に intent.json を書き、切り離された管理プロセス（この jlock 自身）を起動します。管理プロセスは名前付きジョブ Local\\jlock-custody-<hash>-<id>（閉じると終了、ジョブからの離脱なし）を作り、出力とエラーを output.log に向けてコマンドを一時停止状態で作成し、ジョブに入れ、receipt.json を書いてから初めて実行させます。start はそこで状態 running と受領記録を答えて戻ります。管理プロセスはジョブの外にいます。コマンドが自分で終わると、管理プロセスはジョブに残ったものを終了し、プロセスが残っていないことを確認して final.json（reason exited、exitCode、cleanupConfirmed）を書きます。すでに意図のある id が 2 つ目のプロセスを起動することはありません。答えは現在の状態と duplicate true です。status は読むだけです：absent、launching、launch-failed（受領記録がなく生きた管理プロセスもない意図）、running、ended、lost（受領記録があり final.json がなく、管理プロセスがもう存在しない）を、記録とジョブが開いているかとともに答えます。Windows のみ。他では unsupported on this platform で拒否します。 コマンドの実行中、管理役は 10 秒ごと（JLOCK_CUSTODY_BEAT_MS）に beat.json を seq、at、lastOutputAt、outputBytes で置き換えます。30 秒（JLOCK_CUSTODY_SELF_FENCE_MS）書けなければ、自らジョブを終了し final.json なしで終わります。 stop はどのプロセスからでも、管理プロセスがいなくても動きます。job を名前で開いて終了させ、プロセス数がゼロになるまで待ち（--timeout、既定 15 s、JLOCK_CUSTODY_STOP_MS）、final.json を一度だけ書いて（reason stopped で --reason は detail に、管理プロセスがすでにいなければ custodian-lost、by stop）それを返します。確認済みの final.json がすでにあれば、そのまま返します。job がもう存在しないときは、コマンドのルートが識別子で確認して存在しない場合にのみ確認とします。pid で何かを終了させることも、job を作り直すこともありません。その証明がなければ cleanupConfirmed false と error の理由を返し、15 で終了します。",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start：--cwd がフォルダーではありません：{path}",
   "error.custody_busy": "custody start：'{id}' の別の start がまだ進行中です",
   "error.custody_records": "custody の記録フォルダーを使えません",
-  "error.unsupported_platform": "{cmd}：このプラットフォームでは未対応です（unsupported on this platform）"
+  "error.unsupported_platform": "{cmd}：このプラットフォームでは未対応です（unsupported on this platform）",
+  "help.opt.foreground.id": "custody でのコマンドの id（A-Z a-z 0-9 . _ - の 1〜64 文字）。--custody と一緒に使うと、<custody>/<id>/ に intent.json、receipt.json、beat.json、final.json を書き（mode foreground。出力はここに残ります）、custody status が読み custody stop が終了できる名前付きジョブで実行します。",
+  "help.opt.foreground.custody": "custody の記録フォルダー。--id と一緒にのみ使います。",
+  "error.foreground_needs_both": "{cmd}：--id と --custody は一緒に指定します",
+  "error.custody_duplicate": "{cmd}：custody id '{id}' にはすでに intent があります。何も開始していません"
 }

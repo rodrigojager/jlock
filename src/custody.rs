@@ -394,6 +394,281 @@ pub fn stop_requested(rec: &Path) -> bool {
     rec.join(STOP_REQUEST).exists()
 }
 
+/// `--id` and `--custody` of `exec` and `run`: both or neither. `None` without them (the command
+/// runs as it always did); the absolute custody folder and the id with them.
+pub fn foreground_opts(
+    cmd: &str,
+    id: Option<String>,
+    dir: Option<String>,
+) -> Result<Option<(PathBuf, String)>, crate::cli::Failure> {
+    use crate::cli::{fs_error, usage};
+    use crate::i18n::txt;
+    let (id, dir) = match (id, dir) {
+        (None, None) => return Ok(None),
+        (Some(id), Some(dir)) if !dir.trim().is_empty() => (id, dir),
+        _ => return Err(usage(txt!("error.foreground_needs_both", cmd = cmd))),
+    };
+    if !cfg!(windows) {
+        return Err(usage(txt!("error.unsupported_platform", cmd = cmd)));
+    }
+    if !valid_id(&id) {
+        return Err(usage(txt!("error.custody_bad_id", value = id)));
+    }
+    let dir = absolute(Path::new(&dir)).map_err(|e| fs_error(txt!("error.custody_records"), &e))?;
+    Ok(Some((dir, id)))
+}
+
+/// Why a foreground command in custody did not get its intent.
+pub enum Refusal {
+    /// The id already has an intent: nothing is started.
+    Duplicate,
+    /// The records folder cannot be written.
+    Records(io::Error),
+}
+
+/// The intent of a foreground command (`mode: "foreground"`), recorded before any process exists.
+/// `exec` and `run` are their own keeper: they hold the named job, write the receipt before the
+/// command runs, write `beat.json` while it runs and `final.json` once its job is empty. The output
+/// stays with the caller (no `output.log`).
+pub struct Intent {
+    dir: PathBuf,
+    id: String,
+    argv: Vec<String>,
+}
+
+impl Intent {
+    /// Writes `intent.json` exclusively (an id that already has one is refused) and `custodian.json`
+    /// with this process, so that `custody status` reads `launching` until the receipt exists.
+    pub fn record(
+        dir: &Path,
+        id: &str,
+        argv: &[String],
+        limit: Option<std::time::Duration>,
+    ) -> Result<Intent, Refusal> {
+        let rec = dir.join(id);
+        crate::fsx::ensure_dir(&rec).map_err(Refusal::Records)?;
+        let cwd = std::env::current_dir().map_err(Refusal::Records)?;
+        let mut intent = json!({
+            "v": 1,
+            "id": id,
+            "argv": argv,
+            "cwd": cwd.to_string_lossy(),
+            "mode": "foreground",
+            "createdAt": now(),
+        });
+        if let Some(l) = limit {
+            intent["limitMs"] = json!(l.as_millis() as u64);
+        }
+        match crate::fsx::create_exclusive(&rec.join(INTENT), format!("{intent}\n").as_bytes()) {
+            Ok(()) => {}
+            Err(e) if crate::fsx::is_exists(&e) => return Err(Refusal::Duplicate),
+            Err(e) => return Err(Refusal::Records(e)),
+        }
+        let me = std::process::id();
+        if let Some(identity) = crate::process_identity::inspect(me, None).identity() {
+            let _ = publish_once(
+                &rec.join(CUSTODIAN),
+                &json!({ "pid": me, "identity": identity }),
+            );
+        }
+        Ok(Intent {
+            dir: dir.to_path_buf(),
+            id: id.to_string(),
+            argv: argv.to_vec(),
+        })
+    }
+
+    /// Creates the named job, creates the command suspended (it inherits the caller's standard
+    /// handles), puts it in the job, writes `receipt.json` and only then lets it run. A failure
+    /// before the receipt leaves the intent alone (`launch-failed` once this process is gone).
+    #[cfg(windows)]
+    pub fn launch(self) -> io::Result<Foreground> {
+        use crate::process_identity::inspect;
+        use std::os::windows::process::CommandExt;
+        use windows_sys::Win32::System::Threading::{CREATE_NO_WINDOW, CREATE_SUSPENDED};
+
+        let rec = self.dir.join(&self.id);
+        let name = job_name(&self.dir, &self.id);
+        let job = Job::create(&name)?;
+        let mut child = std::process::Command::new(&self.argv[0])
+            .args(&self.argv[1..])
+            .creation_flags(CREATE_SUSPENDED | CREATE_NO_WINDOW)
+            .spawn()?;
+        if let Err(e) = job.assign(&child) {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err(e); // Never fall back to an uncontained command.
+        }
+        let me = std::process::id();
+        let my_identity = inspect(me, None).identity().map(str::to_string);
+        // Suspended: it cannot have exited, so this identity is the command's own.
+        let Some(identity) = inspect(child.id(), None).identity().map(str::to_string) else {
+            let _ = job.terminate(stop_wait());
+            let _ = child.wait();
+            return Err(io::Error::other("cannot read the command's identity"));
+        };
+        let receipt = json!({
+            "v": 1,
+            "id": self.id,
+            "pid": child.id(),
+            "identity": identity,
+            "job": name,
+            "scope": "job",
+            "custodianPid": me,
+            "custodianIdentity": my_identity,
+            "startedAt": now(),
+        });
+        if let Err(e) = publish_once(&rec.join(RECEIPT), &receipt) {
+            let _ = job.terminate(stop_wait());
+            let _ = child.wait();
+            return Err(e);
+        }
+        let mut kept = Foreground {
+            id: self.id,
+            rec,
+            job,
+            child,
+            seq: 0,
+            next_beat: std::time::Instant::now(),
+            recorded: false,
+        };
+        if let Err(e) = crate::process_tree::resume(&kept.child) {
+            let _ = kept.finish("interrupted");
+            return Err(e);
+        }
+        kept.beat();
+        Ok(kept)
+    }
+
+    #[cfg(not(windows))]
+    pub fn launch(self) -> io::Result<Foreground> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "unsupported on this platform",
+        ))
+    }
+}
+
+/// A foreground command running in its named job, kept by this process.
+pub struct Foreground {
+    id: String,
+    rec: PathBuf,
+    job: Job,
+    child: std::process::Child,
+    seq: u64,
+    next_beat: std::time::Instant,
+    /// `final.json` is settled (written, or left to a stop that wrote it).
+    recorded: bool,
+}
+
+impl Foreground {
+    /// The command's exit code once it has ended; writes `beat.json` when one is due.
+    pub fn try_wait(&mut self) -> io::Result<Option<i32>> {
+        let status = self.child.try_wait()?;
+        if status.is_none() && std::time::Instant::now() >= self.next_beat {
+            self.beat();
+        }
+        Ok(status.map(|s| s.code().unwrap_or(1)))
+    }
+
+    /// Replaces `beat.json`. The output goes to the caller, so it is not measured: `lastOutputAt`
+    /// is null and `outputBytes` 0. A beat that cannot be written is tried again shortly.
+    fn beat(&mut self) {
+        let now_mono = std::time::Instant::now();
+        let beat = json!({
+            "v": 1,
+            "id": self.id,
+            "seq": self.seq + 1,
+            "at": now(),
+            "lastOutputAt": Value::Null,
+            "outputBytes": 0,
+        });
+        if write_beat(&self.rec, &beat).is_ok() {
+            self.seq += 1;
+            self.next_beat = now_mono + beat_every();
+        } else {
+            self.next_beat = now_mono + beat_every().min(std::time::Duration::from_millis(100));
+        }
+    }
+
+    /// Ends whatever is left in the job, confirms that no process is, and records the end once in
+    /// `final.json` (`by: "custodian"`, with the command's exit code). A `custody stop` that asked
+    /// for the end records it itself; this waits for that record, and writes its own only if the
+    /// stop gives up. An error (processes still active, a query refused) leaves the end unrecorded:
+    /// call again.
+    pub fn finish(&mut self, reason: &str) -> io::Result<()> {
+        if self.recorded {
+            return Ok(());
+        }
+        let left = self.job.terminate(stop_wait())?;
+        if left > 0 {
+            return Err(io::Error::other(format!(
+                "{left} process(es) still active in the job"
+            )));
+        }
+        let code = self.child.wait()?.code();
+        self.recorded = true;
+        let fin_path = self.rec.join(FINAL);
+        let deadline = std::time::Instant::now() + stop_wait() + std::time::Duration::from_secs(1);
+        while stop_requested(&self.rec) && !fin_path.exists() {
+            if std::time::Instant::now() >= deadline {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        if fin_path.exists() {
+            return Ok(());
+        }
+        let reason = if stop_requested(&self.rec) {
+            "stopped"
+        } else {
+            reason
+        };
+        let mut fin = json!({
+            "v": 1,
+            "id": self.id,
+            "reason": reason,
+            "cleanupConfirmed": true,
+            "scope": "job",
+            "activeProcesses": 0,
+            "endedAt": now(),
+            "by": "custodian",
+        });
+        if let Some(c) = code {
+            fin["exitCode"] = json!(c);
+        }
+        match publish_once(&fin_path, &fin) {
+            Err(e) if !crate::fsx::is_exists(&e) => Err(e),
+            _ => Ok(()),
+        }
+    }
+}
+
+/// The command of `exec` or `run`: a private tree as always, or, with `--id`/`--custody`, a
+/// foreground command in custody.
+pub enum Supervised {
+    Tree(crate::process_tree::Tree),
+    Kept(Foreground),
+}
+
+impl Supervised {
+    pub fn try_wait(&mut self) -> io::Result<Option<i32>> {
+        match self {
+            Supervised::Tree(t) => t.try_wait(),
+            Supervised::Kept(k) => k.try_wait(),
+        }
+    }
+
+    /// Stops what is left of the command; `reason` is what `final.json` records in custody
+    /// (`stopped` instead when a `custody stop` asked for the end).
+    pub fn stop(&mut self, reason: &str) -> io::Result<()> {
+        match self {
+            Supervised::Tree(t) => t.stop(),
+            Supervised::Kept(k) => k.finish(reason),
+        }
+    }
+}
+
 #[cfg(windows)]
 mod os {
     use std::io;

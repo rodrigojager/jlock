@@ -17,7 +17,6 @@
     "resource": "مورد",
     "nested": "متداخل"
   },
-
   "help.tagline": "أقفال على مستوى الجهاز للملفات والمجلدات والأسماء",
   "help.intro": "يجعل jlock البرامج والسكربتات والأشخاص ووكلاء الذكاء الاصطناعي على جهاز واحد يتناوبون. قبل لمس ملف أو مجلد أو أي مورد مسمّى (منفذ، سطح المكتب، عملية نشر) يطلبون من jlock قفله: مالك واحد في كل مرة (أو عدة مالكين معًا في الوضع shared)، ويقف الآخرون في الطابور بترتيب وصولهم. القفل الذي تركته عملية ماتت يُستعاد تلقائيًا، والطلب الذي كان سيسبب جمودًا يُرفض، ويعرض jlock list من يملك ماذا. لا يوجد خادم: الحالة مجلد على القرص.",
   "help.usage_line": "الاستخدام: jlock <أمر> [خيارات]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "لغة",
   "help.meta.mode": "وضع",
   "help.opt.json": "يطبع كائن JSON واحدًا فيه الحقل result بدلًا من أسطر النص.",
-
   "help.exit.0": "تم",
   "help.exit.2": "استخدام خاطئ: خيار أو قيمة غير صالحة (الرسالة تحدد أيهما)",
   "help.exit.10": "مشغول: لم يُؤخذ، مع --no-wait",
@@ -60,7 +58,6 @@
   "help.exit.14": "فُقد القفل: كُسر بـ unlock --force، أو انتهت صلاحيته",
   "help.exit.20": "خطأ في نظام الملفات (صلاحيات، قرص ممتلئ، ملف يحتجزه برنامج آخر)؛ رسالة نظام التشغيل تحدد أيها",
   "help.exit.130": "مُقاطَع (CTRL+C) أثناء الانتظار؛ تم التخلي عن المكان في الطابور",
-
   "help.cmd.acquire.summary": "يأخذ مفاتيح ويحتفظ بها بعد انتهاء الأمر.",
   "help.cmd.acquire.usage": "<مفتاح...> [خيارات]",
   "help.cmd.acquire.desc": "يأخذ كل المفاتيح المعطاة، كلها أو لا شيء، بترتيب ثابت، فلا يحجب طلبان لنفس المفاتيح بترتيبين مختلفين أحدهما الآخر أبدًا. المفتاح الحر يُمنح فورًا؛ والمفتاح المأخوذ يُنتظر في طابور عادل، بترتيب الوصول، بلا حد ما لم يقل --timeout أو --no-wait غير ذلك. يؤخذ كل مفتاح في الوضع exclusive ما لم يقل --mode shared أو @shared الخاص به غير ذلك: حيازات shared للمفتاح الواحد تتعايش، وحيازة exclusive تنتظرها، وطلب shared لا يتجاوز أبدًا طلب exclusive كان ينتظر قبله. يبقى القفل بعد خروج jlock: جدّده بـ jlock heartbeat، أو استخدم hold أو run اللذين يجددانه عنك. طلب مفتاح تملكه بالفعل يُمنح فورًا.",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "ينتظر في الطابور حتى تصبح المفاتيح حرة. هذا هو الافتراضي.",
   "help.opt.acquire.no_wait": "لا ينتظر: إن كان مفتاح مأخوذًا، يجيب بمشغول (الرمز 10) مع حائزه والموضع الذي كنت ستحصل عليه.",
   "help.opt.acquire.timeout": "ينتظر هذه المدة على الأكثر، ثم يغادر الطابور ويستسلم (الرمز 11). الوحدات: ms, s, m, h, d. الافتراضي: بلا حد.",
-
   "help.cmd.run.summary": "يحتفظ بالمفاتيح أثناء تشغيل أمر، مثل flock(1).",
   "help.cmd.run.usage": "<مفتاح...> [خيارات] -- <أمر...>",
   "help.cmd.run.desc": "يأخذ المفاتيح (بنفس خيارات acquire)، ويشغّل الأمر المكتوب بعد --، ويجدد القفل أثناء تشغيله ويحرره عند انتهائه. كل ما بعد -- يخص الأمر، حتى الكلمات التي تشبه خيارات jlock. يخرج jlock برمز خروج الأمر نفسه. إن فُقد القفل يُوقَف الأمر ويخرج run بالرمز 14؛ وإن قُتل run نفسه، تنتهي صلاحية القفل.",
   "help.cmd.run.examples": "# عملية بناء واحدة في كل مرة على هذا الجهاز\njlock run D:\\proj\\dist -- cargo build --release\n# الاستسلام بعد انتظار دقيقتين\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "رمز خروج الأمر نفسه، بعد منح المفاتيح (0 عند نجاحه)",
   "help.exit.run.14": "فُقد القفل أثناء تشغيل الأمر؛ أُوقف الأمر",
-
   "help.cmd.hold.summary": "يحتفظ بالمفاتيح حتى يُطلب منه التوقف.",
   "help.cmd.hold.usage": "<مفتاح...> [خيارات]",
   "help.cmd.hold.desc": "يأخذ المفاتيح (بنفس خيارات acquire)، ويطبع مُنح، ثم يبقى يعمل ويجدد القفل. يحرر القفل ويخرج بالرمز 0 عندما يقرأ السطر release من دخله القياسي، أو عند CTRL+C، أو عند إنهائه؛ وينتهي أيضًا بالرمز 0 عندما يُرجع مالكه المفاتيح بـ jlock release. وأثناء عمله يقفل نظام التشغيل أيضًا ملفات حيازته، فيتحرر القفل لحظة موت العملية. إن انتُزع القفل يطبع فُقد ويخرج بالرمز 14. ومع --detach يجيب ويعود فورًا، وتحتفظ عملية ثانية بالقفل في الخلفية: أبسط طريقة لكي يحتفظ وكيل بملفات مهمة كاملة.",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "يجيب ويعود مثل acquire (مُنح، مشغول، انتهت المهلة، بنفس رموز الخروج)، بينما يُبقي jlock hold ثانٍ القفل حيًا في الخلفية حتى jlock release أو --ttl أو unlock --force. استدعاء واحد للوكيل، والجواب في يده.",
   "help.opt.hold.release_on_eof": "ينتهي عند إغلاق المدخل القياسي: نهاية المدخل تُعدّ كسطر release، فالبرنامج الذي يبقى مفتوحًا ويشغّل hold في المقدمة ممسكًا بمدخله القياسي يحرّر القفل لحظة موته (حتى على Windows، حيث لا يُنهي موتُ الأب أبناءه). لا يُستعمل مع --detach: العملية في الخلفية لا مدخل قياسي لها.",
   "help.exit.hold.0": "حُرّر، بعد release أو CTRL+C أو الإنهاء",
-
   "help.cmd.release.summary": "يُرجع المفاتيح.",
   "help.cmd.release.usage": "[<مفتاح...>] [خيارات]",
   "help.cmd.release.desc": "يُرجع المفاتيح المذكورة إن كنت مالكها (وإلا يخرج بالرمز 13). بلا مفاتيح يحرر كل ما يملكه المالك؛ ومع --group يحرر كل ما يملكه المالك في تلك المجموعة. الحيازات المتداخلة في المحررة تنتهي معها. يحصل التالي في الطابور على كل مفتاح، ويختفي مجلد المفتاح عندما لا يملكه أحد ولا ينتظره.",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agent-7\n# كل ما يملكه agent-7\njlock release --owner agent-7\n# المجموعة كلها، أيًّا كان مالك كل قفل\njlock release --group task-42 --any-owner",
   "help.exit.release.0": "حُرّرت (أو لم يكن هناك ما يُحرَّر)",
   "help.exit.release.13": "أحد المفاتيح المذكورة ليس لك؛ وحُرّرت البقية",
-
   "help.cmd.renew.summary": "يؤجّل موعد انتهاء الأقفال التي تملكها.",
   "help.cmd.renew.usage": "[<مفتاح...>] [خيارات]",
   "help.cmd.renew.desc": "ينقل موعد انتهاء (--ttl) الأقفال التي تملكها إلى الآن زائد ttl، ويجدد نبضتها: لعمل قد يدوم أطول من ttl المطلوب. من دون --ttl يستخدم ttl الذي أُخذ به القفل. من دون مفاتيح يجدد كل ما يملكه المالك؛ ومع --group، كل ما يملكه في تلك المجموعة. لا يُترك القفل أبدًا أثناء التجديد، ويستمر hold أو run الذي يحتفظ به كما كان. القفل الذي تجاوز موعده بالفعل لا يمكن تجديده: تنتهي صلاحيته (رمز الخروج 14) ويجب أخذه من جديد.",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agent-7",
   "help.exit.heartbeat.0": "جُدّد",
   "help.exit.heartbeat.13": "فُقد: القفل لم يعد لك (كُسر أو انتهت صلاحيته)",
-
   "help.cmd.status.summary": "يعرض من يملك مفتاحًا واحدًا ومن ينتظره.",
   "help.cmd.status.usage": "<مفتاح> [خيارات]",
   "help.cmd.status.desc": "يعرض هل المفتاح حرّ أم محجوز، ومن يملكه: كل حيازة مع وضعها (shared أو exclusive)، والحيازة المتداخلة فيها، ومنذ متى، وآخر نبضة، والمجموعة والغرض. ثم الطابور بالترتيب، مع الوضع الذي يطلبه كل منتظر، والمفاتيح الأخرى التي تحجبه: مجلد أعلاه، أو ملفات بداخله، أو *. القفل الميت الذي يُعثر عليه في الطريق تنتهي صلاحيته.",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:port-3000 --json",
-
   "help.cmd.list.summary": "يعرض كل ما هو مقفل على هذا الجهاز.",
   "help.cmd.list.usage": "[خيارات]",
   "help.cmd.list.desc": "يسرد كل مفتاح مقفل أو له طابور. يقرأ مجلد السجل نفسه، لا ملخصًا أبدًا، لذا فهو يعكس الحقيقة دائمًا.",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "فقط الأقفال والتذاكر الميتة (نبضة أقدم من JLOCK_STALE_MS، أو تجاوزت الـ ttl).",
   "help.opt.list.watch": "يعيد الرسم كل ثانية حتى CTRL+C.",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agent-7 --json",
-
   "help.cmd.graph.summary": "يعرض من ينتظر من، وأي حلقة.",
   "help.cmd.graph.usage": "[خيارات]",
   "help.cmd.graph.desc": "كل سطر هو منتظِر واحد، ومن ينتظر، وعبر أي مفتاح، مع الوضعين في الطرفين. الحلقة (A ينتظر B بينما B ينتظر A) جمود؛ يرفض jlock الطلب الذي قد يغلق حلقة، لذا لا تظهر الحلقة إلا للحظة. حيازات shared وعائلة المالك نفسه (الأسلاف والأحفاد) لا تُنتج سطرًا أبدًا؛ والمالك ينتظر كلما انتظر أحد أحفاده، فالسلسلة التي ترجع إلى أحد أسلاف المنتظِر حلقة أيضًا.",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[خيارات]",
   "help.cmd.resources.desc": "يعرض الموارد المسجّلة: المضمّنة (desktop وclipboard وport:<n> وmachine...) ومواردك الخاصة، من resources.json في مجلد السجل، لكل منها الوضع المأخوذ عندما لا يذكر الطلب وضعًا ووصفها. المفتاح resource: الذي لا يظهر اسمه في القائمة يُرفض، مع أقرب اسم كاقتراح، فلا يتحول خطأ مطبعي إلى مورد آخر. المورد لا يتعارض إلا مع المورد نفسه والوسيط نفسه، وليس مع المسارات أو مفاتيح name: أبدًا.",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "يكسر قفل شخص آخر (يتطلب --force).",
   "help.cmd.unlock.usage": "(<مفتاح...> | --owner <معرّف> | --group <مجموعة>) --force [خيارات]",
   "help.cmd.unlock.desc": "للطوارئ: يكسر الأقفال المذكورة أيًّا كان مالكها، ويكتب في السجل من فرض ذلك ولماذا. يلاحظ hold أو run الخاص بالمالك ذلك عند نبضته التالية ويتوقف بالرمز 14، وتنتهي الحيازات المتداخلة في الحيازة المكسورة معها، ويحصل التالي في الطابور على المفتاح. لإرجاع قفلك أنت استخدم release.",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"agent hung\"\njlock unlock --owner agent-3 --force",
   "help.exit.unlock.0": "تم (وأيضًا حين لا يوجد ما يُكسر)",
   "help.exit.unlock.2": "استخدام خاطئ، أو --force مفقود",
-
   "help.cmd.gc.summary": "تنظيف الآن: إنهاء صلاحية الأقفال الميتة، وحذف المجلدات الفارغة.",
   "help.cmd.gc.usage": "[خيارات]",
   "help.cmd.gc.desc": "يشغّل التنظيف الشامل فورًا: ينهي صلاحية الأقفال والتذاكر التي مات مالكوها، ويحذف المخلفات، ويزيل مجلدات المفاتيح الفارغة، ويدوّر سجل الأحداث، ويعيد كتابة index.json، ويطبع ما أزاله. كل أمر يفعل هذا أصلًا، مرة واحدة على الأكثر كل JLOCK_SWEEP_MS.",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "يشرح jlock، أو أمرًا واحدًا.",
   "help.cmd.help.usage": "[<أمر>]",
   "help.cmd.help.desc": "بلا أمر: ما هو jlock وقائمة الأوامر. مع أمر: خياراته بقيمها الافتراضية وأمثلة، ورموز خروجه. ويعرض jlock <أمر> --help الصفحة نفسها.",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "لا يوجد أمر بهذا الاسم (يُقترح أقرب اسم)",
-
   "help.cmd.about.summary": "من صنع jlock، وأين تجده.",
   "help.cmd.about.usage": "[خيارات]",
   "help.cmd.about.desc": "يطبع الإصدار، والمؤلف مع GitHub و LinkedIn، والمستودع، والترخيص، وروابط التوثيق. لا يستخدم الشبكة.",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "أقفال على مستوى الجهاز للملفات والمجلدات والأسماء: طابور عادل، واستعادة الأقفال التي تتركها عمليات ميتة، وكشف الجمود، بلا خادم.",
   "about.author": "المؤلف",
   "about.repository": "المستودع",
@@ -180,13 +165,11 @@
   "about.usage": "الاستخدام",
   "about.roadmap": "خارطة الطريق",
   "about.footer": "jlock من تأليف {author} · {github} · {linkedin}",
-
   "tip.busy": "تلميح: jlock status {key} يعرض من يملكه والطابور؛ احذف --no-wait لتنتظر دورك",
   "tip.timeout": "تلميح: انتظر أطول بـ --timeout أكبر، أو اعرف من يملكه بـ jlock status {key}",
   "tip.deadlock": "تلميح: حرّر ما تملكه ثم اطلب مجددًا، أو خذ كل المفاتيح في acquire واحد",
   "tip.not_owner": "تلميح: القفل ملك {owner}؛ استخدم --owner {owner}، أو jlock unlock --force لكسره",
   "tip.lost": "تلميح: كسر أحدهم قفلك على {key} أو أنهى صلاحيته؛ توقف عن تعديله، وتحقق بـ jlock status {key}، ثم خذه من جديد بـ jlock acquire",
-
   "help.cmd.update.summary": "يثبّت أحدث إصدار من jlock فوق هذا الإصدار.",
   "help.cmd.update.usage": "[خيارات]",
   "help.cmd.update.desc": "يسأل GitHub عن أحدث إصدار (أو يأخذ الإصدار المعطى)، وينزّل الأرشيف الخاص بهذا النظام، ويتحقق منه مقابل SHA256SUMS الخاص بالإصدار، ويضع jlock الجديد مكان الذي يعمل، ويشغّله مرة للتأكد من إصداره؛ وإن فشل ذلك يُعاد القديم. يستخدم curl الخاص بالنظام (و PowerShell على Windows إن لم يوجد curl). هذا هو الأمر الوحيد الذي يستخدم الشبكة، وفقط حين تشغّله.",
@@ -196,7 +179,6 @@
   "help.meta.version": "إصدار",
   "help.exit.update.0": "حُدّث، أو هو محدّث أصلًا، أو (مع --check) تمت المقارنة",
   "help.exit.update.20": "لم يُعثر على إصدار، أو فشل التنزيل أو المجموع الاختباري، أو تعذّرت الكتابة في المجلد؛ الرسالة تحدد أيها",
-
   "update.current": "هذا الإصدار:  {version}",
   "update.latest": "أحدث إصدار:   {version}",
   "update.available": "يتوفر تحديث: jlock update يثبّته",
@@ -216,14 +198,12 @@
   "update.restore_failed": "لم يعمل jlock الجديد وتعذّرت إعادة القديم إلى {path}؛ أعد التثبيت بـ install.sh أو install.ps1",
   "update.no_exe": "تعذّر معرفة مكان jlock هذا",
   "update.bad_version": "إصدار غير صالح '{version}' (استخدم v0.2.0)",
-
   "help.cmd.doctor.summary": "يتحقق من أن هذا الجهاز جاهز للأقفال.",
   "help.cmd.doctor.usage": "[خيارات]",
   "help.cmd.doctor.desc": "يتحقق بالترتيب من: الإصدار والملف التنفيذي الذي يعمل؛ ومجلد السجل (JLOCK_HOME)، ومن أين يأتي، وهل هو مجلد قابل للكتابة؛ وعمليات الملفات الثلاث التي يقوم عليها البروتوكول (create_new و rename و remove) في ذلك المجلد؛ وقفل نظام التشغيل الذي يستخدمه hold و run؛ ونظام الملفات؛ ومتغيرات JLOCK_*؛ وهل jlock هذا هو الأول في PATH؛ وما يحويه السجل الآن؛ و curl من أجل update. كل سطر يقول سليم أو تحذير أو فشل، وكيف يُصلَح. هو يقترح فقط: لا يغيّر شيئًا أبدًا، والملفات الوحيدة التي يكتبها هي ملفاته المؤقتة، ويحذفها قبل أن ينتهي.",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "لم يفشل أي فحص (التحذيرات لا تغيّر الرمز)",
   "help.exit.doctor.20": "فشل فحص واحد على الأقل",
-
   "doctor.name.version": "الإصدار",
   "doctor.name.home": "مجلد السجل",
   "doctor.name.primitives": "العمليات الأساسية",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "ثبّت curl بمدير الحزم لديك؛ لا شيء آخر في jlock يحتاجه",
   "doctor.skipped": "لم يُفحص: مجلد السجل غير صالح للاستخدام",
   "doctor.skipped_fix": "أصلح مجلد السجل أولًا (انظر أعلاه)",
-
   "acquire.granted": "مُنح {key}",
   "acquire.busy": "مشغول {key} لدى {owner}{via} (الموضع {position})",
   "acquire.timeout": "انتهت المهلة {key} لدى {owner}{via} (الموضع {position})",
@@ -294,23 +273,18 @@
   "acquire.nested": " (متداخل في {owner})",
   "acquire.and_others_one": " و{n} آخر",
   "acquire.and_others_other": " و{n} آخرين",
-
   "result.released": "حُرّر {key}",
   "result.lost": "فُقد {key}",
-
   "heartbeat.renewed": "جُدّد {key}",
   "renew.until": "جُدّد {key} حتى {until}",
   "renew.not_owner": "لست المالك {key}: القفل لدى {holder}",
   "renew.not_locked": "لست المالك {key} (غير مقفل)",
   "renew.nothing": "لا شيء لتجديده",
-
   "release.not_owner": "لست المالك {key}: القفل لدى {holder}",
   "release.not_locked": "لست المالك {key} (غير مقفل)",
   "release.nothing": "لا شيء لتحريره",
-
   "unlock.forced": "كُسر {key} قسرًا (كان لدى {owner})",
   "unlock.nothing": "لا شيء لكسره قسرًا",
-
   "status.held": "مقفل {key}",
   "status.free": "حر {key}",
   "status.by": "لدى {owner} ({mode}) منذ {since} (قبل {ago})",
@@ -331,7 +305,6 @@
   "status.why_above": "السبب: القفل على مجلد يغطي كل ما بداخله، لذا فإن مجلدًا مقفلًا فوق هذا المفتاح يحجبه",
   "status.why_inside": "السبب: لا يمكن أخذ مجلد إلا إذا لم يكن شيء بداخله مقفلًا، لذا تحجبه هذه المفاتيح التي بداخله",
   "status.why_all": "السبب: * يتعارض مع كل مفتاح",
-
   "list.nothing": "لا شيء مقفل",
   "list.col_key": "المفتاح",
   "list.col_mode": "الوضع",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(ميت) توقفت النبضة ولا أحد يحتفظ بقفل نظام التشغيل: ستنتهي صلاحيته",
   "list.legend_late": "(متأخر) النبضة متأخرة، لكن العملية التي تملك القفل حية (قفل نظام التشغيل محتجز)",
   "list.legend_nested": "(متداخل) حيازة داخل حيازة لأحد أسلاف المالك: تنتهي عندما تنتهي تلك الحيازة",
-
   "graph.no_waiters": "لا منتظرين",
   "graph.edge_held": "{from} -> {to}  ({key} لدى {holder} بالوضع {to_mode}؛ يريد {mode})",
   "graph.edge_queued": "{from} -> {to}  ({key} في الطابور خلف {holder}، {to_mode}؛ يريد {mode})",
@@ -370,19 +342,16 @@
   "resource.machine": "الجهاز كله: exclusive يطلبه هادئًا (اختبارات الأداء، اختبارات التوقيت)؛ وshared يعني أن مهمة تثقله",
   "resource.network": "وصلة الشبكة (التنزيلات أو الرفع الكبيرة، الاختبارات الحساسة للشبكة)",
   "resource.port": "منفذ TCP أو UDP في هذا الجهاز، بحسب رقمه (resource:port:8080)",
-
   "gc.expired_locks": "أقفال انتهت صلاحيتها",
   "gc.expired_tickets": "تذاكر انتهت صلاحيتها",
   "gc.broken_consumed": "broken/ المعالَجة",
   "gc.folders_removed": "مجلدات أُزيلت",
   "gc.log_bytes": "بايتات سجل الأحداث",
   "gc.error": "خطأ: {error}",
-
   "warn.bad_ms": "تجاهل {name}={value} (المطلوب عدد موجب من ms)",
   "warn.stale_vs_heartbeat": "يجب أن يكون JLOCK_STALE_MS ({stale}) أكبر بكثير من JLOCK_HEARTBEAT_MS ({heartbeat})",
   "warn.resources_file": "تجاهل {path}: {error}",
   "warn.resources_entry": "تجاهل المورد '{name}' في resources.json: {why}",
-
   "error.missing_command": "الأمر مفقود",
   "error.unknown_command": "أمر غير معروف '{cmd}'. الأوامر: {list}",
   "error.unknown_command_near": "أمر غير معروف '{cmd}'؛ هل تقصد '{near}'؟ الأوامر: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under يتوقع مسارًا",
   "error.no_localappdata": "LOCALAPPDATA غير مضبوط؛ اضبط JLOCK_HOME",
   "error.no_home": "HOME غير مضبوط؛ اضبط JLOCK_HOME",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process: وسيط غير متوقع '{arg}'",
   "error.process_needs_pid": "يحتاج process inspect إلى --pid",
   "error.bad_pid": "pid غير صالح '{value}' (عدد موجب)",
-
   "help.cmd.custody.summary": "يشغّل أمرًا منفصلًا داخل مهمة مسمّاة، مع سجلات دائمة.",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <مسار> [خيارات] [-- <command...>]",
   "help.cmd.custody.desc": "يكتب start الملف intent.json في <custody>/<id>/ قبل وجود أي عملية، ثم يشغّل حارسًا منفصلًا (jlock نفسه). ينشئ الحارس المهمة المسمّاة Local\\jlock-custody-<hash>-<id> (إنهاء عند الإغلاق، بلا خروج من المهمة)، وينشئ الأمر معلّقًا مع إخراجه وأخطائه في output.log، ويضعه في المهمة، ويكتب receipt.json وعندها فقط يطلقه؛ ثم يجيب start بالحالة running مع الإيصال ويعود. يبقى الحارس خارج المهمة. عندما ينتهي الأمر من تلقاء نفسه، ينهي الحارس ما تركه في المهمة، ويتأكد من عدم بقاء أي عملية، ويكتب final.json (reason exited وexitCode وcleanupConfirmed). المعرّف الذي له نية بالفعل لا يشغّل أبدًا عملية ثانية: الجواب هو حالته الحالية مع duplicate true. أما status فيقرأ فقط: absent أو launching أو launch-failed (نية بلا إيصال وبلا حارس حي) أو running أو ended أو lost (يوجد إيصال ولا يوجد final.json والحارس لم يعد موجودًا)، مع السجلات وما إذا كانت المهمة مفتوحة. على Windows فقط؛ وفي غيره يرفض بالرسالة unsupported on this platform. أثناء تشغيل الأمر يستبدل الحارس beat.json كل 10 ثوانٍ (JLOCK_CUSTODY_BEAT_MS) مع seq وat وlastOutputAt وoutputBytes؛ وإن لم يستطع كتابته لمدة 30 ثانية (JLOCK_CUSTODY_SELF_FENCE_MS) ينهي المجموعة بنفسه ويخرج دون final.json. يعمل stop من أي عملية، حتى مع غياب الحارس: يفتح الـ job باسمه، وينهيه وينتظر صفر عمليات (--timeout، الافتراضي 15 s، JLOCK_CUSTODY_STOP_MS)، ثم يكتب final.json مرة واحدة (reason stopped مع --reason في detail، أو custodian-lost إذا كان الحارس قد اختفى؛ by stop) ويجيب به؛ وملف final.json مؤكد موجود مسبقًا يُجاب به كما هو. إذا لم يعد الـ job موجودًا فلا يؤكد إلا إذا كان جذر الأمر، المتحقق منه بالهوية، قد اختفى؛ ولا ينهي أي شيء بالـ pid أبدًا ولا يعيد إنشاء الـ job أبدًا. ومن دون هذا الدليل يجيب cleanupConfirmed false مع السبب في error ويخرج بالرمز 15.",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start: ليس --cwd مجلدًا: {path}",
   "error.custody_busy": "custody start: ما زال start آخر للمعرّف '{id}' قيد التنفيذ",
   "error.custody_records": "تعذّر استخدام مجلد سجلات الحراسة",
-  "error.unsupported_platform": "{cmd}: غير مدعوم على هذه المنصة (unsupported on this platform)"
+  "error.unsupported_platform": "{cmd}: غير مدعوم على هذه المنصة (unsupported on this platform)",
+  "help.opt.foreground.id": "معرّف الأمر في الحراسة (من 1 إلى 64 من A-Z a-z 0-9 . _ -)؛ مع --custody يكتب intent.json وreceipt.json وbeat.json وfinal.json في <custody>/<id>/ (الوضع foreground؛ يبقى الخرج هنا) ويشغّله في مهمة مسمّاة يقرؤها custody status وينهيها custody stop.",
+  "help.opt.foreground.custody": "مجلد سجلات الحراسة؛ مع --id فقط.",
+  "error.foreground_needs_both": "{cmd}: يُستخدم --id و--custody معًا",
+  "error.custody_duplicate": "{cmd}: لمعرّف الحراسة '{id}' نية مسجّلة بالفعل؛ لم يبدأ أي شيء"
 }

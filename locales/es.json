@@ -17,7 +17,6 @@
     "resource": "recurso",
     "nested": "anidada"
   },
-
   "help.tagline": "bloqueos para toda la máquina: archivos, carpetas y nombres",
   "help.intro": "jlock hace que programas, scripts, personas y agentes de IA de una misma máquina se turnen. Antes de tocar un archivo, una carpeta o cualquier recurso con nombre (un puerto, el escritorio, un despliegue), le piden a jlock su bloqueo: un dueño a la vez (o varios juntos, en modo shared), los demás esperan en la cola por orden de llegada. Un bloqueo dejado por un proceso que murió se recupera solo, una petición que causaría un deadlock se rechaza, y jlock list muestra quién tiene qué. No hay servidor: el estado es una carpeta en el disco.",
   "help.usage_line": "Uso: jlock <comando> [opciones]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "idioma",
   "help.meta.mode": "modo",
   "help.opt.json": "Imprime un objeto JSON con el campo result en lugar de líneas de texto.",
-
   "help.exit.0": "ok",
   "help.exit.2": "uso incorrecto: una opción o un valor no válido (el mensaje dice cuál)",
   "help.exit.10": "ocupada: no se tomó, con --no-wait",
@@ -60,7 +58,6 @@
   "help.exit.14": "bloqueo perdido: roto con unlock --force, o caducado",
   "help.exit.20": "error del sistema de archivos (permiso, disco lleno, un archivo retenido por otro programa); el mensaje del SO dice cuál",
   "help.exit.130": "interrumpido (CTRL+C) durante la espera; se abandonó el lugar en la cola",
-
   "help.cmd.acquire.summary": "Toma claves y las conserva después de que el comando termina.",
   "help.cmd.acquire.usage": "<clave...> [opciones]",
   "help.cmd.acquire.desc": "Toma todas las claves dadas, todas o ninguna, en un orden fijo, así que dos peticiones de las mismas claves en órdenes distintos nunca se bloquean entre sí. Una clave libre se concede al instante; una ocupada se espera en una cola justa, por orden de llegada, sin límite salvo que --timeout o --no-wait digan otra cosa. Cada clave se toma en modo exclusive salvo que --mode shared o su propio @shared digan otra cosa: las posesiones shared de una clave conviven, una exclusive espera a que terminen, y una petición shared nunca adelanta a una exclusive que esperaba antes. El bloqueo sigue después de que jlock termina: renuévalo con jlock heartbeat, o usa hold o run, que lo renuevan por ti. Pedir de nuevo una clave que ya tienes se concede al instante.",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "Espera en la cola hasta que las claves estén libres. Es el comportamiento por defecto.",
   "help.opt.acquire.no_wait": "No espera: si una clave está ocupada, responde ocupada (salida 10) con su dueño y el lugar que habrías tenido.",
   "help.opt.acquire.timeout": "Espera como máximo este tiempo; luego sale de la cola y desiste (salida 11). Unidades: ms, s, m, h, d. Por defecto: sin límite.",
-
   "help.cmd.run.summary": "Mantiene claves mientras se ejecuta un comando, como flock(1).",
   "help.cmd.run.usage": "<clave...> [opciones] -- <comando...>",
   "help.cmd.run.desc": "Toma las claves (con las mismas opciones que acquire), ejecuta el comando escrito después de --, renueva el bloqueo mientras se ejecuta y lo libera cuando termina. Todo lo que va después de -- es del comando, incluso palabras que parecen opciones de jlock. jlock sale con el código de salida del propio comando. Si se pierde el bloqueo, el comando se detiene y run sale con 14; si se mata al propio run, el bloqueo caduca.",
   "help.cmd.run.examples": "# Un build a la vez en esta máquina\njlock run D:\\proj\\dist -- cargo build --release\n# Desiste tras esperar 2 minutos\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "el código de salida del propio comando, una vez concedidas las claves (0 si tiene éxito)",
   "help.exit.run.14": "bloqueo perdido mientras se ejecutaba el comando; el comando se detuvo",
-
   "help.cmd.hold.summary": "Mantiene claves hasta que se le diga que pare.",
   "help.cmd.hold.usage": "<clave...> [opciones]",
   "help.cmd.hold.desc": "Toma las claves (con las mismas opciones que acquire), imprime concedida y sigue ejecutándose y renovando el bloqueo. Libera y sale con 0 cuando lee la línea release en su entrada estándar, con CTRL+C, o cuando se le termina; también termina con 0 cuando su dueño devuelve las claves con jlock release. Mientras se ejecuta, el sistema operativo también bloquea sus archivos de posesión, así que el bloqueo se libera en el instante en que el proceso muere. Si le quitan el bloqueo, imprime perdida y sale con 14. Con --detach responde y vuelve al momento, y un segundo proceso mantiene el bloqueo en segundo plano: la forma más sencilla de que un agente conserve los archivos de toda una tarea.",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "Responde y vuelve como acquire (concedida, ocupada, tiempo agotado, con los mismos códigos de salida), mientras un segundo jlock hold mantiene vivo el bloqueo en segundo plano hasta jlock release, el --ttl o unlock --force. Una sola llamada para un agente, con la respuesta en mano.",
   "help.opt.hold.release_on_eof": "Termina cuando se cierra la entrada estándar: el fin de la entrada vale como la línea release, así que un programa que sigue abierto y ejecuta hold en primer plano, manteniendo su entrada estándar, suelta el bloqueo en el instante en que muere (incluso en Windows, donde un padre muerto no termina a sus hijos). No se combina con --detach: el proceso en segundo plano no tiene entrada estándar.",
   "help.exit.hold.0": "liberada, tras release, CTRL+C o terminación",
-
   "help.cmd.release.summary": "Devuelve claves.",
   "help.cmd.release.usage": "[<clave...>] [opciones]",
   "help.cmd.release.desc": "Devuelve las claves nombradas, si eres su dueño (si no, salida 13). Sin claves, libera todo lo que tiene el dueño; con --group, todo lo que tiene el dueño en ese grupo. Las posesiones anidadas en las liberadas terminan con ellas. El siguiente de la cola recibe cada clave, y la carpeta de una clave desaparece cuando nadie la tiene ni la espera.",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agente-7\n# Todo lo que tiene agente-7\njlock release --owner agente-7\n# El grupo entero, sea quien sea el dueño de cada bloqueo\njlock release --group tarea-42 --any-owner",
   "help.exit.release.0": "liberadas (o no había nada que liberar)",
   "help.exit.release.13": "una de las claves nombradas no es tuya; las demás se liberaron",
-
   "help.cmd.renew.summary": "Aplaza el plazo de los bloqueos que tienes.",
   "help.cmd.renew.usage": "[<clave...>] [opciones]",
   "help.cmd.renew.desc": "Lleva el plazo (--ttl) de los bloqueos que tienes a ahora más el ttl, y renueva su heartbeat: para un trabajo que puede durar más que el ttl pedido. Sin --ttl usa el ttl con el que se tomó el bloqueo. Sin claves renueva todo lo que tiene el dueño; con --group, todo lo que tiene el dueño en ese grupo. El bloqueo nunca se suelta mientras se renueva, y un hold o run que lo mantiene sigue como antes. Un bloqueo que ya pasó su plazo no se puede renovar: caduca (salida 14) y hay que tomarlo de nuevo.",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agente-7",
   "help.exit.heartbeat.0": "renovada",
   "help.exit.heartbeat.13": "perdida: el bloqueo ya no es tuyo (roto o caducado)",
-
   "help.cmd.status.summary": "Muestra quién tiene una clave y quién la espera.",
   "help.cmd.status.usage": "<clave> [opciones]",
   "help.cmd.status.desc": "Muestra si la clave está libre o bloqueada, y por quién: cada posesión con su modo (shared o exclusive), la posesión en la que está anidada, desde cuándo, el último heartbeat, el grupo y la intención. Luego la cola, en orden, con el modo que pide cada uno, y las otras claves que la bloquean: una carpeta por encima, archivos dentro de ella, o *. Un bloqueo muerto encontrado por el camino se hace caducar.",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:puerto-3000 --json",
-
   "help.cmd.list.summary": "Muestra todo lo bloqueado en esta máquina.",
   "help.cmd.list.usage": "[opciones]",
   "help.cmd.list.desc": "Lista cada clave que está bloqueada o tiene cola. Lee la propia carpeta del registro, nunca un resumen, así que siempre dice la verdad.",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "Solo bloqueos y turnos muertos (heartbeat más antiguo que JLOCK_STALE_MS, o ttl vencido).",
   "help.opt.list.watch": "Redibuja cada segundo hasta CTRL+C.",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agente-7 --json",
-
   "help.cmd.graph.summary": "Muestra quién espera a quién, y los ciclos.",
   "help.cmd.graph.usage": "[opciones]",
   "help.cmd.graph.desc": "Cada línea es alguien que espera, a quién espera y por qué clave, con los modos de ambos lados. Un ciclo (A espera a B mientras B espera a A) es un deadlock; jlock rechaza la petición que cerraría uno, así que un ciclo solo aparece por un instante. Las posesiones shared y la propia familia de un dueño (ancestros, descendientes) nunca generan una línea; un dueño espera siempre que uno de sus descendientes espera, así que una cadena que vuelve a un ancestro de quien espera también es un ciclo.",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[opciones]",
   "help.cmd.resources.desc": "Lista los recursos registrados: los integrados (desktop, clipboard, port:<n>, machine...) y los tuyos, de resources.json en la carpeta del registro, cada uno con el modo que se toma cuando la petición no indica ninguno y su descripción. Una clave resource: cuyo nombre no figura en la lista se rechaza, con el nombre más cercano como sugerencia, para que una errata nunca se convierta en otro recurso. Un recurso solo choca con el mismo recurso y el mismo argumento, nunca con rutas ni claves name:.",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "Rompe el bloqueo de otro (requiere --force).",
   "help.cmd.unlock.usage": "(<clave...> | --owner <id> | --group <grupo>) --force [opciones]",
   "help.cmd.unlock.desc": "Para emergencias: rompe los bloqueos nombrados, sea quien sea su dueño, y anota en el log quién forzó y por qué. El hold o run del dueño lo nota en su siguiente heartbeat y se detiene con 14, las posesiones anidadas en una rota terminan con ella, y el siguiente de la cola recibe la clave. Para devolver tu propio bloqueo, usa release.",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"el agente se colgó\"\njlock unlock --owner agente-3 --force",
   "help.exit.unlock.0": "hecho (también cuando no había nada que romper)",
   "help.exit.unlock.2": "uso incorrecto, o falta --force",
-
   "help.cmd.gc.summary": "Limpia ahora: hace caducar bloqueos muertos, elimina carpetas vacías.",
   "help.cmd.gc.usage": "[opciones]",
   "help.cmd.gc.desc": "Ejecuta el barrido global al instante: hace caducar bloqueos y turnos cuyos dueños murieron, borra restos, elimina carpetas de clave vacías, rota el log, reescribe index.json y muestra lo que eliminó. Todos los comandos ya lo hacen, como máximo una vez cada JLOCK_SWEEP_MS.",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "Explica jlock, o un comando.",
   "help.cmd.help.usage": "[<comando>]",
   "help.cmd.help.desc": "Sin comando: qué es jlock y la lista de comandos. Con un comando: sus opciones con valores por defecto y ejemplos, y sus códigos de salida. jlock <comando> --help muestra la misma página.",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "no existe ese comando (se sugiere el nombre más parecido)",
-
   "help.cmd.about.summary": "Quién hizo jlock, y dónde encontrarlo.",
   "help.cmd.about.usage": "[opciones]",
   "help.cmd.about.desc": "Muestra la versión, el autor con GitHub y LinkedIn, el repositorio, la licencia y los enlaces a la documentación. No usa la red.",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "Bloqueos para toda la máquina, en archivos, carpetas y nombres: cola justa, recuperación de bloqueos dejados por procesos muertos, detección de deadlocks, sin servidor.",
   "about.author": "autor",
   "about.repository": "repositorio",
@@ -180,13 +165,11 @@
   "about.usage": "uso",
   "about.roadmap": "hoja de ruta",
   "about.footer": "jlock por {author} · {github} · {linkedin}",
-
   "tip.busy": "consejo: jlock status {key} muestra quién la tiene y la cola; quita --no-wait para esperar tu turno",
   "tip.timeout": "consejo: espera más con un --timeout mayor, o mira quién la tiene con jlock status {key}",
   "tip.deadlock": "consejo: libera lo que tienes y vuelve a pedirlo, o toma todas las claves en un solo acquire",
   "tip.not_owner": "consejo: el bloqueo es de {owner}; usa --owner {owner}, o jlock unlock --force para romperlo",
   "tip.lost": "consejo: alguien rompió o hizo caducar tu bloqueo de {key}; deja de modificarla, revisa jlock status {key} y vuelve a tomarla con jlock acquire",
-
   "help.cmd.update.summary": "Instala la última versión publicada de jlock sobre esta.",
   "help.cmd.update.usage": "[opciones]",
   "help.cmd.update.desc": "Pregunta a GitHub cuál es el último release (o usa la versión dada), descarga el archivo para este sistema, lo comprueba con el SHA256SUMS del release, pone el nuevo jlock en lugar del que se está ejecutando y lo ejecuta una vez para confirmar su versión; si eso falla, se restaura el anterior. Usa el curl del sistema (PowerShell en Windows cuando no hay curl). Es el único comando que usa la red, y solo cuando lo ejecutas.",
@@ -196,7 +179,6 @@
   "help.meta.version": "versión",
   "help.exit.update.0": "actualizado, ya estaba al día, o (con --check) comparado",
   "help.exit.update.20": "no se encontró ningún release, falló la descarga o la suma de verificación, o no se puede escribir en la carpeta; el mensaje dice cuál",
-
   "update.current": "esta versión:   {version}",
   "update.latest": "último release: {version}",
   "update.available": "hay una actualización: jlock update la instala",
@@ -216,14 +198,12 @@
   "update.restore_failed": "el nuevo jlock no funcionó y no se pudo restaurar el anterior en {path}; reinstala con install.sh o install.ps1",
   "update.no_exe": "no se puede saber dónde está este jlock",
   "update.bad_version": "versión no válida '{version}' (usa v0.2.0)",
-
   "help.cmd.doctor.summary": "Comprueba que esta máquina está lista para bloqueos.",
   "help.cmd.doctor.usage": "[opciones]",
   "help.cmd.doctor.desc": "Comprueba, en orden: la versión y el ejecutable en uso; la carpeta del registro (JLOCK_HOME), de dónde sale y si es una carpeta con permiso de escritura; las tres operaciones de archivo en que se apoya el protocolo (create_new, rename, remove) en esa carpeta; el bloqueo del SO que usan hold y run; el sistema de archivos; las variables JLOCK_*; si este jlock es el primero en el PATH; lo que contiene ahora el registro; y curl, para update. Cada línea dice ok, aviso o fallo, y cómo arreglarlo. Solo sugiere: nunca cambia nada, y los únicos archivos que escribe son sus propios temporales, que borra antes de terminar.",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "ninguna comprobación falló (los avisos no cambian el código)",
   "help.exit.doctor.20": "al menos una comprobación falló",
-
   "doctor.name.version": "versión",
   "doctor.name.home": "carpeta del registro",
   "doctor.name.primitives": "primitivas",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "instala curl con tu gestor de paquetes; nada más en jlock lo necesita",
   "doctor.skipped": "no comprobado: la carpeta del registro no se puede usar",
   "doctor.skipped_fix": "arregla primero la carpeta del registro (ver arriba)",
-
   "acquire.granted": "concedida {key}",
   "acquire.busy": "ocupada {key}, la tiene {owner}{via} (posición {position})",
   "acquire.timeout": "tiempo agotado {key}, la tiene {owner}{via} (posición {position})",
@@ -294,23 +273,18 @@
   "acquire.nested": " (anidada en {owner})",
   "acquire.and_others_one": " y {n} más",
   "acquire.and_others_other": " y {n} más",
-
   "result.released": "liberada {key}",
   "result.lost": "perdida {key}",
-
   "heartbeat.renewed": "renovada {key}",
   "renew.until": "renovada {key} hasta {until}",
   "renew.not_owner": "no es el dueño {key}: la tiene {holder}",
   "renew.not_locked": "no es el dueño {key} (no está bloqueada)",
   "renew.nothing": "nada que renovar",
-
   "release.not_owner": "no es el dueño {key}: la tiene {holder}",
   "release.not_locked": "no es el dueño {key} (no está bloqueada)",
   "release.nothing": "nada que liberar",
-
   "unlock.forced": "forzada {key} (era de {owner})",
   "unlock.nothing": "nada que forzar",
-
   "status.held": "bloqueada {key}",
   "status.free": "libre {key}",
   "status.by": "por {owner} ({mode}) desde {since} (hace {ago})",
@@ -331,7 +305,6 @@
   "status.why_above": "por qué: un bloqueo sobre una carpeta cubre todo lo que contiene, así que una carpeta bloqueada por encima de esta clave la impide",
   "status.why_inside": "por qué: una carpeta solo se puede tomar cuando nada de lo que contiene está bloqueado, así que estas claves dentro de ella la impiden",
   "status.why_all": "por qué: * entra en conflicto con todas las claves",
-
   "list.nothing": "nada bloqueado",
   "list.col_key": "CLAVE",
   "list.col_mode": "MODO",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(muerto) el heartbeat se detuvo y nadie tiene el bloqueo del SO: caducará",
   "list.legend_late": "(atrasado) el heartbeat va con retraso, pero el proceso que tiene el bloqueo está vivo (bloqueo del SO retenido)",
   "list.legend_nested": "(anidada) una posesión dentro de una posesión de un ancestro del dueño: termina cuando termina esa posesión",
-
   "graph.no_waiters": "nadie esperando",
   "graph.edge_held": "{from} -> {to}  ({key} la tiene {holder} en modo {to_mode}; quiere {mode})",
   "graph.edge_queued": "{from} -> {to}  ({key} en cola detrás de {holder}, {to_mode}; quiere {mode})",
@@ -370,19 +342,16 @@
   "resource.machine": "toda la máquina: exclusive la pide tranquila (benchmarks, pruebas de tiempos); shared indica que un trabajo la carga",
   "resource.network": "el enlace de red (descargas o subidas grandes, pruebas sensibles a la red)",
   "resource.port": "un puerto TCP o UDP de esta máquina, por número (resource:port:8080)",
-
   "gc.expired_locks": "bloqueos caducados",
   "gc.expired_tickets": "turnos caducados",
   "gc.broken_consumed": "broken/ consumidos",
   "gc.folders_removed": "carpetas eliminadas",
   "gc.log_bytes": "bytes del log",
   "gc.error": "error: {error}",
-
   "warn.bad_ms": "se ignora {name}={value} (se espera un número positivo de ms)",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS ({stale}) debería ser bastante mayor que JLOCK_HEARTBEAT_MS ({heartbeat})",
   "warn.resources_file": "ignorando {path}: {error}",
   "warn.resources_entry": "ignorando el recurso '{name}' en resources.json: {why}",
-
   "error.missing_command": "falta el comando",
   "error.unknown_command": "comando desconocido '{cmd}'. Comandos: {list}",
   "error.unknown_command_near": "comando desconocido '{cmd}'; ¿quisiste decir '{near}'? Comandos: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under espera una ruta",
   "error.no_localappdata": "LOCALAPPDATA no está definida; define JLOCK_HOME",
   "error.no_home": "HOME no está definida; define JLOCK_HOME",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process: argumento inesperado '{arg}'",
   "error.process_needs_pid": "process inspect necesita --pid",
   "error.bad_pid": "pid inválido '{value}' (un número positivo)",
-
   "help.cmd.custody.summary": "Ejecuta un comando separado en un job con nombre, con registros duraderos.",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <ruta> [opciones] [-- <command...>]",
   "help.cmd.custody.desc": "start escribe intent.json en <custody>/<id>/ antes de que exista ningún proceso e inicia un custodio separado (este mismo jlock). El custodio crea el job con nombre Local\\jlock-custody-<hash>-<id> (terminar al cerrar, sin salida del job), crea el comando suspendido con su salida y sus errores en output.log, lo mete en el job, escribe receipt.json y solo entonces lo suelta; start responde entonces el estado running con el recibo y vuelve. El custodio queda fuera del job. Cuando el comando termina solo, el custodio termina lo que dejó en el job, confirma que no queda ningún proceso y escribe final.json (reason exited, exitCode, cleanupConfirmed). Un id que ya tiene intención nunca inicia un segundo proceso: la respuesta es su estado actual con duplicate true. status solo lee: absent, launching, launch-failed (intención sin recibo y sin custodio vivo), running, ended o lost (hay recibo, no hay final.json y el custodio ya no existe), con los registros y si el job está abierto. Solo en Windows; en otros sistemas se niega con unsupported on this platform. Mientras el comando corre, el custodio reemplaza beat.json cada 10 s (JLOCK_CUSTODY_BEAT_MS) con seq, at, lastOutputAt y outputBytes; si no puede escribirlo durante 30 s (JLOCK_CUSTODY_SELF_FENCE_MS), termina él mismo el grupo y sale sin final.json. stop funciona desde cualquier proceso, incluso sin el custodio: abre el job por su nombre, lo termina y espera cero procesos (--timeout, por defecto 15 s, JLOCK_CUSTODY_STOP_MS), luego escribe final.json una sola vez (reason stopped con --reason en detail, o custodian-lost si el custodio ya no existía; by stop) y lo responde; un final.json confirmado que ya existe se responde tal cual. Si el job ya no existe, solo confirma si la raíz del comando, comprobada por identidad, ya no existe; nunca termina nada por pid y nunca vuelve a crear el job. Sin esa prueba responde cleanupConfirmed false con el motivo en error y sale con 15.",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start: --cwd no es una carpeta: {path}",
   "error.custody_busy": "custody start: otro start de '{id}' sigue en curso",
   "error.custody_records": "no se puede usar la carpeta de los registros de custodia",
-  "error.unsupported_platform": "{cmd}: no disponible en esta plataforma (unsupported on this platform)"
+  "error.unsupported_platform": "{cmd}: no disponible en esta plataforma (unsupported on this platform)",
+  "help.opt.foreground.id": "El id del comando en custodia (1 a 64 de A-Z a-z 0-9 . _ -); con --custody, escribe intent.json, receipt.json, beat.json y final.json en <custody>/<id>/ (modo foreground; la salida queda aquí) y lo ejecuta en un job con nombre que custody status lee y custody stop termina.",
+  "help.opt.foreground.custody": "La carpeta de los registros de custodia; solo junto con --id.",
+  "error.foreground_needs_both": "{cmd}: --id y --custody van juntos",
+  "error.custody_duplicate": "{cmd}: el id de custodia '{id}' ya tiene intención; no se inició nada"
 }

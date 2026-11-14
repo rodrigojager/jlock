@@ -17,7 +17,6 @@
     "resource": "संसाधन",
     "nested": "नेस्टेड"
   },
-
   "help.tagline": "फ़ाइलों, फ़ोल्डरों और नामों के लिए पूरी मशीन पर लागू लॉक",
   "help.intro": "jlock एक ही मशीन पर प्रोग्राम, स्क्रिप्ट, लोगों और AI एजेंटों को बारी-बारी से काम करने देता है। किसी फ़ाइल, फ़ोल्डर या किसी भी नामित संसाधन (एक पोर्ट, डेस्कटॉप, एक डिप्लॉय) को छूने से पहले वे jlock से उसका लॉक माँगते हैं: एक समय में एक स्वामी (या shared मोड में कई एक साथ), बाकी पहुँचने के क्रम में कतार में प्रतीक्षा करते हैं। मर चुकी प्रक्रिया का छोड़ा हुआ लॉक अपने-आप वापस मिल जाता है, डेडलॉक पैदा करने वाला अनुरोध अस्वीकार कर दिया जाता है, और jlock list दिखाता है कि किसके पास क्या है। कोई सर्वर नहीं है: स्थिति डिस्क पर एक फ़ोल्डर है।",
   "help.usage_line": "उपयोग: jlock <कमांड> [विकल्प]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "टैग",
   "help.meta.mode": "मोड",
   "help.opt.json": "टेक्स्ट पंक्तियों के बजाय result फ़ील्ड वाला एक JSON ऑब्जेक्ट छापता है।",
-
   "help.exit.0": "ठीक",
   "help.exit.2": "गलत उपयोग: गलत विकल्प या मान (संदेश बताता है कौन सा)",
   "help.exit.10": "व्यस्त: --no-wait के साथ, लॉक नहीं मिला",
@@ -60,7 +58,6 @@
   "help.exit.14": "लॉक खो गया: unlock --force से तोड़ा गया, या समाप्त हो गया",
   "help.exit.20": "फ़ाइल सिस्टम त्रुटि (अनुमति, डिस्क भरी, किसी अन्य प्रोग्राम द्वारा पकड़ी गई फ़ाइल); OS का संदेश बताता है कौन सी",
   "help.exit.130": "प्रतीक्षा के दौरान बाधित (CTRL+C); कतार में स्थान छोड़ दिया गया",
-
   "help.cmd.acquire.summary": "कुंजियाँ लेता है और कमांड समाप्त होने के बाद भी रखता है।",
   "help.cmd.acquire.usage": "<कुंजी...> [विकल्प]",
   "help.cmd.acquire.desc": "दी गई सभी कुंजियाँ एक तय क्रम में लेता है, सब या कोई नहीं, इसलिए एक ही कुंजियों के दो अनुरोध अलग-अलग क्रम में आने पर भी एक-दूसरे को कभी नहीं रोकते। खाली कुंजी तुरंत दी जाती है; ली हुई कुंजी के लिए एक निष्पक्ष कतार में, पहुँचने के क्रम में, बिना सीमा के प्रतीक्षा की जाती है, जब तक --timeout या --no-wait कुछ और न कहें। हर कुंजी exclusive मोड में ली जाती है, जब तक --mode shared या उसका अपना @shared कुछ और न कहे: किसी कुंजी के shared धारण साथ-साथ रह सकते हैं, exclusive उनकी प्रतीक्षा करता है, और shared अनुरोध उससे पहले प्रतीक्षा कर रहे exclusive को कभी नहीं लाँघता। jlock के बाहर निकलने के बाद भी लॉक बना रहता है: उसे jlock heartbeat से नवीनीकृत करें, या hold अथवा run का उपयोग करें, जो आपके लिए उसे नवीनीकृत करते हैं। जो कुंजी आपके पास पहले से है उसे फिर माँगने पर वह तुरंत दे दी जाती है।",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "कुंजियाँ मुक्त होने तक कतार में प्रतीक्षा करें। यही डिफ़ॉल्ट है।",
   "help.opt.acquire.no_wait": "प्रतीक्षा न करें: कोई कुंजी ली हुई हो तो व्यस्त (निकास 10) उत्तर दें, उसके धारक और उस स्थान के साथ जो आपको मिलता।",
   "help.opt.acquire.timeout": "अधिकतम इतनी देर प्रतीक्षा करें, फिर कतार छोड़कर हार मान लें (निकास 11)। इकाइयाँ: ms, s, m, h, d। डिफ़ॉल्ट: कोई सीमा नहीं।",
-
   "help.cmd.run.summary": "कमांड चलने के दौरान कुंजियाँ रखता है, flock(1) की तरह।",
   "help.cmd.run.usage": "<कुंजी...> [विकल्प] -- <कमांड...>",
   "help.cmd.run.desc": "कुंजियाँ लेता है (acquire जैसे ही विकल्पों के साथ), -- के बाद लिखी कमांड चलाता है, उसके चलते समय लॉक को नवीनीकृत करता है और उसके समाप्त होने पर लॉक छोड़ देता है। -- के बाद की हर चीज़ कमांड की है, वे शब्द भी जो jlock के विकल्प जैसे दिखते हैं। jlock कमांड के अपने निकास कोड से बाहर निकलता है। लॉक खो जाए तो कमांड रोक दी जाती है और run 14 से निकलता है; अगर run को ही मार दिया जाए, तो लॉक समाप्त हो जाता है।",
   "help.cmd.run.examples": "# इस मशीन पर एक समय में एक ही बिल्ड\njlock run D:\\proj\\dist -- cargo build --release\n# 2 मिनट प्रतीक्षा के बाद हार मान लें\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "कुंजियाँ मिलने के बाद, कमांड का अपना निकास कोड (सफल होने पर 0)",
   "help.exit.run.14": "कमांड चलने के दौरान लॉक खो गया; कमांड रोक दी गई",
-
   "help.cmd.hold.summary": "रुकने को कहे जाने तक कुंजियाँ रखता है।",
   "help.cmd.hold.usage": "<कुंजी...> [विकल्प]",
   "help.cmd.hold.desc": "कुंजियाँ लेता है (acquire जैसे ही विकल्पों के साथ), स्वीकृत छापता है, फिर चलता रहता है और लॉक को नवीनीकृत करता रहता है। जब यह अपने मानक इनपुट पर release पंक्ति पढ़ता है, CTRL+C पर, या समाप्त किए जाने पर, यह लॉक छोड़ देता है और 0 से निकलता है; जब इसका स्वामी jlock release से कुंजियाँ लौटा देता है, तब भी यह 0 से समाप्त होता है। इसके चलते समय ऑपरेटिंग सिस्टम इसकी धारण फ़ाइलों को भी लॉक करता है, इसलिए प्रक्रिया के मरते ही लॉक मुक्त हो जाता है। अगर लॉक छीन लिया जाए तो यह खोया छापता है और 14 से निकलता है। --detach के साथ यह तुरंत उत्तर देकर लौट आता है, और एक दूसरी प्रक्रिया पृष्ठभूमि में लॉक को रखती है: किसी एजेंट के लिए पूरे कार्य की फ़ाइलें रखने का सबसे सरल तरीका।",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "acquire की तरह उत्तर दें और लौटें (स्वीकृत, व्यस्त, समयसीमा, उन्हीं निकास कोड के साथ), जबकि एक दूसरा jlock hold पृष्ठभूमि में लॉक को jlock release, --ttl या unlock --force तक जीवित रखता है। एजेंट के लिए एक ही कॉल, उत्तर हाथ में।",
   "help.opt.hold.release_on_eof": "मानक इनपुट बंद होने पर समाप्त होता है: इनपुट का अंत release पंक्ति के समान माना जाता है, इसलिए जो प्रोग्राम खुला रहकर hold को अग्रभूमि में चलाता है और अपना मानक इनपुट थामे रखता है, वह मरते ही लॉक छोड़ देता है (Windows पर भी, जहाँ मृत पैरेंट अपने चाइल्ड को समाप्त नहीं करता)। --detach के साथ नहीं: पृष्ठभूमि प्रक्रिया के पास मानक इनपुट नहीं होता।",
   "help.exit.hold.0": "release, CTRL+C या समाप्ति के बाद छोड़ दिया गया",
-
   "help.cmd.release.summary": "कुंजियाँ लौटाता है।",
   "help.cmd.release.usage": "[<कुंजी...>] [विकल्प]",
   "help.cmd.release.desc": "नामित कुंजियाँ लौटा देता है, अगर आप उनके स्वामी हैं (वरना निकास 13)। कुंजियों के बिना यह स्वामी के पास जो कुछ है वह सब छोड़ देता है; --group के साथ, स्वामी के पास उस समूह में जो कुछ है वह सब। छोड़े गए धारणों के अंदर नेस्टेड धारण उनके साथ समाप्त हो जाते हैं। कतार का अगला हर कुंजी पाता है, और कुंजी का फ़ोल्डर तब गायब हो जाता है जब कोई उसे न रखे और न उसकी प्रतीक्षा करे।",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agent-7\n# agent-7 के पास जो कुछ भी है\njlock release --owner agent-7\n# पूरा समूह, हर लॉक का स्वामी चाहे कोई भी हो\njlock release --group task-42 --any-owner",
   "help.exit.release.0": "छोड़ दिया गया (या छोड़ने को कुछ नहीं था)",
   "help.exit.release.13": "नामित कोई कुंजी आपकी नहीं है; बाकी छोड़ दी गईं",
-
   "help.cmd.renew.summary": "अपने लॉक की समय-सीमा आगे बढ़ाएँ।",
   "help.cmd.renew.usage": "[<कुंजी...>] [विकल्प]",
   "help.cmd.renew.desc": "आपके लॉक की समय-सीमा (--ttl) को अभी + ttl पर ले जाता है और उनकी हार्टबीट नवीनीकृत करता है: ऐसे काम के लिए जो माँगे गए ttl से ज़्यादा चल सकता है। --ttl के बिना, लॉक लेते समय वाला ttl लिया जाता है। कुंजियों के बिना स्वामी के पास जो कुछ है सब नवीनीकृत होता है; --group के साथ, उस समूह में स्वामी के पास जो कुछ है। नवीनीकरण के दौरान लॉक कभी नहीं छूटता, और उसे रखने वाला hold या run पहले की तरह चलता रहता है। जिस लॉक की समय-सीमा पहले ही निकल चुकी है उसे नवीनीकृत नहीं किया जा सकता: वह समाप्त हो जाता है (exit 14) और उसे फिर से लेना होगा।",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agent-7",
   "help.exit.heartbeat.0": "नवीनीकृत",
   "help.exit.heartbeat.13": "खोया: लॉक अब आपका नहीं है (तोड़ा गया या समाप्त हो गया)",
-
   "help.cmd.status.summary": "दिखाता है कि एक कुंजी किसके पास है और कौन उसकी प्रतीक्षा में है।",
   "help.cmd.status.usage": "<कुंजी> [विकल्प]",
   "help.cmd.status.desc": "दिखाता है कि कुंजी खाली है या धारित, और किसके पास: हर धारण अपने मोड (shared या exclusive) के साथ, वह धारण जिसमें वह नेस्टेड है, कब से, आख़िरी हार्टबीट, समूह और उद्देश्य। फिर कतार, क्रम से, हर प्रतीक्षक जो मोड माँगता है उसके साथ, और वे दूसरी कुंजियाँ जो उसे रोकती हैं: ऊपर का फ़ोल्डर, उसके अंदर की फ़ाइलें, या *। रास्ते में मिला मरा हुआ लॉक समाप्त कर दिया जाता है।",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:port-3000 --json",
-
   "help.cmd.list.summary": "इस मशीन पर लॉक की गई हर चीज़ दिखाता है।",
   "help.cmd.list.usage": "[विकल्प]",
   "help.cmd.list.desc": "हर वह कुंजी सूचीबद्ध करता है जो धारित है या जिसकी कतार है। यह सीधे रजिस्ट्री फ़ोल्डर पढ़ता है, कभी सारांश नहीं, इसलिए यह हमेशा सच होता है।",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "केवल मृत लॉक और टिकट (हार्टबीट JLOCK_STALE_MS से पुराना, या ttl पार)।",
   "help.opt.list.watch": "CTRL+C तक हर सेकंड फिर से बनाएँ।",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agent-7 --json",
-
   "help.cmd.graph.summary": "दिखाता है कि कौन किसकी प्रतीक्षा में है, और कोई चक्र।",
   "help.cmd.graph.usage": "[विकल्प]",
   "help.cmd.graph.desc": "हर पंक्ति एक प्रतीक्षक है, वह किसकी प्रतीक्षा में है, और किस कुंजी के ज़रिए, दोनों ओर के मोड के साथ। एक चक्र (A, B की प्रतीक्षा करे जबकि B, A की प्रतीक्षा करे) डेडलॉक है; jlock उस अनुरोध को अस्वीकार करता है जो चक्र बनाता, इसलिए चक्र केवल एक पल के लिए दिखता है। shared धारण और स्वामी का अपना परिवार (पूर्वज, वंशज) कभी कोई पंक्ति नहीं बनाते; जब भी स्वामी का कोई वंशज प्रतीक्षा में हो, स्वामी प्रतीक्षा में माना जाता है, इसलिए प्रतीक्षक के किसी पूर्वज तक लौटने वाली शृंखला भी चक्र है।",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[विकल्प]",
   "help.cmd.resources.desc": "पंजीकृत संसाधनों की सूची दिखाता है: अंतर्निर्मित (desktop, clipboard, port:<n>, machine...) और आपके अपने, रजिस्ट्री फ़ोल्डर की resources.json से, हर एक के साथ वह मोड जो अनुरोध में कोई मोड न होने पर लिया जाता है और उसका विवरण। जिस resource: कुंजी का नाम सूची में नहीं है उसे अस्वीकार कर दिया जाता है, सुझाव के रूप में सबसे निकट का नाम देकर, ताकि टाइपो कभी दूसरा संसाधन न बन जाए। कोई संसाधन केवल उसी संसाधन और उसी तर्क से टकराता है, पथों या name: कुंजियों से कभी नहीं।",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "किसी और का लॉक तोड़ता है (--force चाहिए)।",
   "help.cmd.unlock.usage": "(<कुंजी...> | --owner <id> | --group <समूह>) --force [विकल्प]",
   "help.cmd.unlock.desc": "आपात स्थिति के लिए: नामित लॉक तोड़ देता है, चाहे उनका स्वामी कोई भी हो, और लॉग में लिखता है कि किसने बलपूर्वक किया और क्यों। स्वामी का hold या run अपने अगले हार्टबीट पर यह भाँप लेता है और 14 से रुक जाता है, टूटे हुए धारण के अंदर नेस्टेड धारण उसके साथ समाप्त हो जाते हैं, और कतार का अगला कुंजी पाता है। अपना खुद का लॉक लौटाने के लिए release का उपयोग करें।",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"agent hung\"\njlock unlock --owner agent-3 --force",
   "help.exit.unlock.0": "हो गया (तब भी जब तोड़ने को कुछ नहीं था)",
   "help.exit.unlock.2": "गलत उपयोग, या --force नहीं दिया",
-
   "help.cmd.gc.summary": "अभी सफ़ाई करें: मृत लॉक समाप्त करें, खाली फ़ोल्डर हटाएँ।",
   "help.cmd.gc.usage": "[विकल्प]",
   "help.cmd.gc.desc": "वैश्विक सफ़ाई तुरंत चलाता है: जिन लॉक और टिकट के स्वामी मर चुके हैं उन्हें समाप्त करता है, बचे हुए अवशेष मिटाता है, खाली कुंजी फ़ोल्डर हटाता है, लॉग को घुमाता है, index.json फिर से लिखता है, और जो हटाया वह छापता है। हर कमांड यह पहले से करती है, हर JLOCK_SWEEP_MS में अधिकतम एक बार।",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "jlock को, या एक कमांड को समझाता है।",
   "help.cmd.help.usage": "[<कमांड>]",
   "help.cmd.help.desc": "कमांड के बिना: jlock क्या है और कमांडों की सूची। कमांड के साथ: डिफ़ॉल्ट और उदाहरणों सहित उसके विकल्प, और उसके निकास कोड। jlock <कमांड> --help वही पृष्ठ दिखाता है।",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "ऐसी कोई कमांड नहीं (सबसे निकट का नाम सुझाया जाता है)",
-
   "help.cmd.about.summary": "jlock किसने बनाया, और इसे कहाँ पाएँ।",
   "help.cmd.about.usage": "[विकल्प]",
   "help.cmd.about.desc": "संस्करण, GitHub और LinkedIn सहित लेखक, रिपॉज़िटरी, लाइसेंस और दस्तावेज़ों के लिंक छापता है। यह नेटवर्क का उपयोग नहीं करता।",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "फ़ाइलों, फ़ोल्डरों और नामों के लिए पूरी मशीन पर लागू लॉक: निष्पक्ष कतार, मृत प्रक्रियाओं द्वारा छोड़े गए लॉक की वापसी, डेडलॉक की पहचान, कोई सर्वर नहीं।",
   "about.author": "लेखक",
   "about.repository": "रिपॉज़िटरी",
@@ -180,13 +165,11 @@
   "about.usage": "उपयोग",
   "about.roadmap": "रोडमैप",
   "about.footer": "jlock, {author} द्वारा · {github} · {linkedin}",
-
   "tip.busy": "सुझाव: jlock status {key} दिखाता है कि यह किसके पास है और कतार; अपनी बारी की प्रतीक्षा के लिए --no-wait हटा दें",
   "tip.timeout": "सुझाव: बड़े --timeout के साथ अधिक देर प्रतीक्षा करें, या jlock status {key} से देखें कि यह किसके पास है",
   "tip.deadlock": "सुझाव: जो आपके पास है उसे छोड़कर फिर माँगें, या सभी कुंजियाँ एक ही acquire में लें",
   "tip.not_owner": "सुझाव: लॉक {owner} का है; --owner {owner} इस्तेमाल करें, या इसे तोड़ने के लिए jlock unlock --force",
   "tip.lost": "सुझाव: किसी ने {key} पर आपका लॉक तोड़ दिया या समाप्त कर दिया; इसे बदलना बंद करें, jlock status {key} देखें, और jlock acquire से इसे फिर लें",
-
   "help.cmd.update.summary": "jlock का नवीनतम रिलीज़ इसके ऊपर इंस्टॉल करता है।",
   "help.cmd.update.usage": "[विकल्प]",
   "help.cmd.update.desc": "GitHub से नवीनतम रिलीज़ पूछता है (या दिया गया संस्करण लेता है), इस सिस्टम का आर्काइव डाउनलोड करता है, उसे रिलीज़ के SHA256SUMS से जाँचता है, नया jlock चल रहे वाले की जगह रखता है, और उसका संस्करण पक्का करने के लिए उसे एक बार चलाता है; यह विफल हो तो पुराना वापस रख दिया जाता है। यह सिस्टम का curl इस्तेमाल करता है (Windows पर curl न हो तो PowerShell)। यही एकमात्र कमांड है जो नेटवर्क का उपयोग करती है, और केवल तब जब आप इसे चलाएँ।",
@@ -196,7 +179,6 @@
   "help.meta.version": "संस्करण",
   "help.exit.update.0": "अपडेट किया गया, पहले से अद्यतित, या (--check के साथ) तुलना की गई",
   "help.exit.update.20": "कोई रिलीज़ नहीं मिला, डाउनलोड या चेकसम विफल, या फ़ोल्डर में लिखा नहीं जा सकता; संदेश बताता है कौन सा",
-
   "update.current": "यह संस्करण:     {version}",
   "update.latest": "नवीनतम रिलीज़: {version}",
   "update.available": "अपडेट उपलब्ध है: jlock update इसे इंस्टॉल करता है",
@@ -216,14 +198,12 @@
   "update.restore_failed": "नया jlock काम नहीं किया और पुराना {path} पर वापस नहीं रखा जा सका; install.sh या install.ps1 से फिर इंस्टॉल करें",
   "update.no_exe": "पता नहीं चल सकता कि यह jlock कहाँ है",
   "update.bad_version": "गलत संस्करण '{version}' (v0.2.0 जैसा इस्तेमाल करें)",
-
   "help.cmd.doctor.summary": "जाँचता है कि यह मशीन लॉक के लिए तैयार है।",
   "help.cmd.doctor.usage": "[विकल्प]",
   "help.cmd.doctor.desc": "क्रम से जाँचता है: संस्करण और चल रहा एक्ज़ीक्यूटेबल; रजिस्ट्री फ़ोल्डर (JLOCK_HOME), वह कहाँ से आता है, और क्या वह लिखने योग्य फ़ोल्डर है; उस फ़ोल्डर में वे तीन फ़ाइल ऑपरेशन जिन पर प्रोटोकॉल टिका है (create_new, rename, remove); वह OS लॉक जो hold और run इस्तेमाल करते हैं; फ़ाइल सिस्टम; JLOCK_* वेरिएबल; क्या यह jlock PATH में पहला है; रजिस्ट्री में अभी क्या है; और update के लिए curl। हर पंक्ति ठीक, चेतावनी या विफल कहती है, और इसे कैसे सुधारें। यह केवल सुझाव देता है: यह कभी कुछ नहीं बदलता, और केवल अपनी अस्थायी फ़ाइलें लिखता है, जिन्हें समाप्त होने से पहले हटा देता है।",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "कोई जाँच विफल नहीं हुई (चेतावनियाँ कोड नहीं बदलतीं)",
   "help.exit.doctor.20": "कम से कम एक जाँच विफल हुई",
-
   "doctor.name.version": "संस्करण",
   "doctor.name.home": "रजिस्ट्री फ़ोल्डर",
   "doctor.name.primitives": "प्रिमिटिव",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "अपने पैकेज मैनेजर से curl इंस्टॉल करें; jlock में और किसी चीज़ को इसकी ज़रूरत नहीं",
   "doctor.skipped": "जाँचा नहीं गया: रजिस्ट्री फ़ोल्डर उपयोग योग्य नहीं है",
   "doctor.skipped_fix": "पहले रजिस्ट्री फ़ोल्डर ठीक करें (ऊपर देखें)",
-
   "acquire.granted": "स्वीकृत {key}",
   "acquire.busy": "व्यस्त {key}, {owner}{via} के पास (स्थान {position})",
   "acquire.timeout": "समयसीमा {key}, {owner}{via} के पास (स्थान {position})",
@@ -294,23 +273,18 @@
   "acquire.nested": " ({owner} में नेस्टेड)",
   "acquire.and_others_one": " और {n} अन्य",
   "acquire.and_others_other": " और {n} अन्य",
-
   "result.released": "छोड़ा {key}",
   "result.lost": "खोया {key}",
-
   "heartbeat.renewed": "नवीनीकृत {key}",
   "renew.until": "नवीनीकृत {key}, {until} तक",
   "renew.not_owner": "स्वामी-नहीं {key}: लॉक {holder} का है",
   "renew.not_locked": "स्वामी-नहीं {key} (लॉक नहीं है)",
   "renew.nothing": "नवीनीकृत करने को कुछ नहीं",
-
   "release.not_owner": "स्वामी-नहीं {key}: लॉक {holder} का है",
   "release.not_locked": "स्वामी-नहीं {key} (लॉक नहीं है)",
   "release.nothing": "छोड़ने को कुछ नहीं",
-
   "unlock.forced": "बलपूर्वक-तोड़ा {key} (पहले {owner} का)",
   "unlock.nothing": "बलपूर्वक तोड़ने को कुछ नहीं",
-
   "status.held": "धारित {key}",
   "status.free": "मुक्त {key}",
   "status.by": "{owner} के पास ({mode}) {since} से ({ago} पहले से)",
@@ -331,7 +305,6 @@
   "status.why_above": "क्यों: फ़ोल्डर पर लॉक उसके अंदर की हर चीज़ को ढकता है, इसलिए इस कुंजी के ऊपर का धारित फ़ोल्डर इसे रोकता है",
   "status.why_inside": "क्यों: फ़ोल्डर तभी लिया जा सकता है जब उसके अंदर कुछ भी धारित न हो, इसलिए उसके अंदर की ये कुंजियाँ इसे रोकती हैं",
   "status.why_all": "क्यों: * हर कुंजी से टकराता है",
-
   "list.nothing": "कुछ भी लॉक नहीं",
   "list.col_key": "कुंजी",
   "list.col_mode": "मोड",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(मृत) हार्टबीट रुक गई है और किसी के पास OS लॉक नहीं है: इसे समाप्त कर दिया जाएगा",
   "list.legend_late": "(देर) हार्टबीट देर से है, पर लॉक रखने वाली प्रक्रिया जीवित है (OS लॉक धारित)",
   "list.legend_nested": "(नेस्टेड) स्वामी के किसी पूर्वज के धारण के अंदर का धारण: वह तब समाप्त होता है जब वह धारण समाप्त होता है",
-
   "graph.no_waiters": "कोई प्रतीक्षक नहीं",
   "graph.edge_held": "{from} -> {to}  ({key}, {holder} के पास {to_mode} मोड में; {mode} चाहिए)",
   "graph.edge_queued": "{from} -> {to}  ({key}, कतार में {holder} के पीछे, {to_mode}; {mode} चाहिए)",
@@ -370,19 +342,16 @@
   "resource.machine": "पूरी मशीन: exclusive उसे शांत माँगता है (बेंचमार्क, समय के परीक्षण); shared बताता है कि कोई जॉब उस पर भार डालता है",
   "resource.network": "नेटवर्क लिंक (बड़े डाउनलोड या अपलोड, नेटवर्क-संवेदी परीक्षण)",
   "resource.port": "इस मशीन का एक TCP या UDP पोर्ट, संख्या से (resource:port:8080)",
-
   "gc.expired_locks": "समाप्त लॉक",
   "gc.expired_tickets": "समाप्त टिकट",
   "gc.broken_consumed": "broken/ निपटाए गए",
   "gc.folders_removed": "हटाए गए फ़ोल्डर",
   "gc.log_bytes": "लॉग बाइट",
   "gc.error": "त्रुटि: {error}",
-
   "warn.bad_ms": "{name}={value} को अनदेखा किया जा रहा है (ms की धनात्मक संख्या चाहिए)",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS ({stale}) को JLOCK_HEARTBEAT_MS ({heartbeat}) से काफ़ी ऊपर होना चाहिए",
   "warn.resources_file": "{path} को अनदेखा किया जा रहा है: {error}",
   "warn.resources_entry": "resources.json में संसाधन '{name}' को अनदेखा किया जा रहा है: {why}",
-
   "error.missing_command": "कमांड नहीं दी गई",
   "error.unknown_command": "अज्ञात कमांड '{cmd}'। कमांड: {list}",
   "error.unknown_command_near": "अज्ञात कमांड '{cmd}'; क्या आपका मतलब '{near}' था? कमांड: {list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under को एक पथ चाहिए",
   "error.no_localappdata": "LOCALAPPDATA सेट नहीं है; JLOCK_HOME सेट करें",
   "error.no_home": "HOME सेट नहीं है; JLOCK_HOME सेट करें",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process: अनपेक्षित तर्क '{arg}'",
   "error.process_needs_pid": "process inspect को --pid चाहिए",
   "error.bad_pid": "अमान्य pid '{value}' (एक धनात्मक संख्या)",
-
   "help.cmd.custody.summary": "नामित जॉब में कमांड को अलग से चलाता है, स्थायी रिकॉर्ड के साथ।",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <पथ> [विकल्प] [-- <command...>]",
   "help.cmd.custody.desc": "start किसी भी प्रोसेस के होने से पहले <custody>/<id>/ में intent.json लिखता है और एक अलग किया गया संरक्षक (यही jlock) शुरू करता है। संरक्षक नामित जॉब Local\\jlock-custody-<hash>-<id> बनाता है (बंद होने पर समाप्त, जॉब से बाहर निकलने की अनुमति नहीं), कमांड को रुकी हुई अवस्था में उसके आउटपुट और त्रुटियों को output.log में भेजते हुए बनाता है, उसे जॉब में डालता है, receipt.json लिखता है और तभी उसे चलने देता है; फिर start स्थिति running और रसीद के साथ उत्तर देकर लौटता है। संरक्षक जॉब के बाहर रहता है। जब कमांड अपने आप समाप्त होता है, संरक्षक जॉब में बचा हुआ सब समाप्त करता है, पुष्टि करता है कि कोई प्रोसेस नहीं बचा, और final.json लिखता है (reason exited, exitCode, cleanupConfirmed)। जिस id का इरादा पहले से है वह कभी दूसरा प्रोसेस शुरू नहीं करता: उत्तर उसकी वर्तमान स्थिति और duplicate true होता है। status केवल पढ़ता है: absent, launching, launch-failed (रसीद और जीवित संरक्षक के बिना इरादा), running, ended या lost (रसीद है, final.json नहीं है, और संरक्षक अब नहीं है), रिकॉर्ड और जॉब खुला है या नहीं के साथ। केवल Windows पर; अन्यत्र यह unsupported on this platform के साथ मना करता है। कमांड चलते समय संरक्षक हर 10 s (JLOCK_CUSTODY_BEAT_MS) पर beat.json को seq, at, lastOutputAt और outputBytes के साथ बदलता है; अगर 30 s (JLOCK_CUSTODY_SELF_FENCE_MS) तक उसे लिख नहीं पाता, तो वह खुद समूह को समाप्त करके final.json के बिना निकल जाता है। stop किसी भी प्रोसेस से चलता है, संरक्षक न होने पर भी: यह job को उसके नाम से खोलता है, उसे समाप्त करता है और शून्य प्रोसेस का इंतज़ार करता है (--timeout, डिफ़ॉल्ट 15 s, JLOCK_CUSTODY_STOP_MS), फिर final.json एक बार लिखता है (reason stopped, detail में --reason; या custodian-lost जब संरक्षक पहले ही नहीं था; by stop) और वही उत्तर देता है; पहले से मौजूद पुष्ट final.json जैसा है वैसा लौटाया जाता है। जब job मौजूद नहीं रहता, तो यह तभी पुष्टि करता है जब कमांड की जड़, पहचान से जाँची गई, मौजूद न हो; यह कभी pid से कुछ समाप्त नहीं करता और job को कभी दोबारा नहीं बनाता। उस प्रमाण के बिना यह cleanupConfirmed false और error में कारण देता है और 15 से बाहर निकलता है।",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start: --cwd फ़ोल्डर नहीं है: {path}",
   "error.custody_busy": "custody start: '{id}' का एक और start अभी चल रहा है",
   "error.custody_records": "custody रिकॉर्ड फ़ोल्डर का उपयोग नहीं हो सकता",
-  "error.unsupported_platform": "{cmd}: इस प्लेटफ़ॉर्म पर समर्थित नहीं (unsupported on this platform)"
+  "error.unsupported_platform": "{cmd}: इस प्लेटफ़ॉर्म पर समर्थित नहीं (unsupported on this platform)",
+  "help.opt.foreground.id": "custody में कमांड का id (A-Z a-z 0-9 . _ - में से 1 से 64); --custody के साथ यह <custody>/<id>/ में intent.json, receipt.json, beat.json और final.json लिखता है (mode foreground; आउटपुट यहीं रहता है) और कमांड को नामित जॉब में चलाता है, जिसे custody status पढ़ता है और custody stop ख़त्म करता है।",
+  "help.opt.foreground.custody": "custody रिकॉर्ड का फ़ोल्डर; केवल --id के साथ।",
+  "error.foreground_needs_both": "{cmd}: --id और --custody साथ में दिए जाते हैं",
+  "error.custody_duplicate": "{cmd}: custody id '{id}' का intent पहले से है; कुछ भी शुरू नहीं हुआ"
 }

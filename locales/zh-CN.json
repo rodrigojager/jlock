@@ -17,7 +17,6 @@
     "resource": "资源",
     "nested": "嵌套"
   },
-
   "help.tagline": "全机范围的文件、文件夹和名称锁",
   "help.intro": "jlock 让同一台机器上的程序、脚本、人和 AI 智能体轮流使用资源。它们在动一个文件、一个文件夹或任何有名字的资源（一个端口、桌面、一次部署）之前，先向 jlock 申请它的锁：同一时刻只有一个所有者（在 shared 模式下可以多个同时持有），其他的按到达顺序在队列中等待。已死亡进程留下的锁会自动恢复，会造成死锁的请求会被拒绝，jlock list 会显示谁持有什么。没有服务器：状态就是磁盘上的一个文件夹。",
   "help.usage_line": "用法：jlock <命令> [选项]",
@@ -50,7 +49,6 @@
   "help.meta.tag": "语言标签",
   "help.meta.mode": "模式",
   "help.opt.json": "输出一个带 result 字段的 JSON 对象，而不是文本行。",
-
   "help.exit.0": "成功",
   "help.exit.2": "用法错误：选项或值无效（消息会指明是哪个）",
   "help.exit.10": "忙：使用 --no-wait 时未获取到",
@@ -60,7 +58,6 @@
   "help.exit.14": "锁已丢失：被 unlock --force 解除，或已过期",
   "help.exit.20": "文件系统错误（权限、磁盘已满、文件被其他程序占用）；操作系统的消息会指明原因",
   "help.exit.130": "等待期间被中断（CTRL+C）；已放弃在队列中的位置",
-
   "help.cmd.acquire.summary": "获取键，并在命令结束后继续持有。",
   "help.cmd.acquire.usage": "<键...> [选项]",
   "help.cmd.acquire.desc": "按固定顺序获取给定的所有键，要么全部成功，要么一个也不取，因此两个以不同顺序请求相同键的调用永远不会互相阻塞。空闲的键立即授予；已被占用的键在公平队列中按到达顺序等待，没有时间限制，除非 --timeout 或 --no-wait 另有指定。每个键默认以 exclusive 模式获取，除非 --mode shared 或键自己的 @shared 另有指定：一个键的 shared 持有可以共存，exclusive 持有要等它们结束，而 shared 请求绝不会越过先前已在等待的 exclusive 请求。jlock 退出后锁依然存在：用 jlock heartbeat 续期，或使用会替你续期的 hold 或 run。再次请求你已持有的键会立即授予。",
@@ -76,14 +73,12 @@
   "help.opt.acquire.wait": "在队列中等待，直到键空闲。这是默认行为。",
   "help.opt.acquire.no_wait": "不等待：如果某个键已被占用，回答忙（退出码 10），并给出其持有者和你本应排到的位置。",
   "help.opt.acquire.timeout": "最多等待这么久，然后离开队列并放弃（退出码 11）。单位：ms, s, m, h, d。默认：无限制。",
-
   "help.cmd.run.summary": "在命令运行期间持有键，类似 flock(1)。",
   "help.cmd.run.usage": "<键...> [选项] -- <命令...>",
   "help.cmd.run.desc": "获取键（选项与 acquire 相同），运行 -- 之后写的命令，在其运行期间续期锁，并在其结束时释放。-- 之后的所有内容都属于该命令，即使是看起来像 jlock 选项的词。jlock 以该命令自身的退出码退出。如果锁丢失，命令会被停止，run 以 14 退出；如果 run 本身被杀死，锁会过期。",
   "help.cmd.run.examples": "# 本机同一时间只运行一个构建\njlock run D:\\proj\\dist -- cargo build --release\n# 等待 2 分钟后放弃\njlock run name:deploy-prod --timeout 2m -- ./deploy.sh",
   "help.exit.run.0": "键授予之后，该命令自身的退出码（成功时为 0）",
   "help.exit.run.14": "命令运行期间锁丢失；命令已被停止",
-
   "help.cmd.hold.summary": "持有键，直到被要求停止。",
   "help.cmd.hold.usage": "<键...> [选项]",
   "help.cmd.hold.desc": "获取键（选项与 acquire 相同），输出“已授予”，然后持续运行并续期锁。当它从标准输入读到一行 release、收到 CTRL+C 或被终止时，释放锁并以 0 退出；当其所有者用 jlock release 归还这些键时，它也以 0 结束。运行期间，操作系统也会锁住它的持有文件，因此进程一旦退出，锁会立即释放。如果锁被夺走，它输出“已丢失”并以 14 退出。使用 --detach 时，它立即回答并返回，由第二个进程在后台持有锁：这是智能体持有整个任务的文件最简单的方式。",
@@ -91,7 +86,6 @@
   "help.opt.hold.detach": "像 acquire 一样回答并返回（已授予、忙、超时，退出码相同），同时由第二个 jlock hold 在后台让锁保持有效，直到 jlock release、--ttl 到期或 unlock --force。对智能体来说只需一次调用，立即得到回答。",
   "help.opt.hold.release_on_eof": "标准输入关闭时结束：输入结束等同于一行 release，因此一个保持运行、在前台执行 hold 并握住其标准输入的程序，在它死亡的瞬间就释放锁（即使在 Windows 上，父进程死亡也不会结束子进程）。不能与 --detach 同用：后台进程没有标准输入。",
   "help.exit.hold.0": "已释放：在 release、CTRL+C 或终止之后",
-
   "help.cmd.release.summary": "归还键。",
   "help.cmd.release.usage": "[<键...>] [选项]",
   "help.cmd.release.desc": "归还所指定的键，前提是你是它们的所有者（否则以 13 退出）。不带键时释放该所有者持有的全部；带 --group 时，释放该所有者在该组中持有的全部。嵌套在被释放持有之内的持有随之结束。队列中的下一个获得每个键，而当没有人持有或等待某个键时，它的文件夹就会消失。",
@@ -101,7 +95,6 @@
   "help.cmd.release.examples": "jlock release src/a.ts --owner agent-7\n# agent-7 持有的全部锁\njlock release --owner agent-7\n# 整个组，无论每个锁的所有者是谁\njlock release --group task-42 --any-owner",
   "help.exit.release.0": "已释放（或没有可释放的）",
   "help.exit.release.13": "所列的某个键不属于你；其他键已释放",
-
   "help.cmd.renew.summary": "推迟你持有的锁的期限。",
   "help.cmd.renew.usage": "[<键...>] [选项]",
   "help.cmd.renew.desc": "把你持有的锁的期限（--ttl）改为现在加上 ttl，并更新它们的心跳：用于可能比所请求的 ttl 更久的工作。不带 --ttl 时，使用获取锁时的 ttl。不带键时，为所有者持有的全部锁续期；带 --group 时，为所有者在该组中持有的全部锁续期。续期期间锁从不松开，持有它的 hold 或 run 照常运行。已经过了期限的锁不能续期：它会过期（退出码 14），需要重新获取。",
@@ -119,12 +112,10 @@
   "help.cmd.heartbeat.examples": "jlock heartbeat src/a.ts --owner agent-7",
   "help.exit.heartbeat.0": "已续期",
   "help.exit.heartbeat.13": "已丢失：锁已不再属于你（被解除或已过期）",
-
   "help.cmd.status.summary": "显示谁持有某个键、谁在等待它。",
   "help.cmd.status.usage": "<键> [选项]",
   "help.cmd.status.desc": "显示键是空闲还是被持有，以及被谁持有：每个持有及其模式（shared 或 exclusive）、它所嵌套的持有、起始时间、最近一次心跳、组和用途。然后是队列，按顺序，附上每个等待者请求的模式，以及阻塞它的其他键：上层文件夹、其中的文件，或 *。途中发现的已死亡的锁会被过期。",
   "help.cmd.status.examples": "jlock status src/a.ts\njlock status name:port-3000 --json",
-
   "help.cmd.list.summary": "显示本机上被锁住的所有内容。",
   "help.cmd.list.usage": "[选项]",
   "help.cmd.list.desc": "列出每个被持有或有队列的键。它直接读取注册表文件夹本身，从不读取摘要，因此总是真实状态。",
@@ -135,7 +126,6 @@
   "help.opt.list.stale": "只显示已失效的锁和排队票（心跳早于 JLOCK_STALE_MS，或已超过 ttl）。",
   "help.opt.list.watch": "每秒重绘一次，直到 CTRL+C。",
   "help.cmd.list.examples": "jlock list\njlock list --under D:\\proj --watch\njlock list --owner agent-7 --json",
-
   "help.cmd.graph.summary": "显示谁在等待谁，以及是否有环。",
   "help.cmd.graph.usage": "[选项]",
   "help.cmd.graph.desc": "每行是一个等待者、它在等待谁，以及通过哪个键，并标出双方的模式。环（A 等待 B，同时 B 等待 A）就是死锁；jlock 会拒绝会形成环的请求，因此环只会出现一瞬间。shared 持有以及所有者自己的家族（祖先、后代）永远不会产生一行；只要所有者的某个后代在等待，该所有者就在等待，所以回到某个等待者祖先的链也是环。",
@@ -144,7 +134,6 @@
   "help.cmd.resources.usage": "[选项]",
   "help.cmd.resources.desc": "列出已注册的资源：内置的（desktop、clipboard、port:<n>、machine...）和你自己的（来自注册表文件夹中的 resources.json），每个都附有请求未指定模式时所取的模式及其说明。名称不在列表中的 resource: 键会被拒绝，并给出最接近的名称作为建议，因此拼写错误永远不会变成另一个资源。资源只与同一资源和同一参数冲突，永远不会与路径或 name: 键冲突。",
   "help.cmd.resources.examples": "jlock resources\njlock resources --json",
-
   "help.cmd.unlock.summary": "解除别人的锁（需要 --force）。",
   "help.cmd.unlock.usage": "(<键...> | --owner <id> | --group <组>) --force [选项]",
   "help.cmd.unlock.desc": "用于紧急情况：无论所有者是谁，都会强行破坏所指定的锁，并在日志中记录是谁强制的以及原因。所有者的 hold 或 run 会在下一次心跳时发现并以 14 停止，嵌套在被破坏持有之内的持有随之结束，队列中的下一个获得该键。要归还你自己的锁，请使用 release。",
@@ -156,23 +145,19 @@
   "help.cmd.unlock.examples": "jlock unlock D:\\proj\\src --force --reason \"agent hung\"\njlock unlock --owner agent-3 --force",
   "help.exit.unlock.0": "完成（没有可解除的锁时也是）",
   "help.exit.unlock.2": "用法错误，或缺少 --force",
-
   "help.cmd.gc.summary": "立即清理：使已失效的锁过期，删除空文件夹。",
   "help.cmd.gc.usage": "[选项]",
   "help.cmd.gc.desc": "立即执行全局清扫：使所有者已退出的锁和排队票过期，删除残留文件，删除空的键文件夹，轮转日志，重写 index.json，并输出删除了什么。每个命令都已经在做这件事，最多每 JLOCK_SWEEP_MS 一次。",
   "help.cmd.gc.examples": "jlock gc",
-
   "help.cmd.help.summary": "说明 jlock，或其中一个命令。",
   "help.cmd.help.usage": "[<命令>]",
   "help.cmd.help.desc": "不带命令：说明 jlock 是什么并列出命令。带命令：其选项（含默认值和示例）以及退出码。jlock <命令> --help 显示同一页面。",
   "help.cmd.help.examples": "jlock help\njlock help acquire\njlock --lang pt-BR help run",
   "help.exit.help.2": "没有这个命令（会提示最接近的名称）",
-
   "help.cmd.about.summary": "jlock 的作者，以及在哪里找到它。",
   "help.cmd.about.usage": "[选项]",
   "help.cmd.about.desc": "输出版本、作者及其 GitHub 和 LinkedIn、仓库、许可证以及文档链接。它不使用网络。",
   "help.cmd.about.examples": "jlock about\njlock about --json",
-
   "about.what": "全机范围的文件、文件夹和名称锁：公平队列、回收已退出进程留下的锁、死锁检测、无需服务器。",
   "about.author": "作者",
   "about.repository": "仓库",
@@ -180,13 +165,11 @@
   "about.usage": "用法",
   "about.roadmap": "路线图",
   "about.footer": "jlock 作者 {author} · {github} · {linkedin}",
-
   "tip.busy": "提示：jlock status {key} 显示谁持有它以及队列；去掉 --no-wait 即可排队等候",
   "tip.timeout": "提示：用更大的 --timeout 多等一会儿，或用 jlock status {key} 查看谁持有它",
   "tip.deadlock": "提示：释放你持有的锁后重新请求，或在一次 acquire 中获取所有键",
   "tip.not_owner": "提示：该锁属于 {owner}；使用 --owner {owner}，或用 jlock unlock --force 解除它",
   "tip.lost": "提示：有人解除了你在 {key} 上的锁或使其过期；请停止修改它，检查 jlock status {key}，再用 jlock acquire 重新获取",
-
   "help.cmd.update.summary": "用 jlock 的最新发布版覆盖当前版本。",
   "help.cmd.update.usage": "[选项]",
   "help.cmd.update.desc": "向 GitHub 查询最新发布版（或使用指定的版本），下载适用于本系统的压缩包，用该发布版的 SHA256SUMS 校验它，用新的 jlock 替换正在运行的这个，并运行一次以确认其版本；若失败，则恢复旧版本。它使用系统的 curl（Windows 上没有 curl 时使用 PowerShell）。这是唯一使用网络的命令，并且只在你运行它时才会联网。",
@@ -196,7 +179,6 @@
   "help.meta.version": "版本",
   "help.exit.update.0": "已更新、已是最新，或（使用 --check 时）已比较",
   "help.exit.update.20": "未找到发布版、下载或校验失败，或无法写入文件夹；消息会指明原因",
-
   "update.current": "当前版本：  {version}",
   "update.latest": "最新发布版：{version}",
   "update.available": "有可用更新：jlock update 会安装它",
@@ -216,14 +198,12 @@
   "update.restore_failed": "新的 jlock 无法工作，且无法在 {path} 恢复旧版本；请用 install.sh 或 install.ps1 重新安装",
   "update.no_exe": "无法确定本 jlock 所在位置",
   "update.bad_version": "无效的版本 '{version}'（请使用 v0.2.0 这样的格式）",
-
   "help.cmd.doctor.summary": "检查本机是否已准备好使用锁。",
   "help.cmd.doctor.usage": "[选项]",
   "help.cmd.doctor.desc": "按顺序检查：版本和正在运行的可执行文件；注册表文件夹（JLOCK_HOME）、其来源以及它是否为可写文件夹；协议所依赖的三个文件操作（create_new、rename、remove）在该文件夹中是否可用；hold 和 run 使用的操作系统锁；文件系统；JLOCK_* 变量；本 jlock 是否是 PATH 中的第一个；注册表当前的内容；以及 update 所用的 curl。每行显示 正常、警告 或 失败，以及如何修复。它只给出建议：从不更改任何东西，它写入的文件只有自己的临时文件，并在结束前删除。",
   "help.cmd.doctor.examples": "jlock doctor\njlock doctor --json",
   "help.exit.doctor.0": "没有检查失败（警告不影响退出码）",
   "help.exit.doctor.20": "至少有一项检查失败",
-
   "doctor.name.version": "版本",
   "doctor.name.home": "注册表文件夹",
   "doctor.name.primitives": "基本操作",
@@ -282,7 +262,6 @@
   "doctor.curl_missing_fix": "用你的包管理器安装 curl；jlock 的其他部分都不需要它",
   "doctor.skipped": "未检查：注册表文件夹不可用",
   "doctor.skipped_fix": "先修复注册表文件夹（见上文）",
-
   "acquire.granted": "已授予 {key}",
   "acquire.busy": "忙 {key}：持有者 {owner}{via}（位次 {position}）",
   "acquire.timeout": "超时 {key}：持有者 {owner}{via}（位次 {position}）",
@@ -294,23 +273,18 @@
   "acquire.nested": " (嵌套于 {owner})",
   "acquire.and_others_one": " 及另外 {n} 个",
   "acquire.and_others_other": " 及另外 {n} 个",
-
   "result.released": "已释放 {key}",
   "result.lost": "已丢失 {key}",
-
   "heartbeat.renewed": "已续期 {key}",
   "renew.until": "已续期 {key}，至 {until}",
   "renew.not_owner": "非所有者 {key}：持有者为 {holder}",
   "renew.not_locked": "非所有者 {key}（未被锁定）",
   "renew.nothing": "没有可续期的",
-
   "release.not_owner": "非所有者 {key}：持有者为 {holder}",
   "release.not_locked": "非所有者 {key}（未被锁定）",
   "release.nothing": "没有可释放的",
-
   "unlock.forced": "已强制解除 {key}（原所有者 {owner}）",
   "unlock.nothing": "没有可强制解除的",
-
   "status.held": "已持有 {key}",
   "status.free": "空闲 {key}",
   "status.by": "持有者 {owner}（{mode}），自 {since} 起（{ago} 前）",
@@ -331,7 +305,6 @@
   "status.why_above": "原因：文件夹上的锁涵盖其中的所有内容，因此此键上层一个被持有的文件夹会阻塞它",
   "status.why_inside": "原因：只有当文件夹中没有任何内容被锁住时才能获取该文件夹，因此其中的这些键会阻塞它",
   "status.why_all": "原因：* 与所有键冲突",
-
   "list.nothing": "没有任何锁",
   "list.col_key": "键",
   "list.col_mode": "模式",
@@ -352,7 +325,6 @@
   "list.legend_dead": "(失效) 心跳已停止且无人持有操作系统锁：它将被过期",
   "list.legend_late": "(延迟) 心跳延迟，但持有该锁的进程仍存活（操作系统锁仍被持有）",
   "list.legend_nested": "(嵌套) 嵌套在所有者祖先的持有之内的持有：它在那个持有结束时一并结束",
-
   "graph.no_waiters": "没有等待者",
   "graph.edge_held": "{from} -> {to}  （{key} 由 {holder} 以 {to_mode} 模式持有；想要 {mode}）",
   "graph.edge_queued": "{from} -> {to}  （{key} 排在 {holder} 之后，{to_mode}；想要 {mode}）",
@@ -370,19 +342,16 @@
   "resource.machine": "整台机器：exclusive 表示要它保持安静（基准测试、计时测试）；shared 表示有任务给它加负载",
   "resource.network": "网络链路（大型下载或上传、对网络敏感的测试）",
   "resource.port": "本机的一个 TCP 或 UDP 端口，按编号指定（resource:port:8080）",
-
   "gc.expired_locks": "已过期的锁",
   "gc.expired_tickets": "已过期的排队票",
   "gc.broken_consumed": "已处理的 broken/",
   "gc.folders_removed": "已删除的文件夹",
   "gc.log_bytes": "日志字节数",
   "gc.error": "错误：{error}",
-
   "warn.bad_ms": "忽略 {name}={value}（需要正数的 ms 值）",
   "warn.stale_vs_heartbeat": "JLOCK_STALE_MS（{stale}）应远大于 JLOCK_HEARTBEAT_MS（{heartbeat}）",
   "warn.resources_file": "忽略 {path}：{error}",
   "warn.resources_entry": "忽略 resources.json 中的资源 '{name}'：{why}",
-
   "error.missing_command": "缺少命令",
   "error.unknown_command": "未知命令 '{cmd}'。命令：{list}",
   "error.unknown_command_near": "未知命令 '{cmd}'；你是想用 '{near}' 吗？命令：{list}",
@@ -432,9 +401,8 @@
   "error.under_path": "--under 需要一个路径",
   "error.no_localappdata": "未设置 LOCALAPPDATA；请设置 JLOCK_HOME",
   "error.no_home": "未设置 HOME；请设置 JLOCK_HOME",
-
   "help.cmd.exec.summary": "Run a foreground command in a private process tree, without taking locks.",
-  "help.cmd.exec.usage": "[--timeout <time>] -- <command...>",
+  "help.cmd.exec.usage": "[--timeout <time>] [--id <id> --custody <path>] -- <command...>",
   "help.cmd.exec.desc": "Runs the command without taking any lock. --timeout bounds its runtime (default: no limit); exit 124 means timed out. Before returning, stops remaining descendants, even after a successful wrapper exits. Windows uses a private kill-on-close Job Object, assigned before the child starts. Unix uses a private process group; deliberately detached sessions and remote services are outside its scope. Do not use this command to launch background services.",
   "help.cmd.exec.examples": "jlock exec --timeout 10m -- cargo test",
   "help.opt.run.command_timeout": "Limit command runtime after it starts; stop its private process tree before returning (exit 124). Units: ms, s, m, h, d. Default: no limit. Lock-queue timeout is separate.",
@@ -459,7 +427,6 @@
   "error.process_extra": "process：多余的参数 '{arg}'",
   "error.process_needs_pid": "process inspect 需要 --pid",
   "error.bad_pid": "无效的 pid '{value}'（应为正整数）",
-
   "help.cmd.custody.summary": "在命名作业中分离运行命令，并留下持久记录。",
   "help.cmd.custody.usage": "start|status|stop --id <id> --custody <路径> [选项] [-- <command...>]",
   "help.cmd.custody.desc": "start 在任何进程存在之前把 intent.json 写入 <custody>/<id>/，然后启动一个分离的看管进程（就是这个 jlock）。看管进程创建命名作业 Local\\jlock-custody-<hash>-<id>（关闭即终止，不允许脱离作业），以挂起方式创建命令并把输出和错误写入 output.log，把它放进作业，写入 receipt.json，然后才让它运行；start 随即以状态 running 和回执作答并返回。看管进程留在作业之外。命令自行结束时，看管进程终止它留在作业里的一切，确认没有进程残留，并写入 final.json（reason exited、exitCode、cleanupConfirmed）。已有意图的 id 绝不会启动第二个进程：回答是它的当前状态并带 duplicate true。status 只读：absent、launching、launch-failed（有意图、无回执且无存活的看管进程）、running、ended 或 lost（有回执、无 final.json，且看管进程已不存在），并附带各记录以及作业是否打开。仅限 Windows；其他平台以 unsupported on this platform 拒绝。 命令运行期间，看管进程每 10 秒（JLOCK_CUSTODY_BEAT_MS）用 seq、at、lastOutputAt 和 outputBytes 替换 beat.json；若 30 秒（JLOCK_CUSTODY_SELF_FENCE_MS）内都写不了，它会自行结束作业并在没有 final.json 的情况下退出。 stop 可以从任何进程执行，即使看管进程已不在：按名称打开 job，结束它并等待进程数为零（--timeout，默认 15 s，JLOCK_CUSTODY_STOP_MS），然后只写一次 final.json（reason stopped，--reason 记入 detail；若看管进程已不在则为 custodian-lost；by stop）并输出它；已存在的已确认 final.json 原样输出。job 已不存在时，只有在按身份核对命令的根进程确已不在时才确认；从不按 pid 结束任何进程，也从不重新创建 job。没有这一证明时，回答 cleanupConfirmed false，原因写在 error 中，退出码 15。",
@@ -485,5 +452,9 @@
   "error.custody_bad_cwd": "custody start：--cwd 不是文件夹：{path}",
   "error.custody_busy": "custody start：'{id}' 的另一次 start 仍在进行",
   "error.custody_records": "无法使用看管记录文件夹",
-  "error.unsupported_platform": "{cmd}：此平台不支持（unsupported on this platform）"
+  "error.unsupported_platform": "{cmd}：此平台不支持（unsupported on this platform）",
+  "help.opt.foreground.id": "命令在看管中的 id（1 到 64 个 A-Z a-z 0-9 . _ - 字符）；与 --custody 一起使用时，在 <custody>/<id>/ 写入 intent.json、receipt.json、beat.json 和 final.json（mode foreground；输出仍在此处），并在命名作业中运行，custody status 可读取，custody stop 可结束。",
+  "help.opt.foreground.custody": "看管记录所在的文件夹；只能与 --id 一起使用。",
+  "error.foreground_needs_both": "{cmd}：--id 和 --custody 必须一起使用",
+  "error.custody_duplicate": "{cmd}：看管 id '{id}' 已有 intent；未启动任何内容"
 }

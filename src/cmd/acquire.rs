@@ -40,6 +40,10 @@ pub struct AcquireOpts {
     pub detach: bool,
     /// `hold --release-on-eof`: the end of standard input counts as the line `release`.
     pub release_on_eof: bool,
+    /// `run --id`: the command's id in custody (with `custody_dir`).
+    pub custody_id: Option<String>,
+    /// `run --custody`: the folder of the custody records (with `custody_id`).
+    pub custody_dir: Option<String>,
 }
 
 /// One key asked for, in one mode.
@@ -66,6 +70,8 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
         json: false,
         detach: false,
         release_on_eof: false,
+        custody_id: None,
+        custody_dir: None,
     };
     let mut rest = Vec::new();
     while let Some(arg) = p.next() {
@@ -106,6 +112,8 @@ pub fn parse(args: Vec<String>, cmd: &str) -> Result<(AcquireOpts, Vec<String>),
                 "total-timeout" if cmd == "run" => {
                     opts.total_timeout = Some(parse_duration(&p.value(&f)?)?)
                 }
+                "id" if cmd == "run" => opts.custody_id = Some(p.value(&f)?),
+                "custody" if cmd == "run" => opts.custody_dir = Some(p.value(&f)?),
                 "json" => opts.json = true,
                 "detach" => opts.detach = true,
                 "release-on-eof" => opts.release_on_eof = true,
