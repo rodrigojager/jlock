@@ -140,6 +140,25 @@ pub const COMMANDS: &[Command] = &[
         see: &["run"],
     },
     Command {
+        name: "custody",
+        group: TAKE,
+        opts: &[
+            opt("id", Some("id"), "help.opt.custody.id", "T04-exec-1"),
+            opt(
+                "custody",
+                Some("path"),
+                "help.opt.custody.custody",
+                "D:\\run\\custody",
+            ),
+            opt("cwd", Some("path"), "help.opt.custody.cwd", "D:\\proj"),
+            opt("limit", Some("time"), "help.opt.custody.limit", "2h"),
+            opt("quiet", Some("time"), "help.opt.custody.quiet", "10m"),
+            JSON,
+        ],
+        codes: &["0", "2", "20"],
+        see: &["exec", "process", "capabilities"],
+    },
+    Command {
         name: "hold",
         group: TAKE,
         opts: HOLD_OPTS,

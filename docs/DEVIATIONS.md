@@ -1,6 +1,7 @@
 # Deviations from `docs/PLAN.md`
 
-**Open deviations: none.** Entries 1–7 were written into the plan on 24/10/2026 as revision 4 (the paragraphs
+**Open deviations: 16** (choices the custody specification left open, to be written into it with the 0.5
+documentation). Entries 1–7 were written into the plan on 24/10/2026 as revision 4 (the paragraphs
 marked **[rev. 4]**), entries 8–13 the same day as revision 5 (section 14 and the **[rev. 5]** rows of section 6).
 The plan is the source of truth again; the entries stay as the record of what was decided during
 implementation and why.
@@ -162,3 +163,28 @@ checks, with the leader still unreaped. A live member, inspection failure, trunc
 continues to refuse cleanup. This prevents both an endless wait after ordinary success and an unsafe
 unlock when EPERM really means an unsignalable live command. Snapshot/state API semantics are in Apple's
 [`proc_info.c`](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/proc_info.c).
+
+## 16. `custody start` and `custody status`: points the custody specification leaves open (0.5, J02)
+
+The contract is `D:/jtasks/docs/PLAN-CUSTODIA-jlock.md` ("Registros de um comando", "Comandos").
+
+- **Telling `launching` from `launch-failed`.** `launch-failed` needs the custodian's identity before its
+  receipt exists, and the specification records that identity only in the receipt. Two private files in
+  `<custody>/<id>/` fill the gap, outside the contract: `launch.lock`, on which the first process holds an
+  OS lock (the `oslock` primitive) from before `intent.json` until it answers, and `custodian.json`
+  (`{ pid, identity }`), written by the first process right after starting the custodian (its handle keeps
+  the pid from being reused) and by the custodian itself. `status` answers `launching` while the lock is
+  held or the custodian of `custodian.json` is present (or unknown), and `launch-failed` otherwise.
+- **Ids `.` and `..`** match `^[A-Za-z0-9._-]{1,64}$` but would name the custody folder or its parent:
+  they are refused as bad ids (exit 2).
+- **A duplicate `start` exits 0** with the current state and `duplicate: true`, whatever that state is
+  (also `launch-failed`): the call succeeded in not starting anything. A first `start` whose custodian
+  fails before the receipt answers `launch-failed` with exit 20.
+- **Records published whole and once.** `receipt.json` and `final.json` are written to a private
+  temporary file and hard-linked under their name, which fails when the name exists (a file system
+  without hard links falls back to `create_new`); `intent.json` is `create_new` as specified.
+- **The job name** is made from the absolute custody folder without trailing separators; `status` uses the
+  `job` of the receipt when there is one, so a different spelling of the same folder still finds it.
+- **The custodian** is started with the arguments `custody start --id <id> --custody <dir> -- <argv>` and
+  the private variable `JLOCK_CUSTODY_KEEPER`, which the command never inherits; it reads the command from
+  `intent.json`. It waits for the job to empty for `JLOCK_CUSTODY_STOP_MS` after ending it.

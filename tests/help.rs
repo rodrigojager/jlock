@@ -115,7 +115,7 @@ fn capabilities_and_process_help_in_every_language() {
         "en", "pt-BR", "es", "fr", "de", "it", "zh-CN", "ja", "ru", "ar", "hi",
     ];
     for lang in langs {
-        for name in ["capabilities", "process"] {
+        for name in ["capabilities", "process", "custody"] {
             let done = env.run(&["--lang", lang, "help", name]);
             assert_eq!(done.code, 0, "{lang} help {name}: {}", done.stderr);
             assert!(
@@ -133,6 +133,17 @@ fn capabilities_and_process_help_in_every_language() {
         let process = env.run(&["--lang", lang, "help", "process"]).stdout;
         for want in ["inspect", "--pid", "--identity"] {
             assert!(process.contains(want), "{lang}: {want} in {process}");
+        }
+        let custody = env.run(&["--lang", lang, "help", "custody"]).stdout;
+        for want in [
+            "start|status",
+            "--id",
+            "--custody",
+            "--cwd",
+            "--limit",
+            "--quiet",
+        ] {
+            assert!(custody.contains(want), "{lang}: {want} in {custody}");
         }
     }
 }

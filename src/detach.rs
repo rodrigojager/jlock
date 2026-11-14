@@ -13,33 +13,43 @@ use std::time::Duration;
 
 /// Set in the environment of the second process.
 pub const CHILD: &str = "JLOCK_DETACHED_CHILD";
-/// What the second process prints once the keys are held (never shown to the user).
-const READY: &str = "\u{1e}jlock-ready";
+/// What the second process prints once the keys are held (never shown to the user). The custody
+/// keeper (`custody start`) answers its first process with the same line.
+pub const READY: &str = "\u{1e}jlock-ready";
 const EXIT_INTERRUPTED: i32 = 130;
 
 pub fn is_child() -> bool {
     std::env::var_os(CHILD).is_some()
 }
 
+/// Makes our own standard handles non-inheritable. Windows hands every inheritable handle to a new
+/// process: whoever reads our output (a terminal pipe, an agent's tool) would otherwise wait for
+/// its end until that process exits.
 #[cfg(windows)]
-fn spawn(cmd: &mut Command) -> std::io::Result<Child> {
-    use std::os::windows::process::CommandExt;
-    const DETACHED_PROCESS: u32 = 0x0000_0008;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+pub fn private_std_handles() {
     use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE_FLAG_INHERIT};
     use windows_sys::Win32::System::Console::{
         GetStdHandle, STD_ERROR_HANDLE, STD_INPUT_HANDLE, STD_OUTPUT_HANDLE,
     };
-    // Windows hands every inheritable handle to a new process. Our own standard handles must not
-    // go to the keeper: whoever reads our output (a terminal pipe, an agent's tool) would wait for
-    // its end until the keeper exits. This process ends right after, so nothing else needs them.
     for id in [STD_INPUT_HANDLE, STD_OUTPUT_HANDLE, STD_ERROR_HANDLE] {
         // SAFETY: changes a flag of our own standard handle; an invalid one is simply refused.
         unsafe {
             SetHandleInformation(GetStdHandle(id), HANDLE_FLAG_INHERIT, 0);
         }
     }
+}
+
+/// Starts `cmd` detached from our terminal and process group (and, when allowed, out of the
+/// caller's job), without our standard handles.
+#[cfg(windows)]
+pub fn spawn(cmd: &mut Command) -> std::io::Result<Child> {
+    use std::os::windows::process::CommandExt;
+    const DETACHED_PROCESS: u32 = 0x0000_0008;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
+    // Our own standard handles must not go to the keeper. This process ends right after, so
+    // nothing else needs them.
+    private_std_handles();
     // Out of the caller's job when the job allows it, so that a tool which closes its job when the
     // command returns does not take the lock keeper with it.
     cmd.creation_flags(DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB);
@@ -53,7 +63,7 @@ fn spawn(cmd: &mut Command) -> std::io::Result<Child> {
 }
 
 #[cfg(unix)]
-fn spawn(cmd: &mut Command) -> std::io::Result<Child> {
+pub fn spawn(cmd: &mut Command) -> std::io::Result<Child> {
     use std::os::unix::process::CommandExt;
     // SAFETY: setsid is async-signal-safe; it only gives the child its own session, so that the
     // terminal's CTRL+C and hang-up do not reach it.

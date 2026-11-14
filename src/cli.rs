@@ -214,6 +214,7 @@ fn dispatch(args: Vec<String>) -> CmdResult {
         "about" => crate::cmd::about::run(rest),
         "capabilities" => crate::cmd::capabilities::run(rest),
         "process" => crate::cmd::process::run(rest),
+        "custody" => crate::cmd::custody::run(rest),
         "doctor" => crate::cmd::doctor::run(rest),
         "update" => crate::cmd::update::run(rest),
         "status" => crate::cmd::status::run(rest),

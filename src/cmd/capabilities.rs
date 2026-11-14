@@ -5,8 +5,8 @@ use crate::cli::{print_json, usage, Arg, CmdResult, Parser, EXIT_OK};
 use crate::i18n::txt;
 use serde_json::{json, Value};
 
-/// The custody contract version (0 until custody is wired in).
-pub const CUSTODY: u32 = 0;
+/// The custody contract version (`jlock custody`); 0 where custody is not available.
+pub const CUSTODY: u32 = if cfg!(windows) { 1 } else { 0 };
 
 pub fn answer() -> Value {
     let inspect = u32::from(crate::process_identity::SUPPORTED);

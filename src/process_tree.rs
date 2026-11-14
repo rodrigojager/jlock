@@ -33,7 +33,7 @@ mod platform {
     // The child has never run: its primary thread cannot exit or its PID be recycled.
     // Use the standard library to create it, preserving Windows executable resolution,
     // batch-file escaping, Unicode arguments and standard-handle inheritance.
-    fn resume(child: &Child) -> io::Result<()> {
+    pub fn resume(child: &Child) -> io::Result<()> {
         unsafe {
             let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
             if snapshot == INVALID_HANDLE_VALUE {
@@ -309,4 +309,7 @@ mod platform {
     }
 }
 
+/// Lets a child created with `CREATE_SUSPENDED` run (custody resumes it once it is in its job).
+#[cfg(windows)]
+pub use platform::resume;
 pub use platform::Tree;

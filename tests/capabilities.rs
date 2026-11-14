@@ -15,12 +15,12 @@ fn capabilities_answer_the_contract() {
     let caps = &v["capabilities"];
     assert!(caps["custody"].is_u64(), "{v}");
     assert!(caps["processInspect"].is_u64(), "{v}");
-    // Custody is wired in by a later version of the contract; until then it is 0.
-    assert_eq!(caps["custody"], 0);
     if cfg!(windows) {
+        assert_eq!(caps["custody"], 1);
         assert_eq!(caps["processInspect"], 1);
         assert_eq!(v["custodyScope"], "job");
     } else {
+        assert_eq!(caps["custody"], 0);
         assert_eq!(caps["processInspect"], 0);
         assert_eq!(v["custodyScope"], "none");
     }

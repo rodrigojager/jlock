@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod conflict;
+mod custody;
 mod detach;
 mod expire;
 mod fetch;
@@ -30,6 +31,7 @@ mod cmd {
     pub mod about;
     pub mod acquire;
     pub mod capabilities;
+    pub mod custody;
     pub mod doctor;
     pub mod exec;
     pub mod gc;

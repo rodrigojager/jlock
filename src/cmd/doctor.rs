@@ -377,6 +377,7 @@ const KNOWN_VARS: &[&str] = &[
     "JLOCK_HINTS",
     "JLOCK_DEBUG",
     "JLOCK_UPDATE_BASE",
+    "JLOCK_CUSTODY_STOP_MS",
 ];
 
 /// (6) the `JLOCK_*` variables: the values in effect, and the combinations that do not work.
