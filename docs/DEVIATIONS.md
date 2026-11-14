@@ -205,3 +205,34 @@ The contract is `D:/jtasks/docs/PLAN-CUSTODIA-jlock.md` ("Registros de um comand
 - **The self-fence test cannot swap the command's folder for a file**: Windows refuses to rename a folder
   while a file in it is open, and the command itself holds `output.log` open. The test makes every beat
   fail in the same way instead, by turning `beat.json.tmp` (the beat's temporary name) into a folder.
+
+## 18. `custody stop`: points the custody specification leaves open (0.5, J04)
+
+- **The answer** is `final.json` itself when the end is confirmed (exit 0), so a second `stop` answers
+  the same record byte for byte and writes nothing. When it is not confirmed the answer is
+  `{ v, id, cleanupConfirmed: false, scope: "job", error, activeProcesses?, final? }` with **exit 15**
+  (`help.exit.custody.15`), a code of its own: `error` holds the reason in English, because `reason`
+  already names the kind of end in `final.json`.
+- **Who records a stop's end.** The custodian sees its command end as soon as the job is ended and would
+  record `exited` first. `stop` therefore publishes a private `stop.json` in `<custody>/<id>/` before it
+  touches the job, and the custodian leaves `final.json` to the stop while that file exists. A stop that
+  does not confirm removes `stop.json` again, so a command that ends later is still recorded by its
+  custodian. If the custodian recorded an end first, that record stays and is the answer.
+- **`reason`** is `custodian-lost` when the custodian of the receipt is proven gone (by identity) at the
+  moment the stop begins and no earlier stop had asked for the end; otherwise `stopped`. `detail` holds
+  the text of `--reason` in both cases. `exitCode` is left out: the stop does not own the command's
+  handle. `activeProcesses` is 0 on a confirmed stop, also when the job no longer exists (a job that is
+  gone holds nothing: kill-on-close ended its processes when its last handle closed).
+- **The empty job opened by name is checked against the root.** Even with zero processes in the job, the
+  stop confirms only if the root of the receipt is `absent` by identity afterwards; a root alive (or
+  unknown) outside the job means the job by that name is not the command's (an empty job made again),
+  and the stop answers `cleanupConfirmed: false`.
+- **Nothing to prove.** Without `intent.json` (nothing started with that id) or without `receipt.json`
+  (no root to check: a launch in progress or a launch that failed) the stop answers
+  `cleanupConfirmed: false` and touches nothing.
+- **`--reason` is required** (a usage error without it) and `--timeout` defaults to
+  `JLOCK_CUSTODY_STOP_MS`. The option table is shared by the three actions; options that do not apply
+  to an action are ignored by it, as `--limit` already was by `status`.
+- **The test-only fault** that makes the wait run out is `JLOCK_TEST_CUSTODY_STOP_FAULT=skip-terminate`
+  (the stop does not end the job, so its processes outlive the wait). It exists only in debug builds
+  (`cfg(debug_assertions)`, which `cargo test` builds); a release binary ignores it.

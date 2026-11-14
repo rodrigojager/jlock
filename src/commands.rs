@@ -153,9 +153,16 @@ pub const COMMANDS: &[Command] = &[
             opt("cwd", Some("path"), "help.opt.custody.cwd", "D:\\proj"),
             opt("limit", Some("time"), "help.opt.custody.limit", "2h"),
             opt("quiet", Some("time"), "help.opt.custody.quiet", "10m"),
+            opt(
+                "reason",
+                Some("text"),
+                "help.opt.custody.reason",
+                "\"user stopped\"",
+            ),
+            opt("timeout", Some("time"), "help.opt.custody.timeout", "15s"),
             JSON,
         ],
-        codes: &["0", "2", "20"],
+        codes: &["0", "2", "15", "20"],
         see: &["exec", "process", "capabilities"],
     },
     Command {

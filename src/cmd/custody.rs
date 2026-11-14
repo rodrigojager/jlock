@@ -1,5 +1,6 @@
-//! `jlock custody start` and `jlock custody status`: a command that keeps running after the call
-//! returns, in a named job, with durable records (`crate::custody`).
+//! `jlock custody start`, `status` and `stop`: a command that keeps running after the call
+//! returns, in a named job, with durable records (`crate::custody`), that any other process can end
+//! by the job's name and confirm (`custody::stop`).
 //!
 //! `start` (the first process): takes the launch lock, writes `intent.json` (an id that already has
 //! one never starts a second process: the answer is its state, with `duplicate: true`), starts the
@@ -36,19 +37,32 @@ struct Opts {
     quiet: Option<Duration>,
     json: bool,
     argv: Vec<String>,
+    /// `stop`: the caller's reason, recorded as `detail`.
+    reason: Option<String>,
+    /// `stop`: how long to wait for the job to be empty.
+    timeout: Option<Duration>,
 }
+
+/// `custody stop` could not confirm that nothing is left (`cleanupConfirmed: false`).
+pub const EXIT_UNCONFIRMED: i32 = 15;
+
+/// Test-only fault (debug builds): `custody stop` leaves the job alone, so its wait runs out.
+const STOP_FAULT_ENV: &str = "JLOCK_TEST_CUSTODY_STOP_FAULT";
 
 fn parse(args: Vec<String>) -> Result<Opts, Failure> {
     let mut p = Parser::new(args);
     let mut action: Option<String> = None;
     let (mut id, mut dir, mut cwd) = (None, None, None);
     let (mut limit, mut quiet) = (None, None);
+    let (mut reason, mut timeout) = (None, None);
     let mut json = false;
     let mut argv = Vec::new();
     let mut rest = false;
     while let Some(arg) = p.next() {
         match arg {
             Arg::Flag(f) if f == "json" => json = true,
+            Arg::Flag(f) if f == "reason" => reason = Some(p.value("reason")?),
+            Arg::Flag(f) if f == "timeout" => timeout = Some(parse_duration(&p.value("timeout")?)?),
             Arg::Flag(f) if f == "id" => id = Some(p.value("id")?),
             Arg::Flag(f) if f == "custody" => dir = Some(p.value("custody")?),
             Arg::Flag(f) if f == "cwd" => cwd = Some(p.value("cwd")?),
@@ -64,7 +78,7 @@ fn parse(args: Vec<String>) -> Result<Opts, Failure> {
         }
     }
     let action = match action.as_deref() {
-        Some(a @ ("start" | "status")) => a.to_string(),
+        Some(a @ ("start" | "status" | "stop")) => a.to_string(),
         Some(other) => return Err(usage(txt!("error.custody_action", action = other))),
         None => return Err(usage(txt!("error.custody_needs_action"))),
     };
@@ -82,8 +96,11 @@ fn parse(args: Vec<String>) -> Result<Opts, Failure> {
     if action == "start" && argv.is_empty() {
         return Err(usage(txt!("error.custody_needs_command")));
     }
-    if action == "status" && rest {
-        return Err(unexpected_rest("custody status"));
+    if action != "start" && rest {
+        return Err(unexpected_rest(&format!("custody {action}")));
+    }
+    if action == "stop" && reason.as_deref().is_none_or(|r| r.trim().is_empty()) {
+        return Err(usage(txt!("error.custody_needs_reason")));
     }
     Ok(Opts {
         action,
@@ -94,6 +111,8 @@ fn parse(args: Vec<String>) -> Result<Opts, Failure> {
         quiet,
         json,
         argv,
+        reason,
+        timeout,
     })
 }
 
@@ -105,6 +124,7 @@ pub fn run(args: Vec<String>) -> CmdResult {
     match o.action.as_str() {
         "start" if std::env::var_os(KEEPER_ENV).is_some() => keeper(&o),
         "start" => start(&o),
+        "stop" => stop(&o),
         _ => {
             show(&custody::status(&o.dir, &o.id), o.json);
             Ok(EXIT_OK)
@@ -152,6 +172,39 @@ fn show(v: &Value, json: bool) {
     if let Some(c) = fin["cleanupConfirmed"].as_bool() {
         println!("cleanup confirmed: {c}");
     }
+}
+
+/// `custody stop`: exit 0 with `cleanupConfirmed: true`, `EXIT_UNCONFIRMED` otherwise.
+fn stop(o: &Opts) -> CmdResult {
+    let timeout = o.timeout.unwrap_or_else(custody::stop_wait);
+    let skip_kill = cfg!(debug_assertions)
+        && std::env::var(STOP_FAULT_ENV).is_ok_and(|v| v.trim() == "skip-terminate");
+    let detail = o.reason.as_deref().unwrap_or("");
+    let done =
+        custody::stop(&o.dir, &o.id, detail, timeout, skip_kill).map_err(|e| records_error(&e))?;
+    if o.json {
+        print_json(&done.answer);
+    } else {
+        let v = &done.answer;
+        println!("cleanup confirmed: {}", done.confirmed);
+        if let Some(r) = v["reason"].as_str() {
+            println!("ended: {r}");
+        }
+        if let Some(by) = v["by"].as_str() {
+            println!("by: {by}");
+        }
+        if let Some(n) = v["activeProcesses"].as_u64() {
+            println!("active processes: {n}");
+        }
+        if let Some(e) = v["error"].as_str() {
+            println!("error: {e}");
+        }
+    }
+    Ok(if done.confirmed {
+        EXIT_OK
+    } else {
+        EXIT_UNCONFIRMED
+    })
 }
 
 fn records_error(e: &std::io::Error) -> Failure {
@@ -550,7 +603,11 @@ fn write_final(o: &Opts, rec: &Path, reason: &str, code: Option<i32>, left: std:
     if let Some(c) = code {
         fin["exitCode"] = json!(c);
     }
-    // `custody stop` may have recorded the end first; its record stays.
+    // A `custody stop` that asked for this end records it itself (`by: "stop"`); one that
+    // recorded the end first keeps its record.
+    if custody::stop_requested(rec) {
+        return;
+    }
     let _ = custody::publish_once(&rec.join(custody::FINAL), &fin);
 }
 

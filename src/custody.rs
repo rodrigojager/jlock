@@ -7,7 +7,8 @@
 //! `final.json` (once, by whoever confirmed the end), `output.log` (the command's output and
 //! errors). Two private files help tell `launching` from `launch-failed`: `launch.lock`, which the
 //! first process holds an OS lock on from before the intent until it answers, and
-//! `custodian.json`, the pid and identity of the keeper before its receipt exists.
+//! `custodian.json`, the pid and identity of the keeper before its receipt exists. A third,
+//! `stop.json`, is written by `custody stop` before it ends the job.
 //!
 //! Windows only: elsewhere every custody command refuses with "unsupported on this platform".
 #![cfg_attr(not(windows), allow(dead_code))]
@@ -23,6 +24,9 @@ pub const FINAL: &str = "final.json";
 pub const OUTPUT: &str = "output.log";
 pub const CUSTODIAN: &str = "custodian.json";
 pub const LAUNCH_LOCK: &str = "launch.lock";
+/// Private: written by `custody stop` before it ends the job, so the keeper, seeing its command
+/// end, leaves `final.json` to the stop.
+pub const STOP_REQUEST: &str = "stop.json";
 
 /// Set in the environment of the keeper (the detached `jlock` that holds the job); never passed on
 /// to the command.
@@ -192,6 +196,204 @@ pub fn status(dir: &Path, id: &str) -> Value {
     out
 }
 
+/// What `custody stop` found: the answer to print and whether the end is confirmed.
+pub struct Stopped {
+    pub confirmed: bool,
+    pub answer: Value,
+}
+
+/// `custody stop`: ends the command's job by its name and confirms that nothing is left, by one of
+/// two proofs only: (1) the job opened by name, ended, and zero processes active within `timeout`
+/// (with the root of the receipt not alive outside it); (2) no job by that name, and the root's
+/// identity checked as absent through an open handle. Nothing is ever ended by pid, and a job that
+/// is gone is never created again. A confirmed end is recorded once in `final.json` (`by: "stop"`);
+/// an existing confirmed `final.json` is answered as is, without touching anything.
+///
+/// `skip_kill` leaves the job alone (the test-only fault that makes the wait run out).
+pub fn stop(
+    dir: &Path,
+    id: &str,
+    detail: &str,
+    timeout: std::time::Duration,
+    skip_kill: bool,
+) -> io::Result<Stopped> {
+    use crate::process_identity::{inspect, Inspection};
+
+    let rec = dir.join(id);
+    let fin_path = rec.join(FINAL);
+    let recorded = read_json(&fin_path);
+    if let Some(f) = &recorded {
+        if f["cleanupConfirmed"] == true {
+            return Ok(Stopped {
+                confirmed: true,
+                answer: f.clone(),
+            });
+        }
+    }
+    let not_confirmed = |why: String, active: Option<u32>| {
+        let mut v = json!({
+            "v": 1,
+            "id": id,
+            "cleanupConfirmed": false,
+            "scope": "job",
+            "error": why,
+        });
+        if let Some(n) = active {
+            v["activeProcesses"] = json!(n);
+        }
+        if let Some(f) = &recorded {
+            v["final"] = f.clone();
+        }
+        Stopped {
+            confirmed: false,
+            answer: v,
+        }
+    };
+    if !rec.join(INTENT).exists() {
+        return Ok(not_confirmed(
+            "no intent.json: nothing was started with this id".into(),
+            None,
+        ));
+    }
+    let Some(receipt) = read_json(&rec.join(RECEIPT)) else {
+        let why = match status(dir, id)["state"].as_str() {
+            Some("launching") => "the launch is still in progress (no receipt yet)",
+            _ => "no receipt.json: there is no command to confirm",
+        };
+        return Ok(not_confirmed(why.into(), None));
+    };
+    let (Some(pid), Some(identity)) = (receipt["pid"].as_u64(), receipt["identity"].as_str())
+    else {
+        return Ok(not_confirmed(
+            "receipt.json has no pid and identity".into(),
+            None,
+        ));
+    };
+    let name = receipt["job"]
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| job_name(dir, id));
+    let marker = rec.join(STOP_REQUEST);
+    // Decided before the job is touched: once ended, a keeper that leaves on its own looks lost.
+    let reason = if !marker.exists()
+        && keeper_gone(&receipt["custodianPid"], &receipt["custodianIdentity"])
+    {
+        "custodian-lost"
+    } else {
+        "stopped"
+    };
+    // Tells the keeper that this end is ours to record, before the command can end.
+    let _ = publish_once(
+        &marker,
+        &json!({ "v": 1, "id": id, "detail": detail, "at": now() }),
+    );
+    let failed = |why: String, active: Option<u32>| {
+        // A stop that did not confirm leaves the end to the keeper again.
+        let _ = crate::fsx::remove_with_retry(&marker);
+        Ok(not_confirmed(why, active))
+    };
+    let root = |pid: u64| inspect(pid as u32, Some(identity));
+    match Job::open_control(&name) {
+        Ok(Some(job)) => {
+            if !skip_kill {
+                if let Err(e) = job.kill() {
+                    return failed(format!("cannot end the job {name}: {e}"), None);
+                }
+            }
+            let left = match job.wait_empty(timeout) {
+                Ok(n) => n,
+                Err(e) => return failed(format!("cannot query the job {name}: {e}"), None),
+            };
+            if left > 0 {
+                return failed(
+                    format!(
+                        "timed out after {} ms: {left} process(es) still active in the job",
+                        timeout.as_millis()
+                    ),
+                    Some(left),
+                );
+            }
+            match root(pid) {
+                Inspection::Absent { .. } => {}
+                Inspection::Present { .. } => {
+                    return failed(
+                        "the job opened by name is empty but the command's root is alive \
+                         outside it"
+                            .into(),
+                        Some(0),
+                    )
+                }
+                Inspection::Unknown { reason } => {
+                    return failed(
+                        format!("the job is empty but the command's root is unknown: {reason}"),
+                        Some(0),
+                    )
+                }
+            }
+        }
+        Ok(None) => match root(pid) {
+            Inspection::Absent { .. } => {}
+            Inspection::Present { .. } => {
+                return failed(
+                    "the job does not exist and the command's root is still running \
+                     (nothing is ended by pid)"
+                        .into(),
+                    None,
+                )
+            }
+            Inspection::Unknown { reason } => {
+                return failed(
+                    format!("the job does not exist and the command's root is unknown: {reason}"),
+                    None,
+                )
+            }
+        },
+        Err(e) => return failed(format!("cannot open the job {name}: {e}"), None),
+    }
+    let fin = json!({
+        "v": 1,
+        "id": id,
+        "reason": reason,
+        "detail": detail,
+        "cleanupConfirmed": true,
+        "scope": "job",
+        "activeProcesses": 0,
+        "endedAt": now(),
+        "by": "stop",
+    });
+    match publish_once(&fin_path, &fin) {
+        Ok(()) => Ok(Stopped {
+            confirmed: true,
+            answer: fin,
+        }),
+        Err(e) if crate::fsx::is_exists(&e) => match read_json(&fin_path) {
+            // Another stop, or the keeper, recorded a confirmed end first: that is the answer.
+            Some(f) if f["cleanupConfirmed"] == true => Ok(Stopped {
+                confirmed: true,
+                answer: f,
+            }),
+            // An unconfirmed end was recorded first; it stays, and this stop's proof is the
+            // answer.
+            other => {
+                let mut answer = fin;
+                if let Some(f) = other {
+                    answer["final"] = f;
+                }
+                Ok(Stopped {
+                    confirmed: true,
+                    answer,
+                })
+            }
+        },
+        Err(e) => Err(e),
+    }
+}
+
+/// Whether a `custody stop` has asked for the end: the keeper then leaves `final.json` to it.
+pub fn stop_requested(rec: &Path) -> bool {
+    rec.join(STOP_REQUEST).exists()
+}
+
 #[cfg(windows)]
 mod os {
     use std::io;
@@ -207,6 +409,8 @@ mod os {
 
     /// `JOB_OBJECT_QUERY` (winnt.h).
     const JOB_QUERY: u32 = 0x0004;
+    /// `JOB_OBJECT_TERMINATE` (winnt.h).
+    const JOB_TERMINATE: u32 = 0x0008;
 
     fn wide(text: &str) -> Vec<u16> {
         text.encode_utf16().chain(std::iter::once(0)).collect()
@@ -260,10 +464,20 @@ mod os {
 
         /// Opens the named job to query it; `None` when no such job exists.
         pub fn open_query(name: &str) -> io::Result<Option<Job>> {
+            Self::open(name, JOB_QUERY)
+        }
+
+        /// Opens the named job to end and query it; `None` when no such job exists. Never
+        /// creates one: a job that is gone stays gone.
+        pub fn open_control(name: &str) -> io::Result<Option<Job>> {
+            Self::open(name, JOB_QUERY | JOB_TERMINATE)
+        }
+
+        fn open(name: &str, access: u32) -> io::Result<Option<Job>> {
             let name = wide(name);
             // SAFETY: a NUL-terminated name that outlives the call; the handle is not inheritable.
             unsafe {
-                let h = OpenJobObjectW(JOB_QUERY, 0, name.as_ptr());
+                let h = OpenJobObjectW(access, 0, name.as_ptr());
                 if h.is_null() {
                     let code = GetLastError();
                     if code == ERROR_FILE_NOT_FOUND {
@@ -305,10 +519,28 @@ mod os {
         /// Ends every process in the job and waits, up to `timeout`, for none to be left. Returns
         /// how many are still active (0: cleanup confirmed).
         pub fn terminate(&self, timeout: Duration) -> io::Result<u32> {
+            // A refused end shows up as processes still active when the wait runs out.
+            let _ = self.kill();
+            self.wait_empty(timeout)
+        }
+
+        /// Ends every process in the job (`TerminateJobObject`), without waiting.
+        pub fn kill(&self) -> io::Result<()> {
             // SAFETY: the handle is open; an empty job is simply left empty.
-            unsafe {
-                TerminateJobObject(self.0, 1);
+            if unsafe { TerminateJobObject(self.0, 1) } == 0 {
+                let e = io::Error::last_os_error();
+                // An empty job may refuse; what counts is the count of processes left.
+                if self.active().is_ok_and(|n| n == 0) {
+                    return Ok(());
+                }
+                return Err(e);
             }
+            Ok(())
+        }
+
+        /// Waits, up to `timeout`, for no process to be left in the job. Returns how many are
+        /// still active (0: empty).
+        pub fn wait_empty(&self, timeout: Duration) -> io::Result<u32> {
             let deadline = Instant::now() + timeout;
             loop {
                 let n = self.active()?;
@@ -338,6 +570,15 @@ mod os {
             Err(unsupported())
         }
         pub fn open_query(_name: &str) -> io::Result<Option<Job>> {
+            Err(unsupported())
+        }
+        pub fn open_control(_name: &str) -> io::Result<Option<Job>> {
+            Err(unsupported())
+        }
+        pub fn kill(&self) -> io::Result<()> {
+            Err(unsupported())
+        }
+        pub fn wait_empty(&self, _timeout: Duration) -> io::Result<u32> {
             Err(unsupported())
         }
         pub fn active(&self) -> io::Result<u32> {

@@ -136,7 +136,10 @@ fn capabilities_and_process_help_in_every_language() {
         }
         let custody = env.run(&["--lang", lang, "help", "custody"]).stdout;
         for want in [
-            "start|status",
+            "start|status|stop",
+            "custody stop",
+            "--reason",
+            "--timeout",
             "--id",
             "--custody",
             "--cwd",
