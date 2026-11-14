@@ -216,6 +216,22 @@ pub const COMMANDS: &[Command] = &[
         see: &["acquire", "status"],
     },
     Command {
+        name: "process",
+        group: SEE,
+        opts: &[
+            opt("pid", Some("pid"), "help.opt.process.pid", "4242"),
+            opt(
+                "identity",
+                Some("token"),
+                "help.opt.process.identity",
+                "win:4242:133758291234567890",
+            ),
+            JSON,
+        ],
+        codes: &["0", "2"],
+        see: &["capabilities", "exec"],
+    },
+    Command {
         name: "unlock",
         group: EMERGENCY,
         opts: &[
@@ -277,6 +293,13 @@ pub const COMMANDS: &[Command] = &[
         opts: &[JSON],
         codes: &["0", "2"],
         see: &["help"],
+    },
+    Command {
+        name: "capabilities",
+        group: HELP,
+        opts: &[JSON],
+        codes: &["0", "2"],
+        see: &["about", "process"],
     },
 ];
 

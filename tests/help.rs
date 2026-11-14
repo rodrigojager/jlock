@@ -7,6 +7,11 @@ mod common;
 #[allow(dead_code)]
 mod commands;
 
+// The product's column widths (wide characters count two, combining marks none).
+#[path = "../src/i18n.rs"]
+#[allow(dead_code, unused_imports, unused_macros)]
+mod i18n;
+
 use common::Env;
 use std::time::Duration;
 
@@ -99,6 +104,35 @@ fn help_fits_in_100_columns() {
             for line in page.lines() {
                 assert!(line.chars().count() <= 100, "{lang}: {line}");
             }
+        }
+    }
+}
+
+#[test]
+fn capabilities_and_process_help_in_every_language() {
+    let env = Env::new("help-capabilities");
+    let langs = [
+        "en", "pt-BR", "es", "fr", "de", "it", "zh-CN", "ja", "ru", "ar", "hi",
+    ];
+    for lang in langs {
+        for name in ["capabilities", "process"] {
+            let done = env.run(&["--lang", lang, "help", name]);
+            assert_eq!(done.code, 0, "{lang} help {name}: {}", done.stderr);
+            assert!(
+                done.stdout.starts_with(&format!("jlock {name} - ")),
+                "{lang}: {}",
+                done.stdout
+            );
+            for raw in ["help.cmd.", "help.opt.", "help.meta.", "help.exit."] {
+                assert!(!done.stdout.contains(raw), "{lang}: raw key in {name}");
+            }
+            for line in done.stdout.lines() {
+                assert!(i18n::width(line) <= 100, "{lang} {name}: {line}");
+            }
+        }
+        let process = env.run(&["--lang", lang, "help", "process"]).stdout;
+        for want in ["inspect", "--pid", "--identity"] {
+            assert!(process.contains(want), "{lang}: {want} in {process}");
         }
     }
 }

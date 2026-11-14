@@ -441,5 +441,22 @@
   "help.exit.124": "command deadline reached; its supervised process tree was stopped",
   "error.exec_needs_command": "exec needs a command after '--'",
   "help.cmd.run.more": "Foreground commands only: remaining descendants are stopped before locks are released, including after a successful wrapper exits. Windows uses a suspended launch into a private kill-on-close Job Object, so killing the supervisor also stops its descendants. Unix uses a private process group; deliberately detached sessions, hard supervisor death and remote services are outside that guarantee. A cleanup error retains the locks and reports cleanup pending; it never silently runs without containment.",
-  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d."
+  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d.",
+  "help.cmd.capabilities.summary": "यह jlock क्या कर सकता है, टूल के लिए एक स्थिर उत्तर।",
+  "help.cmd.capabilities.usage": "[विकल्प]",
+  "help.cmd.capabilities.desc": "इस बाइनरी का संस्करण और अनुबंध संख्याएँ छापता है: capabilities.custody (कमांड की निगरानी), capabilities.processInspect (jlock process inspect) और custodyScope (Windows पर job, बाकी जगह none)। जब किसी अनुबंध में असंगत बदलाव होता है तो उसकी संख्या बढ़ती है; 0 का अर्थ है इस प्लेटफ़ॉर्म पर उपलब्ध नहीं। टूल किसी सुविधा पर निर्भर होने से पहले इसे --json से पढ़ते हैं।",
+  "help.cmd.capabilities.examples": "jlock capabilities\njlock capabilities --json",
+  "help.cmd.process.summary": "पूछता है कि कोई pid मौजूद है, अनुपस्थित है या अज्ञात, उसकी पहचान के साथ।",
+  "help.cmd.process.usage": "inspect --pid <pid> [--identity <टोकन>] [विकल्प]",
+  "help.cmd.process.desc": "inspect उत्तर देता है present (प्रक्रिया के उस अवतार के पहचान टोकन के साथ), absent (सिस्टम कहता है कि उस pid की कोई प्रक्रिया नहीं है, या वह समाप्त हो चुकी है) या unknown (पहुँच अस्वीकृत या कोई और त्रुटि, कारण के साथ; इसे कभी अनुपस्थित नहीं माना जाता)। --identity के साथ, किसी दूसरे अवतार की मौजूद प्रक्रिया पर उत्तर absent, कारण replaced होता है: pid दोबारा इस्तेमाल हुआ है और नई प्रक्रिया को कभी छुआ नहीं जाता। यह कभी कुछ नहीं रोकता। Windows के बाहर उत्तर unknown, कारण unsupported है।",
+  "help.cmd.process.examples": "jlock process inspect --pid 4242 --json\njlock process inspect --pid 4242 --identity win:4242:133758291234567890 --json",
+  "help.opt.process.pid": "जाँचने के लिए प्रक्रिया id।",
+  "help.opt.process.identity": "पिछले उत्तर का पहचान टोकन; दूसरा अवतार absent, कारण replaced देता है।",
+  "help.meta.pid": "pid",
+  "help.meta.token": "टोकन",
+  "error.process_needs_action": "process को एक क्रिया चाहिए: inspect",
+  "error.process_action": "process: अज्ञात क्रिया '{action}' (inspect इस्तेमाल करें)",
+  "error.process_extra": "process: अनपेक्षित तर्क '{arg}'",
+  "error.process_needs_pid": "process inspect को --pid चाहिए",
+  "error.bad_pid": "अमान्य pid '{value}' (एक धनात्मक संख्या)"
 }

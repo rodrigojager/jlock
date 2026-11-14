@@ -441,5 +441,22 @@
   "help.exit.124": "command deadline reached; its supervised process tree was stopped",
   "error.exec_needs_command": "exec needs a command after '--'",
   "help.cmd.run.more": "Foreground commands only: remaining descendants are stopped before locks are released, including after a successful wrapper exits. Windows uses a suspended launch into a private kill-on-close Job Object, so killing the supervisor also stops its descendants. Unix uses a private process group; deliberately detached sessions, hard supervisor death and remote services are outside that guarantee. A cleanup error retains the locks and reports cleanup pending; it never silently runs without containment.",
-  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d."
+  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d.",
+  "help.cmd.capabilities.summary": "ما يستطيع jlock هذا فعله، كإجابة ثابتة للأدوات.",
+  "help.cmd.capabilities.usage": "[خيارات]",
+  "help.cmd.capabilities.desc": "يطبع الإصدار وأرقام العقود لهذا البرنامج: capabilities.custody (حراسة الأوامر) و capabilities.processInspect (jlock process inspect) و custodyScope (job على Windows، و none في غيره). يرتفع الرقم حين يتغير عقده بشكل غير متوافق؛ و 0 يعني غير متاح على هذه المنصة. تقرؤه الأدوات بـ --json قبل الاعتماد على ميزة.",
+  "help.cmd.capabilities.examples": "jlock capabilities\njlock capabilities --json",
+  "help.cmd.process.summary": "يسأل هل pid موجود أو غائب أو مجهول، مع هويته.",
+  "help.cmd.process.usage": "inspect --pid <pid> [--identity <رمز>] [خيارات]",
+  "help.cmd.process.desc": "يجيب inspect بـ present (مع رمز هوية لتلك النسخة من العملية)، أو absent (يقول النظام إنه لا توجد عملية بهذا الـ pid، أو إنها انتهت)، أو unknown (رفض الوصول أو أي خطأ آخر، مع سبب؛ ولا يُعدّ غيابًا أبدًا). مع --identity، إذا كانت العملية الموجودة نسخة أخرى فالإجابة absent والسبب replaced: أُعيد استخدام الـ pid ولا تُمَسّ العملية الجديدة أبدًا. لا يوقف أي شيء. خارج Windows تكون الإجابة unknown والسبب unsupported.",
+  "help.cmd.process.examples": "jlock process inspect --pid 4242 --json\njlock process inspect --pid 4242 --identity win:4242:133758291234567890 --json",
+  "help.opt.process.pid": "معرّف العملية المراد فحصها.",
+  "help.opt.process.identity": "رمز الهوية من إجابة سابقة؛ النسخة الأخرى تجيب absent والسبب replaced.",
+  "help.meta.pid": "pid",
+  "help.meta.token": "رمز",
+  "error.process_needs_action": "يحتاج process إلى إجراء: inspect",
+  "error.process_action": "process: إجراء غير معروف '{action}' (استخدم inspect)",
+  "error.process_extra": "process: وسيط غير متوقع '{arg}'",
+  "error.process_needs_pid": "يحتاج process inspect إلى --pid",
+  "error.bad_pid": "pid غير صالح '{value}' (عدد موجب)"
 }

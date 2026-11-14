@@ -441,5 +441,22 @@
   "help.exit.124": "command deadline reached; its supervised process tree was stopped",
   "error.exec_needs_command": "exec needs a command after '--'",
   "help.cmd.run.more": "Foreground commands only: remaining descendants are stopped before locks are released, including after a successful wrapper exits. Windows uses a suspended launch into a private kill-on-close Job Object, so killing the supervisor also stops its descendants. Unix uses a private process group; deliberately detached sessions, hard supervisor death and remote services are outside that guarantee. A cleanup error retains the locks and reports cleanup pending; it never silently runs without containment.",
-  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d."
+  "help.opt.run.total_timeout": "Limit queue plus command runtime with one custodian; exit 124 after cleanup. Default: no limit. Units: ms, s, m, h, d.",
+  "help.cmd.capabilities.summary": "この jlock にできること。ツール向けの安定した答え。",
+  "help.cmd.capabilities.usage": "[オプション]",
+  "help.cmd.capabilities.desc": "このバイナリのバージョンと契約番号を表示する：capabilities.custody（コマンドの管理）、capabilities.processInspect（jlock process inspect）、custodyScope（Windows では job、その他では none）。契約が互換性なく変わると番号が上がる。0 はこのプラットフォームでは使えないことを示す。ツールは機能に頼る前に --json で読む。",
+  "help.cmd.capabilities.examples": "jlock capabilities\njlock capabilities --json",
+  "help.cmd.process.summary": "pid が存在するか、存在しないか、不明かを、その識別子とともに尋ねる。",
+  "help.cmd.process.usage": "inspect --pid <pid> [--identity <トークン>] [オプション]",
+  "help.cmd.process.desc": "inspect は present（そのプロセスのその実体の識別トークン付き）、absent（その pid のプロセスはないか、すでに終了したとシステムが言う）、unknown（アクセス拒否やその他のエラー、理由付き。不在とはみなさない）のいずれかを答える。--identity を付けると、別の実体のプロセスが存在する場合は absent、理由 replaced を答える：pid が再利用されており、新しいプロセスには一切触れない。何も停止しない。Windows 以外では unknown、理由 unsupported。",
+  "help.cmd.process.examples": "jlock process inspect --pid 4242 --json\njlock process inspect --pid 4242 --identity win:4242:133758291234567890 --json",
+  "help.opt.process.pid": "調べるプロセス id。",
+  "help.opt.process.identity": "以前の答えの識別トークン。別の実体なら absent、理由 replaced。",
+  "help.meta.pid": "pid",
+  "help.meta.token": "トークン",
+  "error.process_needs_action": "process にはアクションが必要：inspect",
+  "error.process_action": "process：不明なアクション '{action}'（inspect を使う）",
+  "error.process_extra": "process：余分な引数 '{arg}'",
+  "error.process_needs_pid": "process inspect には --pid が必要",
+  "error.bad_pid": "不正な pid '{value}'（正の整数）"
 }

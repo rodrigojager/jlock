@@ -212,6 +212,8 @@ fn dispatch(args: Vec<String>) -> CmdResult {
     }
     match cmd.as_str() {
         "about" => crate::cmd::about::run(rest),
+        "capabilities" => crate::cmd::capabilities::run(rest),
+        "process" => crate::cmd::process::run(rest),
         "doctor" => crate::cmd::doctor::run(rest),
         "update" => crate::cmd::update::run(rest),
         "status" => crate::cmd::status::run(rest),
